@@ -12,3 +12,8 @@ workspace = true
 
 [dependencies]
 emu-core.workspace = true
+url = { version = "2", features = ["serde"] }
+# DOM parser for Google's SDK repository manifest (crates/emu-android/src/catalog.rs). A simple
+# tree walk fits the manifest's shape (find-by-attribute, then read a few children) better than
+# quick-xml's streaming/serde model; no unsafe, no dependencies of its own.
+roxmltree = "0.21"

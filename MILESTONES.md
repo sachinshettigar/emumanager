@@ -24,7 +24,12 @@ Goal: an empty Tauri app that builds on all three OSes and a validation gate tha
       fixtures (ajv), markdownlint, `knip` all run green; `cargo nextest/deny/machete`, `typos`,
       `actionlint`, `gitleaks`, `lychee` skip with a message until `just setup` / CI installs them
 - [~] CI `ci.yml` (fast + 3-OS gate) and `schema.yml` written, `actionlint`-clean; awaiting the
-      first live push-triggered run on `main` to confirm green before ticking this
+      first live push-triggered run on `main` to confirm green before ticking this. Real bugs
+      the one run that did start found (SPDX license, wildcard path deps, unmaintained
+      advisories) are fixed and verified locally (commit `a97606e`); the next push-triggered run
+      (33884961977) never started — GitHub Actions billing/spending-limit block on the account,
+      not a workflow problem. Needs a human to fix billing in GitHub Settings → Billing & plans;
+      deprioritized for now in favor of local builds + M1.
 - [x] `emu-core` has no `tauri` dependency (`scripts/emu-core-no-tauri.sh`; CI job pending task 0009)
 - [x] `scripts/progress-check.mjs` passes (`just progress`)
 
@@ -37,7 +42,7 @@ a window with the 4 (empty) screens.
 
 Goal: from a machine with nothing, the app installs everything needed to make emulators.
 
-- [ ] Component catalog: resolve versions from Google's repository XML (behind `Downloader`)
+- [x] Component catalog: resolve versions from Google's repository XML (behind `Downloader`)
 - [ ] Download engine: queued, resumable, `pause`/`cancel`, SHA-256 verify, progress events
 - [ ] Bootstrap: fetch `cmdline-tools` + JRE into the data dir; run `sdkmanager` through it
 - [ ] Install `platform-tools`, `emulator`; accept licenses non-interactively

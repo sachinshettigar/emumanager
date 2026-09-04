@@ -7,6 +7,7 @@
 //! Field naming: Rust `snake_case` in storage, `camelCase` on the wire. Structs that cross IPC
 //! carry `#[serde(rename_all = "camelCase")]`.
 
+pub mod component;
 pub mod device;
 pub mod emulator;
 pub mod host;
@@ -15,6 +16,7 @@ pub mod job;
 pub mod plan;
 pub mod profile;
 
+pub use component::{Component, ComponentId, HostArch, HostOs};
 pub use device::{DeviceProfile, FormFactor, Screen};
 pub use emulator::{Emulator, EmulatorId, EmulatorSource, Graphics, Hardware, LiveState, RunState};
 pub use host::{

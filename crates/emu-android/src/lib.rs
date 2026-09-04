@@ -6,4 +6,6 @@
 
 #![forbid(unsafe_code)]
 
+pub mod catalog;
+
 pub use emu_core::{CoreError, Result};

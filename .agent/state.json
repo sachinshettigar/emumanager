@@ -2,9 +2,9 @@
   "$schema": "./state.schema.json",
   "project": "emumanager",
   "updated": "2026-09-05",
-  "currentMilestone": "M0",
+  "currentMilestone": "M1",
   "lastValidatedCommit": "33c446c",
-  "note": "Toolchains: rustc 1.98.1, pnpm 10.0.0, just 1.58. Tasks 0001-0008 done, 0009 in review (M0: 8/9 done). emu-core: models + ports + Provider + testing fakes (39 unit) + SQLite registry (sqlx 0.8, Registry::open + 1 integration test). src-tauri: typed IPC seam via tauri-specta — ping -> Pong/IpcError, src/lib/bindings.ts generated (just bindings, idempotent), 6 rust tests. Frontend: usePing() hook + Dashboard pong line, 11 web tests; `just dev` launches a window. `just validate` wired end to end and GREEN locally (run-all/report-all). lefthook hooks installed and active. CI (task 0009): ci.yml (fast ubuntu job + 3-OS gate job running just validate + unsigned tauri build), schema.yml (ajv), nightly-integration.yml (KVM + test-integration; e2e/gitleaks/lychee deferred), dependabot.yml, composite ./.github/actions/setup (added the previously-missing Linux Tauri build deps — libwebkit2gtk-4.1-dev etc. — plus actionlint/nextest/deny/machete/llvm-cov installs). actionlint clean locally on all 4 workflows. Awaiting the first live push-triggered run on main before flipping 0009 to done and M0 to done/M1. Deferred: specta::Type on emu-core DTOs (M1); .sqlx/ offline cache + query! macros (M3); gitleaks/lychee CI installers; e2e suite (M2+); branch protection (human action, noted in docs/playbooks/milestone-review.md).",
+  "note": "Toolchains: rustc 1.98.1, pnpm 10.0.0, just 1.58 (brew). Tasks 0001-0008 done, 0009 in review — blocked, not broken: the first live push-triggered CI run (33884961977, commit a97606e) never started because of a GitHub Actions billing/spending-limit block on the account, not a workflow bug (the earlier real bugs — SPDX license, wildcard path deps, unmaintained advisories — were found and fixed by an actual prior run and are verified locally). M0 stays in_progress until that's confirmed green; deprioritized per user direction to build locally and move on to M1. M1 started: task 0010 done (emu-android SDK component catalog — parses Google's real repository2-3.xml into Component{id,version,url,size_bytes,sha1} for cmdline-tools;latest/platform-tools/emulator, host-os/host-arch matched, real trimmed fixture, 10 new tests). Tasks 0011 (native ProcessRunner/Downloader/Clock/Fs in src-tauri), 0012 (toolchain bootstrap + InstalledState in emu-core), 0013 (Dependencies screen wired) scoped and queued as todo. Known open decision carried into 0011/0012: repo XML gives SHA-1, Downloader::fetch verifies SHA-256 — must reconcile, not silently drop verification. Also carried: spec's \"bundled JRE\" vs. modern cmdline-tools needing a system JDK — 0012 must record a decision, default recommendation is v1 requires system JDK with a clear error. emu-core: models + ports + Provider + testing fakes (39 unit) + SQLite registry (sqlx 0.8, Registry::open + 1 integration test) + Component/ComponentId/HostOs/HostArch (task 0010). src-tauri: typed IPC seam via tauri-specta — ping -> Pong/IpcError, src/lib/bindings.ts generated (just bindings, idempotent), 6 rust tests. Frontend: usePing() hook + Dashboard pong line, 11 web tests; `just dev` launches a window; `pnpm tauri build --debug` confirmed producing a working target/debug/emumanager binary that launches. `just validate` GREEN locally (run-all/report-all). lefthook hooks installed and active. Deferred: specta::Type on emu-core DTOs (add when 0013 crosses IPC with them); .sqlx/ offline cache + query! macros (M3); gitleaks/lychee CI installers; e2e suite (M2+); branch protection (human action, noted in docs/playbooks/milestone-review.md).",
   "coverageGate": {
     "rust": null,
     "web": null
@@ -106,6 +106,34 @@
       "milestone": "M0",
       "status": "review",
       "validate": "actionlint .github/workflows/*.yml"
+    },
+    {
+      "id": "0010",
+      "title": "emu-android: SDK component catalog from Google's repository XML",
+      "milestone": "M1",
+      "status": "done",
+      "validate": "cargo test -p emu-core -p emu-android --all-features"
+    },
+    {
+      "id": "0011",
+      "title": "src-tauri: real ProcessRunner + Downloader + Clock + Fs port impls",
+      "milestone": "M1",
+      "status": "todo",
+      "validate": "cargo test -p emumanager --all-features"
+    },
+    {
+      "id": "0012",
+      "title": "emu-core: toolchain manager — InstalledState scan + bootstrap sdkmanager",
+      "milestone": "M1",
+      "status": "todo",
+      "validate": "cargo test -p emu-core --all-features"
+    },
+    {
+      "id": "0013",
+      "title": "IPC + Dependencies screen wired to real toolchain state",
+      "milestone": "M1",
+      "status": "todo",
+      "validate": "just bindings && git diff --exit-code src/lib/bindings.ts"
     }
   ]
 }

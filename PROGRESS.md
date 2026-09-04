@@ -5,34 +5,42 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
-- **Milestone:** M0 — Skeleton & gate
-- **Phase:** Workspace, task runner, frontend shell, `emu-core` domain + registry, the typed
-  Rust↔TS IPC seam, `just validate`, git hooks, and CI workflows all stand up. Tasks `0001`–
-  `0008` done, `0009` (CI) **in review** — pending confirmation of the first live push-triggered
-  run on `main` (M0: 8/9 done). `just validate` is green locally; `just dev` launches a window;
-  lefthook hooks are active on this repo.
-- **CI (task 0009):** `ci.yml` (ubuntu-only `fast` job and a 3-OS `gate` job that runs
-  `just validate` and an unsigned `tauri build --debug`), `schema.yml` (ajv),
-  `nightly-integration.yml` (KVM + `test-integration`; `e2e`/issue-filing deferred),
-  `dependabot.yml`. The composite `.github/actions/setup` action added the **Linux Tauri build
-  deps that were missing** from the session-0 scaffold (`libwebkit2gtk-4.1-dev` etc. — without
-  them every rust step on `ubuntu-latest` would have failed, not just the tauri build), plus
-  installs for `actionlint`/`cargo-nextest`/`-deny`/`-machete`/`-llvm-cov`. `actionlint` verified
-  clean locally on all 4 workflow files. See <https://v2.tauri.app/start/prerequisites/#linux>.
-- **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 10.0.0, just 1.58.0.
+- **Milestone:** M1 — Toolchain manager: SDK from zero (M0 stays open only on the CI task, see
+  below; work moved on to M1 per user direction)
+- **Phase:** M0's app skeleton, `just validate` gate, and git hooks are solid and green locally.
+  M0 task `0009` (CI) is **blocked, not broken** — see below. M1 started: task `0010` (SDK
+  component catalog) **done**; `0011`–`0013` scoped and queued.
+- **CI (task 0009) status:** the workflows themselves are fine — a live run did catch and this
+  session fixed three real bugs (SPDX license field, wildcard path deps, unmaintained
+  advisories; commit `a97606e`, verified locally with the real tools). The *next* push-triggered
+  run (33884961977) never started at all: GitHub Actions reported "recent account payments have
+  failed or your spending limit needs to be increased" — a billing/spending-limit block on the
+  `sachinshettigar/emumanager` account, not a repo problem. Needs a human to fix it in GitHub
+  **Settings → Billing & plans**; nothing left to do here until then. Deprioritized per user
+  direction ("skip ci cd for now, build locally").
+- **Local build confirmed working** as an alternative to CI: `pnpm tauri build --debug` succeeds
+  and `target/debug/emumanager` launches (verified as a running process).
+- **M1 task 0010 (SDK component catalog) done:** `emu-core::model::component` adds
+  `Component`/`ComponentId`/`HostOs`/`HostArch`; `emu_android::catalog::parse()` reads Google's
+  real repository manifest and resolves `cmdline-tools;latest`/`platform-tools`/`emulator` for a
+  given host, picking the right archive by `<host-os>`/`<host-arch>`. Real fixture captured from
+  <https://dl.google.com/android/repository/repository2-3.xml> (trimmed, bytes verbatim), 10 new
+  tests, no network in tests.
+- **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (via brew;
+  was missing at the start of this session).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
-- **Last validated commit:** see `.agent/state.json` `lastValidatedCommit` (the task-0007 commit;
-  updated again once the 0009 CI run is confirmed green).
-- **Next action:** watch the `main`-push CI run; on green, flip task `0009` and milestone `M0`
-  to `done`, move `currentMilestone` to `M1`. Deferred: `#[derive(specta::Type)]` on the
-  `emu-core` DTOs → first M1 IPC command; `.sqlx/` offline cache + `query!` macros → M3;
-  `gitleaks`/`lychee` CI installers + e2e suite → later milestones; branch protection → a human
-  (or explicitly-directed) action per `docs/playbooks/milestone-review.md`.
+- **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
+- **Next action:** task `0011` (real `ProcessRunner`/`Downloader`/`Clock`/`Fs` port impls in
+  `src-tauri`) — carries forward two decisions to make there, not silently: the repo manifest's
+  SHA-1 checksums vs. `Downloader::fetch`'s SHA-256 verification, and (in `0012`) whether v1
+  bundles a JRE or requires a system JDK. Separately: once GitHub billing is fixed, re-watch the
+  next `ci.yml` push run, then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
-- [~] **M0** Skeleton & gate — tasks 0001–0008 done; 0009 (CI) in review, pending a live green run
-- [ ] M1 Toolchain manager: SDK from zero
+- [~] **M0** Skeleton & gate — tasks 0001–0008 done; 0009 (CI) blocked on a GitHub billing issue,
+      not code — see Current state
+- [~] M1 Toolchain manager: SDK from zero — task 0010 done, 0011–0013 queued
 - [ ] M2 Create & launch one emulator end-to-end
 - [ ] M3 Registry & reliable tracking
 - [ ] M4 Profiles: export / import / recreate
@@ -41,6 +49,43 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 4 (Claude Code) — M1 task 0010 (SDK component catalog)
+
+- **Task 0010 done** — the first real M1 behavior: turning Google's Android SDK repository
+  manifest into typed, host-matched components.
+- `crates/emu-core/src/model/component.rs` (new): `ComponentId` (`CmdlineTools`, `PlatformTools`,
+  `Emulator` — the 3 components M1 needs, with `.repo_path()` returning the exact `sdkmanager`
+  package path and `.m1_set()` in install order), `HostOs`/`HostArch` (tag strings matching the
+  manifest's `<host-os>`/`<host-arch>` exactly, plus `::current()` from `std::env::consts`),
+  `Component { id, version, url, size_bytes, sha1 }`.
+- `crates/emu-android/src/catalog.rs` (new): `parse(xml, os, arch) -> Result<Vec<Component>>` —
+  a `roxmltree` DOM walk (chosen over `quick-xml` — a tree fits "find by attribute, read a few
+  children" better than a streaming/serde model here) that finds each `<remotePackage>`, joins
+  its `<revision>` into a version string, and picks the `<archive>` whose `<host-os>`/optional
+  `<host-arch>` matches. Missing package or no matching archive → a real `CoreError`, not a
+  panic. Relative `<url>` values are resolved against `catalog::BASE_URL`.
+- **Real fixture, not hand-written:** `crates/emu-android/tests/fixtures/repository2-3.xml` is
+  Google's actual manifest (`curl`'d from <https://dl.google.com/android/repository/repository2-3.xml>,
+  captured 2026-09-05), trimmed to the 3 `<remotePackage>` elements this parser reads — every
+  byte inside them is verbatim. Real-data quirks this surfaced (documented in task 0010's Notes):
+  `<url>` is a bare filename, not absolute; `<host-arch>` is *absent*, not `"any"`, when one
+  archive covers every arch; `<revision>` doesn't always have `<micro>`; checksums are SHA-1
+  only; `emulator` has no `windows`/`aarch64` archive at all (used as the real "no match" test
+  case instead of inventing one).
+- 10 new tests (linux/x64, macOS/arm64 incl. arch-specific vs. arch-agnostic archives,
+  windows/x64, missing-package, missing-archive-for-host, malformed-XML), all fixture-driven, no
+  network. `cargo test -p emu-core -p emu-android --all-features`, `scripts/emu-core-no-tauri.sh`,
+  `just check-fast`, and full `just validate` all green.
+- Carried forward, not decided here (flagged in tasks `0011`/`0012`): the manifest's SHA-1 vs.
+  `Downloader::fetch`'s SHA-256 verification; whether v1 bundles a JRE (per `docs/spec.md` §5.1)
+  or requires a system JDK (modern `cmdline-tools` needs one either way).
+- Also this session: diagnosed the `0009` CI run that never started as a GitHub Actions
+  billing/spending-limit block (see Current state) — not a code fix, documented and parked.
+  Discarded an unrelated stray `dist/index.html` diff left over from an earlier local
+  `tauri build` in this working tree before committing.
+- Scoped and filed the rest of M1 as tasks `0011` (native port impls), `0012` (toolchain
+  bootstrap + `InstalledState`), `0013` (Dependencies screen wired to real state).
 
 ### 2026-09-05 — session 3 (Claude Code) — M0 task 0009 (CI workflows)
 
