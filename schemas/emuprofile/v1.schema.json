@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://emumanager.app/schemas/emuprofile/v1.schema.json",
+  "title": "EmuProfile v1",
+  "description": "Portable recipe for an Android emulator. Contains no SDK components and no disk images (ADR 0004).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "name", "platform", "device", "image", "hardware"],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "platform": { "const": "android" },
+    "description": { "type": "string", "maxLength": 500 },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile"],
+      "properties": {
+        "profile": {
+          "type": "string",
+          "description": "Google device profile id (e.g. pixel_6), or 'custom' when 'custom' is provided.",
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "custom": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["widthPx", "heightPx", "densityDpi"],
+          "properties": {
+            "widthPx": { "type": "integer", "minimum": 240, "maximum": 8192 },
+            "heightPx": { "type": "integer", "minimum": 320, "maximum": 8192 },
+            "densityDpi": { "type": "integer", "minimum": 120, "maximum": 640 },
+            "diagonalInches": { "type": "number", "minimum": 1, "maximum": 20 },
+            "ramMb": { "type": "integer", "minimum": 512, "maximum": 65536 }
+          }
+        }
+      }
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["api", "type", "abi"],
+      "properties": {
+        "api": { "type": "integer", "minimum": 21, "maximum": 100 },
+        "type": {
+          "enum": [
+            "default",
+            "google_apis",
+            "google_apis_playstore",
+            "android-wear",
+            "android-tv",
+            "android-automotive",
+            "android-automotive_playstore"
+          ]
+        },
+        "abi": { "enum": ["x86_64", "arm64-v8a"] }
+      }
+    },
+    "hardware": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ramMb", "storageGb"],
+      "properties": {
+        "ramMb": { "type": "integer", "minimum": 512, "maximum": 65536 },
+        "storageGb": { "type": "integer", "minimum": 2, "maximum": 256 },
+        "dpi": { "type": "integer", "minimum": 120, "maximum": 640 },
+        "graphics": { "enum": ["auto", "hardware", "swiftshader_indirect"], "default": "auto" },
+        "snapshots": { "type": "boolean", "default": true },
+        "coldBoot": { "type": "boolean", "default": false },
+        "deviceFrame": { "type": "boolean", "default": true }
+      }
+    },
+    "seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional. References APK filenames the importer must supply separately; never embedded binaries.",
+      "properties": {
+        "apks": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "\\.apk$" },
+          "maxItems": 50
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "properties": {
+            "locale": { "type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$" }
+          }
+        }
+      }
+    }
+  }
+}

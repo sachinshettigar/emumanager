@@ -1,0 +1,29 @@
+name: nightly-integration
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: enable KVM (linux)
+        if: runner.os == 'Linux'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0660", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
+      - name: integration (real sdkmanager/avdmanager)
+        run: just test-integration
+      - name: e2e
+        run: just e2e
+      - name: annotate on failure
+        if: failure()
+        run: echo "::warning::nightly integration/e2e failed on ${{ matrix.os }}"

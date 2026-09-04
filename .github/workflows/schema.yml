@@ -1,0 +1,17 @@
+name: schema
+
+on:
+  push:
+    paths: ["schemas/**", "scripts/validate-schema.mjs"]
+  pull_request:
+    paths: ["schemas/**", "scripts/validate-schema.mjs"]
+
+jobs:
+  emuprofile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm i --no-save ajv@8
+      - run: node scripts/validate-schema.mjs

@@ -1,0 +1,185 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #fbfbfa; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #1f1e1c; -webkit-font-smoothing: antialiased; }
+    a { color: #2f6db3; text-decoration: none; }
+    a:hover { color: #24547f; }
+  </style>
+</helmet>
+
+<div style="width:1280px;height:1000px;background:#fbfbfa;display:flex;overflow:hidden;border:1px solid #d9d8d3;border-radius:10px">
+
+  <aside style="width:204px;flex-shrink:0;background:#f2f1ee;border-right:1px solid #d9d8d3;padding:18px 0;display:flex;flex-direction:column;gap:3px">
+    <div style="padding:2px 18px 20px;display:flex;align-items:center;gap:10px">
+      <div style="width:26px;height:26px;border:1.5px solid #1f1e1c;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px">E</div>
+      <span style="font-weight:600;font-size:14px;letter-spacing:-0.01em">EmuManager</span>
+    </div>
+    <div style="margin:0 10px;padding:9px 10px;border-radius:7px;background:#fff;border:1px solid #d9d8d3;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:#1f1e1c">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="11" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="11" y="11" width="6" height="6" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div style="margin:0 10px;padding:9px 10px;border-radius:7px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:#6f6e69">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="6" y="3" width="8" height="14" rx="1.5"/><line x1="8.5" y1="14.5" x2="11.5" y2="14.5"/></svg>
+      Device catalog
+    </div>
+    <div style="margin:0 10px;padding:9px 10px;border-radius:7px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:#6f6e69">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9"/><path d="M6.5 9 10 12.5 13.5 9"/><path d="M4 16h12"/></svg>
+      Dependencies
+    </div>
+    <div style="margin:0 10px;padding:9px 10px;border-radius:7px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:#6f6e69">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 3h5l3 3v11H6z"/><path d="M11 3v3h3"/></svg>
+      Profiles
+    </div>
+    <div style="flex-grow:1"></div>
+    <div style="margin:0 10px;padding:9px 10px;border-radius:7px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:#6f6e69">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="3"/><path d="M10 3.5v2M10 14.5v2M3.5 10h2M14.5 10h2M5.3 5.3l1.4 1.4M13.3 13.3l1.4 1.4M14.7 5.3l-1.4 1.4M6.7 13.3l-1.4 1.4"/></svg>
+      Settings
+    </div>
+  </aside>
+
+  <div style="flex-grow:1;display:flex;flex-direction:column;min-width:0">
+
+    <div style="height:57px;flex-shrink:0;border-bottom:1px solid #d9d8d3;display:flex;align-items:center;justify-content:space-between;padding:0 22px">
+      <div style="font-size:16px;font-weight:600;letter-spacing:-0.01em">My emulators</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div style="display:flex;align-items:center;gap:8px;border:1px solid #d3d2cc;border-radius:6px;padding:7px 10px;background:#fff;width:210px;color:#9a9992;font-size:12.5px">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="9" cy="9" r="5"/><line x1="12.7" y1="12.7" x2="17" y2="17"/></svg>
+          Search emulators
+        </div>
+        <div style="background:#2f6db3;color:#fff;font-size:13px;font-weight:500;padding:9px 14px;border-radius:6px;display:flex;align-items:center;gap:7px">
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="10" y1="4" x2="10" y2="16"/><line x1="4" y1="10" x2="16" y2="10"/></svg>
+          Create emulator
+        </div>
+      </div>
+    </div>
+
+    <div style="flex-grow:1;padding:20px 22px;display:flex;flex-direction:column;gap:16px;min-height:0">
+
+      <div style="border:1px solid #d9d8d3;border-radius:8px;background:#fff;padding:11px 14px;display:flex;align-items:center;gap:14px;font-size:12.5px;color:#4b4a46;flex-wrap:wrap">
+        <span style="font-weight:600;color:#1f1e1c">Host</span>
+        <span>Windows 11 &middot; x64</span>
+        <span style="color:#d0cfc9">|</span>
+        <span style="display:flex;align-items:center;gap:6px">Accelerator: WHPX
+          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#2f8a5f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg>
+        </span>
+        <span style="color:#d0cfc9">|</span>
+        <span>Disk free: 214 GB</span>
+        <span style="color:#d0cfc9">|</span>
+        <span>RAM: 32 GB</span>
+        <span style="flex-grow:1"></span>
+        <span style="color:#2f6db3;display:flex;align-items:center;gap:5px">
+          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10a6 6 0 0 1 10-4.5M16 10a6 6 0 0 1-10 4.5"/><path d="M14 3v3h-3M6 17v-3h3"/></svg>
+          Re-scan host
+        </span>
+      </div>
+
+      <div style="border:1px solid #d9d8d3;border-radius:8px;background:#fff;overflow:hidden">
+        <div style="display:grid;grid-template-columns:1.7fr 1.2fr 1.5fr 1fr 0.9fr;gap:12px;padding:10px 16px;background:#f7f6f3;border-bottom:1px solid #e6e5df;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:#8a897f">
+          <div>Name</div><div>Device</div><div>API / image</div><div>State</div><div style="text-align:right">Actions</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.7fr 1.2fr 1.5fr 1fr 0.9fr;gap:12px;padding:12px 16px;border-bottom:1px solid #eeede8;align-items:center;font-size:12.5px">
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">Pixel 8 API 34</span><span style="font-size:10.5px;color:#9a9992">from profile &middot; qa-baseline</span></div>
+          <div style="color:#4b4a46">Pixel 8</div>
+          <div style="color:#4b4a46">API 34 &middot; Play Store &middot; x86_64</div>
+          <div style="display:flex;align-items:center;gap:7px"><span style="width:7px;height:7px;border-radius:50%;background:#2f8a5f;flex-shrink:0"></span><span style="font-weight:500">Running &middot; 00:12:41</span></div>
+          <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center">
+            <div style="border:1px solid #d3d2cc;border-radius:5px;padding:5px 9px;font-size:11.5px;font-weight:500;display:flex;align-items:center;gap:5px;color:#a3392f"><svg width="10" height="10" viewBox="0 0 20 20"><rect x="5" y="5" width="10" height="10" rx="1.5" fill="currentColor"/></svg>Stop</div>
+            <div style="border:1px solid #d3d2cc;border-radius:5px;padding:5px 8px;font-size:11.5px;color:#6f6e69">&middot;&middot;&middot;</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.7fr 1.2fr 1.5fr 1fr 0.9fr;gap:12px;padding:12px 16px;border-bottom:1px solid #eeede8;align-items:center;font-size:12.5px">
+          <div style="font-weight:600">Pixel Tablet</div>
+          <div style="color:#4b4a46">Pixel Tablet</div>
+          <div style="color:#4b4a46">API 34 &middot; Google APIs &middot; x86_64</div>
+          <div style="display:flex;align-items:center;gap:7px"><span style="width:7px;height:7px;border-radius:50%;background:#fff;border:1.5px solid #b9b8b1;flex-shrink:0"></span><span style="color:#8a897f">Stopped</span></div>
+          <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center">
+            <div style="border:1px solid #d3d2cc;border-radius:5px;padding:5px 9px;font-size:11.5px;font-weight:500;display:flex;align-items:center;gap:5px;color:#2f6db3"><svg width="11" height="11" viewBox="0 0 20 20"><path d="M7 5l9 5-9 5z" fill="currentColor"/></svg>Launch</div>
+            <div style="border:1px solid #d3d2cc;border-radius:5px;padding:5px 8px;font-size:11.5px;color:#6f6e69">&middot;&middot;&middot;</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.7fr 1.2fr 1.5fr 1fr 0.9fr;gap:12px;padding:12px 16px;border-bottom:1px solid #eeede8;align-items:center;font-size:12.5px">
+          <div style="font-weight:600">Pixel Fold</div>
+          <div style="color:#4b4a46">Pixel Fold</div>
+          <div style="color:#4b4a46">API 33 &middot; Play Store &middot; x86_64</div>
+          <div style="display:flex;align-items:center;gap:7px"><span style="width:7px;height:7px;border-radius:50%;background:#2f8a5f;flex-shrink:0"></span><span style="font-weight:500">Running &middot; 01:38:02</span></div>
+          <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center">
+            <div style="border:1px solid #d3d2cc;border-radius:5px;padding:5px 9px;font-size:11.5px;font-weight:500;display:flex;align-items:center;gap:5px;color:#a3392f"><svg width="10" height="10" viewBox="0 0 20 20"><rect x="5" y="5" width="10" height="10" rx="1.5" fill="currentColor"/></svg>Stop</div>
+            <div style="border:1px solid #d3d2cc;border-radius:5px;padding:5px 8px;font-size:11.5px;color:#6f6e69">&middot;&middot;&middot;</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.7fr 1.2fr 1.5fr 1fr 0.9fr;gap:12px;padding:12px 16px;border-bottom:1px solid #eeede8;align-items:center;font-size:12.5px">
+          <div style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600">Nexus 5X</span><span style="font-size:10.5px;color:#9a9992">imported &middot; legacy-regression</span></div>
+          <div style="color:#4b4a46">Nexus 5X</div>
+          <div style="color:#4b4a46">API 30 &middot; AOSP &middot; x86_64</div>
+          <div style="display:flex;align-items:center;gap:7px"><span style="width:7px;height:7px;border-radius:50%;background:#fff;border:1.5px solid #b9b8b1;flex-shrink:0"></span><span style="color:#8a897f">Stopped</span></div>
+          <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center">
+            <div style="border:1px solid #d3d2cc;border-radius:5px;padding:5px 9px;font-size:11.5px;font-weight:500;display:flex;align-items:center;gap:5px;color:#2f6db3"><svg width="11" height="11" viewBox="0 0 20 20"><path d="M7 5l9 5-9 5z" fill="currentColor"/></svg>Launch</div>
+            <div style="border:1px solid #d3d2cc;border-radius:5px;padding:5px 8px;font-size:11.5px;color:#6f6e69">&middot;&middot;&middot;</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.7fr 1.2fr 1.5fr 1fr 0.9fr;gap:12px;padding:12px 16px;align-items:center;font-size:12.5px">
+          <div style="font-weight:600">Wear Small Round</div>
+          <div style="color:#4b4a46">Wear OS Small Round</div>
+          <div style="color:#4b4a46">API 33 &middot; Wear &middot; x86_64</div>
+          <div style="display:flex;align-items:center;gap:7px"><span style="width:7px;height:7px;border-radius:50%;background:#fff;border:1.5px solid #b9b8b1;flex-shrink:0"></span><span style="color:#8a897f">Stopped</span></div>
+          <div style="display:flex;gap:6px;justify-content:flex-end;align-items:center">
+            <div style="border:1px solid #d3d2cc;border-radius:5px;padding:5px 9px;font-size:11.5px;font-weight:500;display:flex;align-items:center;gap:5px;color:#2f6db3"><svg width="11" height="11" viewBox="0 0 20 20"><path d="M7 5l9 5-9 5z" fill="currentColor"/></svg>Launch</div>
+            <div style="border:1px solid #d3d2cc;border-radius:5px;padding:5px 8px;font-size:11.5px;color:#6f6e69">&middot;&middot;&middot;</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:11.5px;color:#9a9992;margin-top:-4px">5 emulators &middot; 2 running &middot; disk used by AVDs: 42.5 GB</div>
+
+      <div style="display:grid;grid-template-columns:1.55fr 1fr;gap:16px;flex-grow:1;min-height:0">
+        <div style="border:1px solid #d9d8d3;border-radius:8px;background:#fff;display:flex;flex-direction:column;overflow:hidden">
+          <div style="padding:9px 14px;border-bottom:1px solid #e6e5df;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px">
+            <span style="width:7px;height:7px;border-radius:50%;background:#2f8a5f;display:inline-block"></span>
+            Console &mdash; Pixel 8 API 34
+          </div>
+          <div style="padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.75;color:#5c5b55;background:#fcfcfb;flex-grow:1">
+            emulator: Android emulator version 35.1.4.0<br>
+            emulator: found systemPath .../android-34/google_apis_playstore/x86_64<br>
+            emulator: added library vulkan-1<br>
+            emulator: Boot completed in 4123 ms<br>
+            adb: emulator-5554&nbsp;&nbsp;device<br>
+            <span style="color:#9a9992">&mdash; streaming &mdash;</span>
+          </div>
+        </div>
+
+        <div style="border:1px solid #d9d8d3;border-radius:8px;background:#fff;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:2px">Details</div>
+          <div style="display:flex;justify-content:space-between;gap:12px;font-size:11.5px"><span style="color:#8a897f">Device</span><span style="text-align:right;color:#3a3934">Pixel 8 &middot; Google</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;font-size:11.5px"><span style="color:#8a897f">Image</span><span style="text-align:right;color:#3a3934">android-34 &middot; play_store &middot; x86_64</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;font-size:11.5px"><span style="color:#8a897f">RAM / storage</span><span style="text-align:right;color:#3a3934">2048 MB &middot; 6 GB</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;font-size:11.5px"><span style="color:#8a897f">adb serial</span><span style="text-align:right;color:#3a3934">emulator-5554</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;font-size:11.5px"><span style="color:#8a897f">Snapshot</span><span style="text-align:right;color:#3a3934">default_boot &middot; 312 MB</span></div>
+          <div style="display:flex;justify-content:space-between;gap:12px;font-size:11.5px"><span style="color:#8a897f">Source profile</span><span style="text-align:right;color:#2f6db3">qa-baseline</span></div>
+          <div style="flex-grow:1"></div>
+          <div style="display:flex;gap:8px">
+            <div style="flex-grow:1;text-align:center;border:1px solid #d3d2cc;border-radius:6px;padding:8px;font-size:11.5px;font-weight:500">Open data folder</div>
+            <div style="flex-grow:1;text-align:center;border:1px solid #d3d2cc;border-radius:6px;padding:8px;font-size:11.5px;font-weight:500;color:#a3392f">Wipe data</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

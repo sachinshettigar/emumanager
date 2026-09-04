@@ -1,0 +1,29 @@
+{
+  "$schema": "./state.schema.json",
+  "project": "emumanager",
+  "updated": "2026-09-04",
+  "currentMilestone": "M0",
+  "lastValidatedCommit": null,
+  "coverageGate": { "rust": null, "web": null },
+  "milestones": {
+    "M0": { "title": "Skeleton & gate", "status": "in_progress" },
+    "M1": { "title": "Toolchain manager: SDK from zero", "status": "todo" },
+    "M2": { "title": "Create & launch one emulator end-to-end", "status": "todo" },
+    "M3": { "title": "Registry & reliable tracking", "status": "todo" },
+    "M4": { "title": "Profiles: export / import / recreate", "status": "todo" },
+    "M5": { "title": "Host readiness & elevated helper", "status": "todo" },
+    "M6": { "title": "Cross-platform hardening & packaging", "status": "todo" },
+    "M7": { "title": "Feature-complete v1.0", "status": "todo" }
+  },
+  "tasks": [
+    { "id": "0001", "title": "Cargo workspace skeleton", "milestone": "M0", "status": "todo", "validate": "cargo build --workspace" },
+    { "id": "0002", "title": "emu-core ports and models (no impls)", "milestone": "M0", "status": "todo", "validate": "cargo test -p emu-core" },
+    { "id": "0003", "title": "Vite + React + TS strict app shell with 4 routes", "milestone": "M0", "status": "todo", "validate": "pnpm -C . run typecheck && pnpm -C . run test" },
+    { "id": "0004", "title": "tauri-specta wired: ping command + generated bindings", "milestone": "M0", "status": "todo", "validate": "just bindings && git diff --exit-code src/lib/bindings.ts" },
+    { "id": "0005", "title": "sqlx + initial migration + committed .sqlx offline data", "milestone": "M0", "status": "todo", "validate": "cargo sqlx prepare --check --workspace" },
+    { "id": "0006", "title": "justfile + package.json script mirror + scripts/", "milestone": "M0", "status": "todo", "validate": "just --summary" },
+    { "id": "0007", "title": "just validate wired end to end (all static tools)", "milestone": "M0", "status": "todo", "validate": "just validate" },
+    { "id": "0008", "title": "lefthook hooks (pre-commit regen+fmt, pre-push validate)", "milestone": "M0", "status": "todo", "validate": "lefthook run pre-commit" },
+    { "id": "0009", "title": "CI: ci.yml matrix + schema.yml + emu-core-no-tauri check", "milestone": "M0", "status": "todo", "validate": "actionlint" }
+  ]
+}

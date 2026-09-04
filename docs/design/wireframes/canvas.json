@@ -1,0 +1,12 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1280, "h": 1000, "title": "1 - Dashboard / my emulators" },
+    { "file": "Create.dc.html", "x": 1360, "y": 0, "w": 1280, "h": 1000, "title": "2 - Create emulator" },
+    { "file": "Dependencies.dc.html", "x": 0, "y": 1120, "w": 1280, "h": 1000, "title": "3 - Dependencies & SDK" },
+    { "file": "Profiles.dc.html", "x": 1360, "y": 1120, "w": 1280, "h": 1000, "title": "4 - Profiles" }
+  ],
+  "annotations": [
+    { "id": "note-legend", "x": 0, "y": -164, "w": 620, "text": "EmuManager - low-fi wireframes (scope B: Android only, Windows / Linux / macOS)\n\nConventions: blue = primary action, green = running / installed, amber = needs attention, dashed = drop zone. All copy and numbers are placeholder. Sharing is recipe-only - a .emuprofile never carries SDK or image bytes; each machine resolves and downloads locally." }
+  ],
+  "launch": { "view": "canvas" }
+}

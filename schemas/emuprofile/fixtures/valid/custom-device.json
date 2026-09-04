@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "name": "Odd tablet",
+  "platform": "android",
+  "device": {
+    "profile": "custom",
+    "custom": { "widthPx": 2560, "heightPx": 1600, "densityDpi": 276, "diagonalInches": 10.95, "ramMb": 4096 }
+  },
+  "image": { "api": 34, "type": "google_apis", "abi": "arm64-v8a" },
+  "hardware": { "ramMb": 4096, "storageGb": 12 }
+}

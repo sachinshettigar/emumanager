@@ -1,0 +1,41 @@
+# Rust
+/target
+**/*.rs.bk
+
+# Node
+node_modules
+pnpm-debug.log*
+.pnpm-store
+
+# Vite / frontend build
+dist
+dist-ssr
+*.local
+
+# Tauri
+src-tauri/target
+src-tauri/gen
+
+# Test / coverage
+coverage
+lcov.info
+.nyc_output
+target/nextest
+
+# sqlx: keep .sqlx/ (offline metadata is committed); ignore local DB
+*.sqlite
+*.sqlite-*
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.shared.json
+
+# App data written during local runs
+/.scratch
+/tmp

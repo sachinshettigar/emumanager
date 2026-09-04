@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0",
+  "name": "iOS smoke",
+  "platform": "ios",
+  "device": { "profile": "iphone_15" },
+  "image": { "api": 17, "type": "google_apis_playstore", "abi": "arm64-v8a" },
+  "hardware": { "ramMb": 2048, "storageGb": 6 }
+}

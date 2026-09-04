@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0",
+  "name": "Bad ABI",
+  "platform": "android",
+  "device": { "profile": "pixel_6" },
+  "image": { "api": 34, "type": "google_apis_playstore", "abi": "armeabi-v7a" },
+  "hardware": { "ramMb": 2048, "storageGb": 6 }
+}

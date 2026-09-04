@@ -1,0 +1,19 @@
+# typos-cli config. Run: typos
+
+[files]
+extend-exclude = [
+    "pnpm-lock.yaml",
+    "Cargo.lock",
+    ".sqlx/",
+    "src/lib/bindings.ts",
+    "docs/design/emumanager-wireframes.html",
+]
+
+[default.extend-words]
+# domain / tooling terms typos might "correct"
+avdmanager = "avdmanager"
+sdkmanager = "sdkmanager"
+emu = "emu"
+abi = "abi"
+Abi = "Abi"
+aarch = "aarch"

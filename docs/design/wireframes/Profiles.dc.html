@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #fbfbfa; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: #1f1e1c; -webkit-font-smoothing: antialiased; }
+    a { color: #2f6db3; text-decoration: none; }
+    a:hover { color: #24547f; }
+  </style>
+</helmet>
+
+<div style="width:1280px;height:1000px;background:#fbfbfa;display:flex;overflow:hidden;border:1px solid #d9d8d3;border-radius:10px">
+
+  <aside style="width:204px;flex-shrink:0;background:#f2f1ee;border-right:1px solid #d9d8d3;padding:18px 0;display:flex;flex-direction:column;gap:3px">
+    <div style="padding:2px 18px 20px;display:flex;align-items:center;gap:10px">
+      <div style="width:26px;height:26px;border:1.5px solid #1f1e1c;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px">E</div>
+      <span style="font-weight:600;font-size:14px;letter-spacing:-0.01em">EmuManager</span>
+    </div>
+    <div style="margin:0 10px;padding:9px 10px;border-radius:7px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:#6f6e69">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="11" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="11" y="11" width="6" height="6" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div style="margin:0 10px;padding:9px 10px;border-radius:7px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:#6f6e69">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="6" y="3" width="8" height="14" rx="1.5"/><line x1="8.5" y1="14.5" x2="11.5" y2="14.5"/></svg>
+      Device catalog
+    </div>
+    <div style="margin:0 10px;padding:9px 10px;border-radius:7px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:#6f6e69">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v9"/><path d="M6.5 9 10 12.5 13.5 9"/><path d="M4 16h12"/></svg>
+      Dependencies
+    </div>
+    <div style="margin:0 10px;padding:9px 10px;border-radius:7px;background:#fff;border:1px solid #d9d8d3;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:#1f1e1c">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 3h5l3 3v11H6z"/><path d="M11 3v3h3"/></svg>
+      Profiles
+    </div>
+    <div style="flex-grow:1"></div>
+    <div style="margin:0 10px;padding:9px 10px;border-radius:7px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:#6f6e69">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="3"/><path d="M10 3.5v2M10 14.5v2M3.5 10h2M14.5 10h2M5.3 5.3l1.4 1.4M13.3 13.3l1.4 1.4M14.7 5.3l-1.4 1.4M6.7 13.3l-1.4 1.4"/></svg>
+      Settings
+    </div>
+  </aside>
+
+  <div style="flex-grow:1;display:flex;flex-direction:column;min-width:0">
+
+    <div style="height:57px;flex-shrink:0;border-bottom:1px solid #d9d8d3;display:flex;align-items:center;justify-content:space-between;padding:0 22px">
+      <div style="font-size:16px;font-weight:600;letter-spacing:-0.01em">Profiles</div>
+      <div style="border:1px solid #d3d2cc;border-radius:6px;padding:7px 11px;font-size:12px;font-weight:500;color:#4b4a46;display:flex;align-items:center;gap:6px">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v9"/><path d="M6.5 10 10 13.5 13.5 10"/><path d="M4 16h12"/></svg>
+        Export all
+      </div>
+    </div>
+
+    <div style="flex-grow:1;padding:20px 22px;display:grid;grid-template-columns:372px 1fr;gap:18px;min-height:0">
+
+      <div style="display:flex;flex-direction:column;gap:14px;min-height:0">
+        <div style="border:1.5px dashed #c2c1ba;border-radius:10px;padding:22px 16px;text-align:center;background:#fff">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none" stroke="#9a9992" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:8px"><path d="M10 14V5"/><path d="M6 9l4-4 4 4"/><path d="M4 16h12"/></svg>
+          <div style="font-size:13px;font-weight:500">Drop a .emuprofile file here</div>
+          <div style="font-size:11.5px;color:#9a9992;margin:4px 0 10px">Recipe only &mdash; no SDK or image data included</div>
+          <span style="border:1px solid #d3d2cc;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500">Browse files</span>
+        </div>
+
+        <div style="border:1px solid #d9d8d3;border-radius:8px;background:#fff;flex-grow:1;display:flex;flex-direction:column;overflow:hidden">
+          <div style="padding:10px 14px;border-bottom:1px solid #e6e5df;font-size:12px;font-weight:600;display:flex;align-items:center;gap:8px">
+            Reviewing
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6f6e69;font-weight:400">qa-baseline.emuprofile</span>
+          </div>
+          <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:#8a897f">Name</span><span style="color:#3a3934">QA baseline</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:#8a897f">Device</span><span style="color:#3a3934">Pixel 6</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:#8a897f">Image</span><span style="color:#3a3934;text-align:right">API 33 &middot; Play Store &middot; x86_64</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:#8a897f">Hardware</span><span style="color:#3a3934;text-align:right">2048 MB &middot; 6 GB &middot; 420 dpi</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:11.5px"><span style="color:#8a897f">Seed</span><span style="color:#3a3934;text-align:right">2 APKs &middot; locale en-US</span></div>
+          </div>
+          <div style="padding:10px 14px;border-top:1px solid #eeede8;background:#fcfcfb">
+            <div style="font-size:10.5px;color:#8a897f;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:7px">Resolving requirements</div>
+            <div style="display:flex;flex-direction:column;gap:6px;font-size:11.5px">
+              <div style="display:flex;align-items:center;gap:8px"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#2f8a5f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg> Emulator 35.1.4 &mdash; present</div>
+              <div style="display:flex;align-items:center;gap:8px"><svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="#2f8a5f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5l4 4 8-9"/></svg> platform-tools &mdash; present</div>
+              <div style="display:flex;align-items:center;gap:8px;color:#8a5f1c"><span style="width:13px;height:13px;border-radius:50%;background:#b07d2b;color:#fff;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0">!</span> Needs download &mdash; <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px">system-images;android-33;&hellip;</span> &middot; 3.1 GB</div>
+            </div>
+          </div>
+          <div style="flex-grow:1"></div>
+          <div style="padding:12px 14px;border-top:1px solid #e6e5df;display:flex;gap:8px">
+            <div style="flex-grow:1;text-align:center;border:1px solid #d3d2cc;border-radius:6px;padding:8px;font-size:12px;font-weight:500">Cancel</div>
+            <div style="flex-grow:2;text-align:center;background:#2f6db3;color:#fff;border-radius:6px;padding:8px;font-size:12px;font-weight:500">Download &amp; create</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;min-height:0">
+        <div style="display:flex;align-items:baseline;gap:8px">
+          <span style="font-size:13px;font-weight:600">Saved profiles</span>
+          <span style="font-size:11.5px;color:#9a9992">4 profiles</span>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="border:1px solid #bcd4ea;background:#f4f8fc;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:9px">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:13px;font-weight:600">QA baseline</span>
+              <span style="font-size:11px;color:#9a9992">used by 2 emulators</span>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span style="font-size:11px;background:#eaf1f8;border:1px solid #cfe0ee;border-radius:4px;padding:2px 7px;color:#2c567d">Pixel 6</span>
+              <span style="font-size:11px;background:#eaf1f8;border:1px solid #cfe0ee;border-radius:4px;padding:2px 7px;color:#2c567d">API 33</span>
+              <span style="font-size:11px;background:#eaf1f8;border:1px solid #cfe0ee;border-radius:4px;padding:2px 7px;color:#2c567d">Play Store</span>
+              <span style="font-size:11px;background:#eaf1f8;border:1px solid #cfe0ee;border-radius:4px;padding:2px 7px;color:#2c567d">x86_64</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div style="background:#2f6db3;color:#fff;border-radius:6px;padding:6px 12px;font-size:11.5px;font-weight:500">Create instance</div>
+              <div style="border:1px solid #d3d2cc;border-radius:6px;padding:6px 12px;font-size:11.5px;font-weight:500">Export</div>
+              <div style="border:1px solid #d3d2cc;border-radius:6px;padding:6px 9px;font-size:11.5px;color:#6f6e69">&middot;&middot;&middot;</div>
+            </div>
+          </div>
+
+          <div style="border:1px solid #e6e5df;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:9px">
+            <div style="font-size:13px;font-weight:600">Tablet landscape</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span style="font-size:11px;background:#f0efec;border:1px solid #e2e1db;border-radius:4px;padding:2px 7px;color:#5c5b55">Pixel Tablet</span>
+              <span style="font-size:11px;background:#f0efec;border:1px solid #e2e1db;border-radius:4px;padding:2px 7px;color:#5c5b55">API 34</span>
+              <span style="font-size:11px;background:#f0efec;border:1px solid #e2e1db;border-radius:4px;padding:2px 7px;color:#5c5b55">Google APIs</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div style="border:1px solid #d3d2cc;border-radius:6px;padding:6px 12px;font-size:11.5px;font-weight:500">Create instance</div>
+              <div style="border:1px solid #d3d2cc;border-radius:6px;padding:6px 12px;font-size:11.5px;font-weight:500">Export</div>
+              <div style="border:1px solid #d3d2cc;border-radius:6px;padding:6px 9px;font-size:11.5px;color:#6f6e69">&middot;&middot;&middot;</div>
+            </div>
+          </div>
+
+          <div style="border:1px solid #e6e5df;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:9px">
+            <div style="font-size:13px;font-weight:600">Wear mini</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span style="font-size:11px;background:#f0efec;border:1px solid #e2e1db;border-radius:4px;padding:2px 7px;color:#5c5b55">Wear OS Small Round</span>
+              <span style="font-size:11px;background:#f0efec;border:1px solid #e2e1db;border-radius:4px;padding:2px 7px;color:#5c5b55">API 33</span>
+              <span style="font-size:11px;background:#f0efec;border:1px solid #e2e1db;border-radius:4px;padding:2px 7px;color:#5c5b55">Wear</span>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div style="border:1px solid #d3d2cc;border-radius:6px;padding:6px 12px;font-size:11.5px;font-weight:500">Create instance</div>
+              <div style="border:1px solid #d3d2cc;border-radius:6px;padding:6px 12px;font-size:11.5px;font-weight:500">Export</div>
+              <div style="border:1px solid #d3d2cc;border-radius:6px;padding:6px 9px;font-size:11.5px;color:#6f6e69">&middot;&middot;&middot;</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="border:1px solid #e6e5df;border-radius:8px;background:#faf9f7;overflow:hidden;margin-top:2px">
+          <div style="padding:8px 14px;border-bottom:1px solid #eeede8;font-size:11px;font-weight:600;color:#8a897f;display:flex;align-items:center;gap:8px">
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M6 3h5l3 3v11H6z"/><path d="M11 3v3h3"/></svg>
+            qa-baseline.emuprofile
+          </div>
+          <pre style="margin:0;padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;line-height:1.7;color:#4b4a46;white-space:pre;overflow:hidden">{
+  "schemaVersion": "1.0",
+  "name": "QA baseline",
+  "platform": "android",
+  "device":   { "profile": "pixel_6" },
+  "image":    { "api": 33, "type": "google_apis_playstore", "abi": "x86_64" },
+  "hardware": { "ramMb": 2048, "storageGb": 6, "dpi": 420 },
+  "seed":     { "apks": ["app-qa.apk", "mock-loc.apk"],
+                "settings": { "locale": "en-US" } }
+}</pre>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

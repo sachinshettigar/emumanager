@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0",
+  "name": "Extra field",
+  "platform": "android",
+  "device": { "profile": "pixel_6" },
+  "image": { "api": 34, "type": "google_apis_playstore", "abi": "x86_64" },
+  "hardware": { "ramMb": 2048, "storageGb": 6 },
+  "snapshotBlob": "base64-would-go-here-but-recipes-carry-no-binaries"
+}

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "name": "QA baseline",
+  "platform": "android",
+  "description": "Regression device for the checkout flow.",
+  "device": { "profile": "pixel_6" },
+  "image": { "api": 33, "type": "google_apis_playstore", "abi": "x86_64" },
+  "hardware": {
+    "ramMb": 2048,
+    "storageGb": 6,
+    "dpi": 420,
+    "graphics": "hardware",
+    "snapshots": true,
+    "coldBoot": false,
+    "deviceFrame": true
+  },
+  "seed": {
+    "apks": ["app-qa.apk", "mock-loc.apk"],
+    "settings": { "locale": "en-US" }
+  }
+}

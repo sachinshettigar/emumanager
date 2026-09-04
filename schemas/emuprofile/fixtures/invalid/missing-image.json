@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "1.0",
+  "name": "No image",
+  "platform": "android",
+  "device": { "profile": "pixel_6" },
+  "hardware": { "ramMb": 2048, "storageGb": 6 }
+}

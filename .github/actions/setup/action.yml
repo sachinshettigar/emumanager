@@ -1,0 +1,29 @@
+name: setup
+description: Rust + Node/pnpm + just, with caching. Used by all workflows.
+
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    - uses: Swatinem/rust-cache@v2
+    - name: install cargo tools
+      shell: bash
+      run: |
+        cargo install cargo-nextest cargo-deny cargo-machete cargo-llvm-cov sqlx-cli --locked || true
+    - uses: pnpm/action-setup@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: pnpm
+    - name: install node deps
+      shell: bash
+      run: '[ -f package.json ] && pnpm install --frozen-lockfile || echo "no package.json yet"'
+    - name: install just + lint CLIs
+      shell: bash
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        cargo install typos-cli --locked || true
+        npm i -g markdownlint-cli2 || true

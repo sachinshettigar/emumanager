@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EmuManager agent state",
+  "type": "object",
+  "required": ["project", "updated", "currentMilestone", "milestones", "tasks"],
+  "additionalProperties": true,
+  "properties": {
+    "project": { "const": "emumanager" },
+    "updated": { "type": "string", "format": "date" },
+    "currentMilestone": { "type": "string", "pattern": "^M[0-9]+$" },
+    "lastValidatedCommit": { "type": ["string", "null"] },
+    "coverageGate": {
+      "type": "object",
+      "properties": {
+        "rust": { "type": ["number", "null"] },
+        "web": { "type": ["number", "null"] }
+      }
+    },
+    "milestones": {
+      "type": "object",
+      "patternProperties": {
+        "^M[0-9]+$": {
+          "type": "object",
+          "required": ["title", "status"],
+          "properties": {
+            "title": { "type": "string" },
+            "status": { "enum": ["todo", "in_progress", "done"] }
+          }
+        }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "milestone", "status"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[0-9]{4}$" },
+          "title": { "type": "string" },
+          "milestone": { "type": "string", "pattern": "^M[0-9]+$" },
+          "status": { "enum": ["todo", "doing", "review", "done", "blocked"] },
+          "validate": { "type": "string" }
+        }
+      }
+    }
+  }
+}

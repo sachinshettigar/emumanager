@@ -1,0 +1,30 @@
+# Git hooks (tool-agnostic). CI does not use these — it runs `just validate` directly.
+# Override for an explicit WIP branch with: LEFTHOOK=0 git push
+
+pre-commit:
+  parallel: false
+  commands:
+    fmt-rust:
+      glob: "*.rs"
+      run: cargo fmt -- {staged_files} && git add {staged_files}
+    fmt-web:
+      glob: "*.{ts,tsx,js,jsx,json,css,md,yml,yaml}"
+      run: pnpm exec prettier --write {staged_files} && git add {staged_files}
+    bindings:
+      run: just bindings && git add src/lib/bindings.ts
+    db-prepare:
+      run: just db-prepare && git add .sqlx
+    secrets:
+      run: gitleaks protect --staged --redact --no-banner
+    progress:
+      run: just progress
+
+commit-msg:
+  commands:
+    conventional:
+      run: 'grep -qE "^(feat|fix|chore|docs|refactor|test|perf|build|ci)(\(.+\))?!?: .+" {1} || { echo "commit message must be Conventional Commits"; exit 1; }'
+
+pre-push:
+  commands:
+    validate:
+      run: just validate
