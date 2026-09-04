@@ -1,0 +1,10 @@
+# cargo-nextest config. Used by `just test-rust` / `just validate` when nextest
+# is installed (falls back to `cargo test` otherwise).
+
+[profile.default]
+fail-fast = false
+
+[profile.ci]
+fail-fast = false
+retries = 1
+slow-timeout = { period = "60s", terminate-after = 3 }

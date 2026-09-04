@@ -10,8 +10,6 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 
 import { commands, type IpcError, type Pong } from "./bindings";
 
-export type { IpcError, Pong };
-
 /** A failed IPC call. `ipc.code` is the stable machine string from the backend. */
 export class IpcCallError extends Error {
   readonly ipc: IpcError;
@@ -34,7 +32,7 @@ function unwrap<T>(res: Envelope<T>): T {
 }
 
 /** Liveness check against the Rust backend. Rejects with an {@link IpcCallError}. */
-export async function ping(name: string): Promise<Pong> {
+async function ping(name: string): Promise<Pong> {
   return unwrap(await commands.ping(name));
 }
 

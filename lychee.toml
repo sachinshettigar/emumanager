@@ -1,0 +1,10 @@
+# lychee link checker. `just validate` runs `lychee --offline .` (no network) —
+# it only verifies that relative links between repo files resolve.
+
+exclude_path = ["node_modules", "target", "dist", "coverage", ".git", ".sqlx"]
+
+# Ignore anchors we can't resolve offline and known-good external hosts.
+exclude = [
+  "^https?://",
+  "^mailto:",
+]

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "src/**/*.test.{ts,tsx}",
+    "src/test/**/*.{ts,tsx}",
+    "*.config.{ts,js}",
+    "vitest.config.ts",
+    "eslint.config.js",
+    "scripts/*.mjs"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "scripts/*.mjs"],
+  "ignore": ["src/lib/bindings.ts"],
+  "ignoreDependencies": ["markdownlint-cli2"],
+  "ignoreBinaries": ["just", "playwright"]
+}

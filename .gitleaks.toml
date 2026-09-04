@@ -1,0 +1,17 @@
+# gitleaks secret-scan config. `just validate` runs `gitleaks detect`.
+# Extends the built-in ruleset; only adds an allowlist for files that carry no
+# real secrets.
+
+title = "EmuManager gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Lockfiles, fixtures, and generated bindings hold no credentials."
+paths = [
+  '''pnpm-lock\.yaml''',
+  '''Cargo\.lock''',
+  '''schemas/emuprofile/fixtures/.*''',
+  '''src/lib/bindings\.ts''',
+]

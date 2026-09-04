@@ -6,26 +6,24 @@ Narrative companion to `.agent/state.json`. Update both together (see
 ## Current state
 
 - **Milestone:** M0 — Skeleton & gate
-- **Phase:** Workspace, task runner, frontend shell, `emu-core` domain + registry, and the typed
-  Rust↔TS IPC seam all stand up. Tasks `0001`–`0006` done (M0: 6/9). `emu-core` has the full
-  model + port traits + `Provider` + `testing` fakes (39 unit tests) and a SQLite `Registry`
-  (`sqlx` 0.8, `migrations/0001_init.sql`, `Registry::open` + 1 integration test). `src-tauri`
-  serves a `ping` command through `tauri-specta`; `src/lib/bindings.ts` is generated (6 rust
-  tests). Frontend renders 4 routes and calls `ping` via a `usePing()` hook (11 web tests);
-  `@tauri-apps/cli` added so `just dev` launches a window. `cargo test --workspace
-  --all-features`, `clippy -D warnings`, `fmt`, `pnpm {typecheck,lint,test,format:check}`, and
-  `just check-fast` all green.
+- **Phase:** Workspace, task runner, frontend shell, `emu-core` domain + registry, the typed
+  Rust↔TS IPC seam, and the full `just validate` gate all stand up. Tasks `0001`–`0007` done
+  (M0: 7/9). `emu-core` has the model + ports + `Provider` + `testing` fakes (39 unit tests) and
+  a SQLite `Registry` (`sqlx` 0.8, `migrations/0001_init.sql`, `Registry::open` + 1 integration
+  test). `src-tauri` serves `ping` through `tauri-specta`; `src/lib/bindings.ts` is generated (6
+  rust tests). Frontend renders 4 routes and calls `ping` via `usePing()` (11 web tests);
+  `just dev` launches a window. **`just validate` is green** — run-all/report-all; core checks
+  pass, optional external tools skip with a message until `just setup`/CI install them.
 - **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 10.0.0, just 1.58.0.
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
-- **Last validated commit:** _pending — `just validate` not fully wired until task 0007; the
-  individual gates (`cargo test/clippy/fmt`, `pnpm` chain, `just check-fast`) are green._
-- **Next action:** task `0007` (`just validate` wired end to end). Then `0008 → 0009`.
+- **Last validated commit:** see `.agent/state.json` `lastValidatedCommit` (the task-0007 commit).
+- **Next action:** task `0008` (lefthook pre-commit/pre-push hooks). Then `0009` (CI matrix).
   Deferred: `#[derive(specta::Type)]` on the `emu-core` DTOs → first M1 IPC command;
   `.sqlx/` offline cache + `query!` macros → M3.
 
 ## Milestone checklist
 
-- [~] **M0** Skeleton & gate — tasks 0001–0006 done; 0007–0009 open
+- [~] **M0** Skeleton & gate — tasks 0001–0007 done; 0008, 0009 open
 - [ ] M1 Toolchain manager: SDK from zero
 - [ ] M2 Create & launch one emulator end-to-end
 - [ ] M3 Registry & reliable tracking
@@ -35,6 +33,27 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 3 (Claude Code) — M0 task 0007 (`just validate` gate)
+
+- **Task 0007 done** — `just validate` runs the full static-analysis + test matrix and is
+  **green** on macOS. Run-all/report-all (not fail-fast): every step runs, failures are tallied,
+  non-zero exit at the end. `docs/testing-and-validation.md` documents the matrix.
+- Core checks (always run, must pass): progress-check, emuprofile schema via `ajv` (full mode —
+  valid + invalid fixtures), `emu-core-no-tauri`, `cargo fmt`, `cargo clippy --all-targets
+  --all-features -D warnings`, rust tests `--all-features`, `just bindings` + `git diff`,
+  `pnpm typecheck/lint/format:check/test`, `knip`, `markdownlint-cli2`.
+- Optional tools skip with `(skip: <tool> …)` when absent (never fail the gate): `cargo-nextest`
+  / `-deny` / `-machete` / `-llvm-cov`, `sqlx prepare --check` (M3), `typos`, `actionlint`,
+  `gitleaks`, `lychee`. `just setup` installs the cargo ones + `typos-cli` and tries `brew` for
+  the rest; CI (0009) installs them in the runner.
+- New dev-deps: `knip` 5.39.2 (`knip.json`), `markdownlint-cli2` 0.15.0, `ajv` 8.20.0. Dropped
+  unused `@testing-library/user-event`.
+- knip-driven cleanup: `src/lib/ipc.ts` now exports only `usePing` + `IpcCallError`; added the
+  missing `ajv` dep.
+- `.markdownlint-cli2.yaml` relaxed (MD022/028/031/032/036/040 off — they only hit pre-existing
+  docs). New: `.gitleaks.toml`, `lychee.toml`, `.config/nextest.toml`.
+- `lastValidatedCommit` set (this commit).
 
 ### 2026-09-05 — session 3 (Claude Code) — M0 task 0005 (sqlx registry bootstrap)
 

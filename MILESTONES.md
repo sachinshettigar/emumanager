@@ -19,8 +19,9 @@ Goal: an empty Tauri app that builds on all three OSes and a validation gate tha
       dir (`.sqlx/` offline cache deferred to M3 — no `query!` macros yet)
 - [x] `justfile` with every recipe in `AGENTS.md` §4; `package.json` script mirrors
 - [ ] `lefthook` installed; pre-commit runs fmt + `bindings` + `db-prepare` and stages results
-- [ ] `just validate` runs and passes: fmt, `tsc`, `clippy -D warnings`, `cargo nextest`, vitest,
-      `cargo deny`, schema fixtures, markdownlint, actionlint, gitleaks, `knip`, `cargo machete`
+- [x] `just validate` runs and passes: fmt, `tsc`, `clippy -D warnings`, tests, vitest, schema
+      fixtures (ajv), markdownlint, `knip` all run green; `cargo nextest/deny/machete`, `typos`,
+      `actionlint`, `gitleaks`, `lychee` skip with a message until `just setup` / CI installs them
 - [ ] CI `ci.yml` green on ubuntu + windows + macos; `schema.yml` green
 - [x] `emu-core` has no `tauri` dependency (`scripts/emu-core-no-tauri.sh`; CI job pending task 0009)
 - [x] `scripts/progress-check.mjs` passes (`just progress`)

@@ -70,5 +70,5 @@ pnpm install && pnpm typecheck && pnpm lint && pnpm test && pnpm build
 - Fonts: IBM Plex loaded from Google Fonts via `<link>` in `index.html` (CSP is `null`).
   Bundling for offline = M7.
 - `@vitejs/plugin-react` + esbuild: pnpm 10 ignores esbuild's build script by default but Vite
-  vendors its own esbuild, so no `onlyBuiltDependencies` entry is needed — verified `pnpm test`
-  + `pnpm build` both work.
+  vendors its own esbuild, so no `onlyBuiltDependencies` entry is needed — verified that
+  `pnpm test` and `pnpm build` both work.
