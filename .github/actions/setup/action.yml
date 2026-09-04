@@ -1,17 +1,29 @@
 name: setup
-description: Rust + Node/pnpm + just, with caching. Used by all workflows.
+description: Rust + Node/pnpm + just + static-analysis CLIs, with caching. Used by all workflows.
 
 runs:
   using: composite
   steps:
+    # Tauri v2 Linux build deps — https://v2.tauri.app/start/prerequisites/#linux
+    - name: linux system deps (webkit2gtk, gtk, appindicator)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libwebkit2gtk-4.1-dev \
+          libxdo-dev \
+          libssl-dev \
+          libayatana-appindicator3-dev \
+          librsvg2-dev \
+          build-essential \
+          curl wget file
+
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt, clippy
     - uses: Swatinem/rust-cache@v2
-    - name: install cargo tools
-      shell: bash
-      run: |
-        cargo install cargo-nextest cargo-deny cargo-machete cargo-llvm-cov sqlx-cli --locked || true
+
     - uses: pnpm/action-setup@v4
     - uses: actions/setup-node@v4
       with:
@@ -20,10 +32,27 @@ runs:
     - name: install node deps
       shell: bash
       run: '[ -f package.json ] && pnpm install --frozen-lockfile || echo "no package.json yet"'
-    - name: install just + lint CLIs
+
+    # Prebuilt-binary installs (fast — no from-source cargo compiles) for the
+    # tools taiki-e/install-action is known to carry.
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: just,cargo-nextest,cargo-deny,cargo-machete,cargo-llvm-cov
+    # sqlx-cli / typos-cli: install from source, best-effort. `|| true` so a
+    # slow or failed build never breaks the job — `just validate` skips them
+    # cleanly when absent.
+    - name: install remaining cargo tools
+      shell: bash
+      run: cargo install sqlx-cli typos-cli --locked || true
+
+    # actionlint has no crates.io package; install via its own release script.
+    # https://github.com/rhysd/actionlint/blob/main/docs/install.md
+    - name: install actionlint
       shell: bash
       run: |
-        curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
-        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-        cargo install typos-cli --locked || true
-        npm i -g markdownlint-cli2 || true
+        bash <(curl -s https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+        echo "$PWD" >> "$GITHUB_PATH"
+
+    # Not installed here: `gitleaks`, `lychee`. `just validate` skips them
+    # cleanly when absent (docs/testing-and-validation.md) — add an installer
+    # when secret/link scanning becomes load-bearing for a milestone.

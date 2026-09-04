@@ -10,8 +10,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Cheap ubuntu-only smoke test: catches state.json/task-file drift, a gross
+  # schema break, or emu-core gaining a tauri dep, in seconds — before paying
+  # for the 3-OS matrix below.
   fast:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,6 +31,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup

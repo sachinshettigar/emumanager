@@ -7,23 +7,31 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 - **Milestone:** M0 — Skeleton & gate
 - **Phase:** Workspace, task runner, frontend shell, `emu-core` domain + registry, the typed
-  Rust↔TS IPC seam, and the full `just validate` gate all stand up. Tasks `0001`–`0007` done
-  (M0: 7/9). `emu-core` has the model + ports + `Provider` + `testing` fakes (39 unit tests) and
-  a SQLite `Registry` (`sqlx` 0.8, `migrations/0001_init.sql`, `Registry::open` + 1 integration
-  test). `src-tauri` serves `ping` through `tauri-specta`; `src/lib/bindings.ts` is generated (6
-  rust tests). Frontend renders 4 routes and calls `ping` via `usePing()` (11 web tests);
-  `just dev` launches a window. **`just validate` is green** — run-all/report-all; core checks
-  pass, optional external tools skip with a message until `just setup`/CI install them.
+  Rust↔TS IPC seam, `just validate`, git hooks, and CI workflows all stand up. Tasks `0001`–
+  `0008` done, `0009` (CI) **in review** — pending confirmation of the first live push-triggered
+  run on `main` (M0: 8/9 done). `just validate` is green locally; `just dev` launches a window;
+  lefthook hooks are active on this repo.
+- **CI (task 0009):** `ci.yml` (ubuntu-only `fast` job and a 3-OS `gate` job that runs
+  `just validate` and an unsigned `tauri build --debug`), `schema.yml` (ajv),
+  `nightly-integration.yml` (KVM + `test-integration`; `e2e`/issue-filing deferred),
+  `dependabot.yml`. The composite `.github/actions/setup` action added the **Linux Tauri build
+  deps that were missing** from the session-0 scaffold (`libwebkit2gtk-4.1-dev` etc. — without
+  them every rust step on `ubuntu-latest` would have failed, not just the tauri build), plus
+  installs for `actionlint`/`cargo-nextest`/`-deny`/`-machete`/`-llvm-cov`. `actionlint` verified
+  clean locally on all 4 workflow files. See <https://v2.tauri.app/start/prerequisites/#linux>.
 - **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 10.0.0, just 1.58.0.
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
-- **Last validated commit:** see `.agent/state.json` `lastValidatedCommit` (the task-0007 commit).
-- **Next action:** task `0009` (CI: `ci.yml` matrix ubuntu/windows/macos + `schema.yml` +
-  `emu-core`-no-tauri job) — the last M0 task. Deferred: `#[derive(specta::Type)]` on the
-  `emu-core` DTOs → first M1 IPC command; `.sqlx/` offline cache + `query!` macros → M3.
+- **Last validated commit:** see `.agent/state.json` `lastValidatedCommit` (the task-0007 commit;
+  updated again once the 0009 CI run is confirmed green).
+- **Next action:** watch the `main`-push CI run; on green, flip task `0009` and milestone `M0`
+  to `done`, move `currentMilestone` to `M1`. Deferred: `#[derive(specta::Type)]` on the
+  `emu-core` DTOs → first M1 IPC command; `.sqlx/` offline cache + `query!` macros → M3;
+  `gitleaks`/`lychee` CI installers + e2e suite → later milestones; branch protection → a human
+  (or explicitly-directed) action per `docs/playbooks/milestone-review.md`.
 
 ## Milestone checklist
 
-- [~] **M0** Skeleton & gate — tasks 0001–0008 done; 0009 (CI) open
+- [~] **M0** Skeleton & gate — tasks 0001–0008 done; 0009 (CI) in review, pending a live green run
 - [ ] M1 Toolchain manager: SDK from zero
 - [ ] M2 Create & launch one emulator end-to-end
 - [ ] M3 Registry & reliable tracking
@@ -33,6 +41,31 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 3 (Claude Code) — M0 task 0009 (CI workflows)
+
+- **Task 0009 in review** — the `.github/workflows/*.yml` + composite action scaffolded in
+  session 0 are now actually runnable, plus one addition (`dependabot.yml`).
+- **Fixed the load-bearing gap:** `.github/actions/setup/action.yml` had no Linux system
+  packages for Tauri v2 (`libwebkit2gtk-4.1-dev`, `libxdo-dev`, `libssl-dev`,
+  `libayatana-appindicator3-dev`, `librsvg2-dev`, `build-essential`) — every rust
+  build/test/clippy step on `ubuntu-latest`, not just `tauri build`, would have failed without
+  them. Added, cited <https://v2.tauri.app/start/prerequisites/#linux>.
+- Tool installs: `just`/`cargo-nextest`/`cargo-deny`/`cargo-machete`/`cargo-llvm-cov` via
+  `taiki-e/install-action@v2` (prebuilt, fast); `sqlx-cli`/`typos-cli` via
+  `cargo install --locked || true` (best-effort, never breaks the job); `actionlint` via its own
+  `download-actionlint.bash` release script (no crates.io package) — verified clean locally on
+  all 4 workflow files with the same script.
+- `nightly-integration.yml`: `just e2e` now skips cleanly when no `playwright.config.*` exists
+  (no e2e suite yet — deferred to M2+) instead of failing every night.
+- `ci.yml`: added `timeout-minutes` to both jobs.
+- `docs/playbooks/milestone-review.md`: concrete branch-protection required-check names, flagged
+  as a human (or explicitly-directed agent) action — not applied here.
+- **Deferred, documented:** `gitleaks`/`lychee` CI installers (no reliable non-cargo prebuilt
+  path found quickly; `just validate` already skips them cleanly); auto-filing a GitHub issue on
+  nightly failure (a `::warning::` annotation stands in).
+- **Not yet ticked `done`** — waiting to observe the first live push-triggered `ci.yml` run on
+  `main` before closing the task and M0.
 
 ### 2026-09-05 — session 3 (Claude Code) — M0 task 0008 (lefthook git hooks)
 

@@ -29,8 +29,12 @@ Run this when you think a milestone (`MILESTONES.md`) is done.
 - Journal: a `milestone-MX-review` entry with the CI links, coverage numbers, demo, and anything
   deferred.
 - Tag: `git tag mX-done` (annotate with the summary).
-- If this repo uses branch protection, confirm `ci.yml` is a required check before opening the
-  next milestone's work.
+- **Branch protection** (do this once, after M0's first green CI run): on GitHub →
+  Settings → Branches → protect `main` → require status checks to pass before merging → select
+  `ci / fast`, `ci / gate (ubuntu-latest)`, `ci / gate (windows-latest)`, `ci / gate
+  (macos-latest)`, and `schema / emuprofile`. This is a repo setting change — a human with admin
+  access makes it (or explicitly directs an agent to via `gh api`); an agent should not flip it
+  unprompted.
 
 ## If it's not actually done
 

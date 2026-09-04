@@ -23,7 +23,14 @@ jobs:
       - name: integration (real sdkmanager/avdmanager)
         run: just test-integration
       - name: e2e
-        run: just e2e
+        # No Playwright suite exists yet (deferred — see MILESTONES.md). Skip
+        # cleanly instead of failing nightly on a missing config.
+        run: |
+          if [ -f playwright.config.ts ] || [ -f playwright.config.js ]; then
+            just e2e
+          else
+            echo "e2e: no playwright.config — skipping (not wired up yet)"
+          fi
       - name: annotate on failure
         if: failure()
         run: echo "::warning::nightly integration/e2e failed on ${{ matrix.os }}"
