@@ -11,7 +11,24 @@ workspace = true
 
 [dependencies]
 thiserror.workspace = true
+serde.workspace = true
+async-trait = "0.1"
+time = { version = "0.3", default-features = false, features = [
+    "std",
+    "macros",
+    "parsing",
+    "formatting",
+    "serde-well-known",
+] }
+url = { version = "2", features = ["serde"] }
+sha2 = "0.10"
 
 [features]
-# Enables in-crate fakes for the ports (added in task 0002).
+# Enables the in-crate fakes for the port traits (FakeProcessRunner, FakeDownloader,
+# FakeClock, InMemoryFs). Off by default; turned on by tests and downstream test code.
 testing = []
+
+[dev-dependencies]
+emu-core = { path = ".", features = ["testing"] }
+serde_json.workspace = true
+tokio = { version = "1", features = ["rt", "macros"] }

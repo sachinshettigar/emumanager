@@ -1,4 +1,8 @@
 too-many-arguments-threshold = 8
 # Allow the domain vocabulary from docs/context/glossary.md in doc comments
 # without `clippy::doc_markdown` backticking every occurrence.
-doc-valid-idents = ["EmuManager", "AVD", "AVDs", "SDK", "ABI", "KVM", "WHPX", "AEHD", "HVF", "adb", "sdkmanager", "avdmanager", "..."]
+doc-valid-idents = [
+    "EmuManager", "AVD", "AVDs", "SDK", "ABI", "KVM", "WHPX", "AEHD", "HVF",
+    "adb", "sdkmanager", "avdmanager", "MiB", "GiB", "KiB", "TiB",
+    "...",
+]

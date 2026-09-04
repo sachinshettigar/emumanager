@@ -1,46 +1,28 @@
 //! `emu-core` — domain logic and orchestration for EmuManager.
 //!
-//! This crate holds all business logic and defines the port traits for every side effect
-//! (process spawning, downloads, host probing). It has **no `tauri` dependency** so it stays
-//! testable with `cargo test` alone — see `AGENTS.md` §6 and `docs/architecture.md` §2.
+//! This crate holds all business logic and defines the **port traits** for every side effect
+//! (process spawning, downloads, host probing, the clock, the filesystem). It has **no `tauri`
+//! dependency** so it stays testable with `cargo test` alone — see `AGENTS.md` §6 and
+//! `docs/architecture.md` §2.
 //!
-//! Models and ports land in task `0002`; this is the skeleton.
+//! Layout:
+//! - [`model`] — the domain entities (`docs/context/domain-model.md`). Pure data, `serde`-ready.
+//! - [`ports`] — the injected-effect traits and their DTOs.
+//! - [`provider`] — the [`provider::Provider`] trait an emulator backend implements.
+//! - [`error`] — [`CoreError`] and its stable [`CoreError::code`] contract.
+//! - `testing` (cargo feature) — in-memory fakes for every port.
+//!
+//! Task `0002` adds the types and traits; there is still **no real behavior** here.
+//! `specta::Type` derives are added alongside the IPC layer in task `0004`.
 
 #![forbid(unsafe_code)]
 
-/// Errors returned by domain operations.
-///
-/// Real variants land with the models in task `0002`. Each variant maps to a stable
-/// [`CoreError::code`] string that the IPC layer surfaces to the frontend.
-#[derive(Debug, thiserror::Error)]
-#[non_exhaustive]
-pub enum CoreError {
-    /// A code path that is scaffolded but not yet implemented.
-    #[error("not implemented: {0}")]
-    NotImplemented(&'static str),
-}
+pub mod error;
+pub mod model;
+pub mod ports;
+pub mod provider;
 
-impl CoreError {
-    /// Stable machine-readable code for the IPC error contract.
-    ///
-    /// The frontend switches on this string; keep the values stable across releases.
-    #[must_use]
-    pub fn code(&self) -> &'static str {
-        match self {
-            CoreError::NotImplemented(_) => "not_implemented",
-        }
-    }
-}
+#[cfg(feature = "testing")]
+pub mod testing;
 
-/// Crate result alias.
-pub type Result<T, E = CoreError> = core::result::Result<T, E>;
-
-#[cfg(test)]
-mod tests {
-    use super::CoreError;
-
-    #[test]
-    fn error_code_is_stable() {
-        assert_eq!(CoreError::NotImplemented("x").code(), "not_implemented");
-    }
-}
+pub use error::{CoreError, Result};

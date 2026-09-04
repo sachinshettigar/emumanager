@@ -6,20 +6,22 @@ Narrative companion to `.agent/state.json`. Update both together (see
 ## Current state
 
 - **Milestone:** M0 — Skeleton & gate
-- **Phase:** Workspace + task runner + frontend shell all stand up. Tasks `0001`, `0006`, `0003`
-  done — Rust workspace compiles; `just check-fast` green (rust + web); the React app shell
-  renders the sidebar + 4 routes; `pnpm typecheck/lint/format:check/test/build` all green
-  (7 tests).
+- **Phase:** Workspace, task runner, frontend shell, and the `emu-core` domain layer all stand
+  up. Tasks `0001`, `0002`, `0003`, `0006` done. `emu-core` has the full model + port traits +
+  `Provider` + `testing` fakes (39 tests). Frontend shell renders 4 routes (7 tests).
+  `cargo test --workspace --all-features`, `clippy -D warnings`, `fmt`, and the `pnpm` chain all
+  green.
 - **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 10.0.0, just 1.58.0.
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
-- **Last validated commit:** _pending — `just validate` not fully wired until task 0007; 0001 /
-  0006 / 0003 verified via `cargo`, `just check-fast`, and the `pnpm` chain directly._
-- **Next action:** task `0002` (emu-core ports/models — trait `Provider`, model structs,
-  `testing` fakes), then `0004 → 0005 → 0007 → 0008 → 0009`.
+- **Last validated commit:** _pending — `just validate` not fully wired until task 0007; the
+  individual gates (`cargo test/clippy/fmt`, `pnpm` chain, `just check-fast`) are green._
+- **Next action:** task `0004` (tauri-specta: `ping` command + generated `src/lib/bindings.ts`;
+  also adds `#[derive(specta::Type)]` across the `emu-core` DTOs). Then `0005 → 0007 → 0008 →
+  0009`.
 
 ## Milestone checklist
 
-- [~] **M0** Skeleton & gate — tasks 0001, 0003, 0006 done; 0002, 0004, 0005, 0007–0009 open
+- [~] **M0** Skeleton & gate — tasks 0001–0003, 0006 done; 0004, 0005, 0007–0009 open
 - [ ] M1 Toolchain manager: SDK from zero
 - [ ] M2 Create & launch one emulator end-to-end
 - [ ] M3 Registry & reliable tracking
@@ -29,6 +31,25 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 2 (Claude Code) — M0 task 0002 (emu-core ports & models)
+
+- **Task 0002 done** — the `emu-core` domain layer, no real behaviour.
+- `model/`: `DeviceProfile`, `SystemImage` + `ImageCoord`/`ImageType`/`Abi` (Display/FromStr
+  round-tripping the `sdkmanager` package path), `Emulator`/`Hardware`/`EmulatorSource`/
+  `LiveState`, `HostReport` + verdict/fixes, `Job`/`JobHandle`/`Progress`, `Plan`/`Requirement`/
+  `CreateSpec`, `EmuProfile` (mirrors `schemas/emuprofile/v1.schema.json`, with `From`
+  conversions to the domain types).
+- `ports.rs`: `ProcessRunner` (+ `ChildProcess`), `Downloader`, `HostProbe`, `Clock`, `Fs` —
+  all `async-trait`, object-safe. `provider.rs`: the `Provider` trait + `LaunchOpts` /
+  `RunningHandle`.
+- `error.rs`: `CoreError` grew to 9 variants, each with a pinned `code()` string.
+- `testing/` (feature `testing`): `FakeProcessRunner`, `FakeDownloader` (real SHA-256),
+  `FakeClock`, `InMemoryFs` — all behaviour-tested.
+- **39 tests** green with and without `--all-features`; `clippy -D warnings`, `fmt`,
+  `emu-core-no-tauri.sh` all green.
+- Deviation: `specta::Type` derives deferred to task 0004 (needs the `tauri-specta`/`specta`
+  version pin). serde-only for now.
 
 ### 2026-09-05 — session 2 (Claude Code) — M0 task 0003 (frontend app shell)
 
