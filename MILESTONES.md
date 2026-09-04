@@ -44,15 +44,17 @@ Goal: from a machine with nothing, the app installs everything needed to make em
 
 - [x] Component catalog: resolve versions from Google's repository XML (behind `Downloader`)
 - [ ] Download engine: queued, resumable, `pause`/`cancel`, SHA-256 verify, progress events —
-      **partial**: one-shot fetch+verify+progress lands in task 0011; queueing/pause/resume/cancel
-      are not built (not needed by anything through M1; revisit when the Dependencies screen,
-      task 0013, or real multi-GB system-image downloads make it a real gap)
+      **partial**: one-shot fetch+verify+progress lands in task 0011 and is live in the
+      Dependencies screen (task 0013); queueing/pause/resume/cancel are still not built — not
+      needed by anything through M1, revisit when real multi-GB system-image downloads (M2+) make
+      it a real gap
 - [x] Bootstrap: fetch `cmdline-tools` into the data dir; run `sdkmanager` through it — **no
       bundled JRE**, a system JDK 17+ is required instead (`docs/adr/0006-require-system-jdk.md`)
 - [x] Install `platform-tools`, `emulator`; accept licenses non-interactively
 - [x] `InstalledState` scan of the data dir (+ any existing system SDK) drives the Dependencies
-      screen (task 0013 wires the UI; the scan itself is done)
-- [ ] Dependencies screen wired to real data: components list, active downloads, storage breakdown
+      screen
+- [x] Dependencies screen wired to real data: components list + live install progress. **Partial**:
+      no storage-breakdown view yet (not part of task 0013's scope; revisit if a real need shows up)
 - [ ] `emu-android` parsers for `sdkmanager --list` / repo XML, tested against captured fixtures —
       **partial**: the repo XML component catalog (task 0010) is done; `sdkmanager --list` output
       parsing (system images) is not — not needed until M2's image list/create flow

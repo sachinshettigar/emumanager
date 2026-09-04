@@ -219,27 +219,35 @@ async fn fetch_and_extract_cmdline_tools(
     Ok(())
 }
 
-/// Unpack `cmdline-tools`'s zip into `<app_sdk_dir>/cmdline-tools/latest`, entirely through the
-/// `Fs` port (so this is exercisable with `InMemoryFs` in fake-driven tests, no bypass to real
-/// `std::fs`).
+/// One file or directory read out of the archive, fully owned — no `zip`-crate type survives past
+/// [`read_cmdline_tools_zip`].
+struct ExtractedEntry {
+    /// Path relative to `cmdline-tools/latest/` (the archive's own leading segment stripped).
+    relative: PathBuf,
+    is_dir: bool,
+    contents: Vec<u8>,
+}
+
+/// Read every entry out of the archive into memory, synchronously, with no `.await` anywhere in
+/// this function.
+///
+/// This has to be a separate, non-`async` step from [`extract_cmdline_tools`]: `zip::ZipFile`
+/// holds a `&mut dyn Read` with no `Send` bound, so a `ZipArchive`/`ZipFile` value can never be
+/// held across an `.await` point in code that must produce a `Send` future — which a real Tauri
+/// command's async body must (discovered when task 0013 first called this from a real command;
+/// `emu-core`'s own single-threaded test runtime never required `Send` and so never caught it).
+/// Splitting the zip-crate-touching code out into a plain function that returns fully owned,
+/// `Send`-safe data before any `Fs` call starts fixes it at the root instead of fighting the
+/// borrow checker inside one giant async loop.
 ///
 /// The archive's own top-level folder is named `cmdline-tools/` (verified against the real
 /// archive while building this task — see the task file's Notes) and must be *renamed* to
 /// `latest/`: that placement is an Android convention the zip itself does not encode, so the
-/// leading path segment is stripped and replaced with `cmdline-tools/latest` here rather than
-/// trusted from the archive.
-///
-/// `Fs::write_atomic` doesn't carry a permission mode, so the extracted files land without the
-/// executable bit; [`make_bin_executable`] fixes that up afterward via `chmod` (a real port call,
-/// not a new one) rather than bypassing `Fs` to set permissions directly.
-async fn extract_cmdline_tools(
-    zip_bytes: &[u8],
-    app_sdk_dir: &Path,
-    ports: &BootstrapPorts<'_>,
-) -> Result<()> {
+/// leading path segment is stripped here rather than trusted from the archive.
+fn read_cmdline_tools_zip(zip_bytes: &[u8]) -> Result<Vec<ExtractedEntry>> {
     let mut archive =
         zip::ZipArchive::new(std::io::Cursor::new(zip_bytes)).map_err(|e| extract_err(&e))?;
-    let dest_root = app_sdk_dir.join("cmdline-tools/latest");
+    let mut entries = Vec::with_capacity(archive.len());
 
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(|e| extract_err(&e))?;
@@ -252,20 +260,64 @@ async fn extract_cmdline_tools(
         if relative.as_os_str().is_empty() {
             continue; // the top-level directory entry itself
         }
+        let relative = relative.to_path_buf();
 
-        let out_path = dest_root.join(relative);
         if entry.is_dir() {
+            entries.push(ExtractedEntry {
+                relative,
+                is_dir: true,
+                contents: Vec::new(),
+            });
+            continue;
+        }
+        let mut contents = Vec::with_capacity(usize::try_from(entry.size()).unwrap_or(0));
+        entry
+            .read_to_end(&mut contents)
+            .map_err(|e| fs_io_err(&relative, &e))?;
+        entries.push(ExtractedEntry {
+            relative,
+            is_dir: false,
+            contents,
+        });
+    }
+    Ok(entries)
+}
+
+/// Unpack `cmdline-tools`'s zip into `<app_sdk_dir>/cmdline-tools/latest`, entirely through the
+/// `Fs` port (so this is exercisable with `InMemoryFs` in fake-driven tests, no bypass to real
+/// `std::fs`).
+///
+/// `Fs::write_atomic` doesn't carry a permission mode, so the extracted files land without the
+/// executable bit; [`make_bin_executable`] fixes that up afterward via `chmod` (a real port call,
+/// not a new one) rather than bypassing `Fs` to set permissions directly.
+async fn extract_cmdline_tools(
+    zip_bytes: &[u8],
+    app_sdk_dir: &Path,
+    ports: &BootstrapPorts<'_>,
+) -> Result<()> {
+    // Real archives run ~140 MB of synchronous deflate decompression — `spawn_blocking` keeps
+    // that off the async executor's worker thread, not just off the (already required) `Send`
+    // path. `zip_bytes` is copied once into the blocking task rather than borrowed, since a
+    // `'static` future can't hold a borrow of the caller's stack.
+    let owned_bytes = zip_bytes.to_vec();
+    let entries = tokio::task::spawn_blocking(move || read_cmdline_tools_zip(&owned_bytes))
+        .await
+        .map_err(|e| CoreError::Invalid {
+            what: "cmdline-tools archive",
+            detail: format!("extraction task panicked: {e}"),
+        })??;
+
+    let dest_root = app_sdk_dir.join("cmdline-tools/latest");
+    for entry in entries {
+        let out_path = dest_root.join(&entry.relative);
+        if entry.is_dir {
             ports.fs.ensure_dir(&out_path).await?;
             continue;
         }
         if let Some(parent) = out_path.parent() {
             ports.fs.ensure_dir(parent).await?;
         }
-        let mut contents = Vec::with_capacity(usize::try_from(entry.size()).unwrap_or(0));
-        entry
-            .read_to_end(&mut contents)
-            .map_err(|e| fs_io_err(&out_path, &e))?;
-        ports.fs.write_atomic(&out_path, &contents).await?;
+        ports.fs.write_atomic(&out_path, &entry.contents).await?;
     }
 
     make_bin_executable(&dest_root, ports.process).await

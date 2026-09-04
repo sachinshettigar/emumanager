@@ -5,57 +5,50 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
-- **Milestone:** M1 — Toolchain manager: SDK from zero (M0 stays open only on the CI task, see
-  below; work moved on to M1 per user direction)
-- **Phase:** M0's app skeleton, `just validate` gate, and git hooks are solid and green locally.
-  M0 task `0009` (CI) is **blocked, not broken** — see below. M1: tasks `0010`, `0011`, `0012`
-  **done**; `0013` (Dependencies screen IPC wiring) is the last thing left in M1.
-- **CI (task 0009) status:** the workflows themselves are fine — a live run did catch and this
-  session fixed three real bugs (SPDX license field, wildcard path deps, unmaintained
-  advisories; commit `a97606e`, verified locally with the real tools). The *next* push-triggered
-  run (33884961977) never started at all: GitHub Actions reported "recent account payments have
-  failed or your spending limit needs to be increased" — a billing/spending-limit block on the
-  `sachinshettigar/emumanager` account, not a repo problem. Needs a human to fix it in GitHub
-  **Settings → Billing & plans**; nothing left to do here until then. Deprioritized per user
-  direction ("skip ci cd for now, build locally").
-- **Local build confirmed working** as an alternative to CI: `pnpm tauri build --debug` succeeds
-  and `target/debug/emumanager` launches (verified as a running process).
-- **M1 task 0010 (SDK component catalog) done:** `emu-core::model::component` adds
-  `Component`/`ComponentId`/`HostOs`/`HostArch`; `emu_android::catalog::parse()` reads Google's
-  real repository manifest and resolves `cmdline-tools;latest`/`platform-tools`/`emulator` for a
-  given host, picking the right archive by `<host-os>`/`<host-arch>`.
-- **M1 task 0011 (native port impls) done:** `src-tauri/src/ports/`: `NativeProcessRunner`,
-  `NativeDownloader`, `SystemClock`, `NativeFs`.
-- **M1 task 0012 (toolchain bootstrap) done:** `emu-core/src/toolchain/{installed_state,
-  bootstrap}.rs`. `InstalledState::scan` checks the app-managed `sdk/` dir **and** any existing
-  system Android SDK (`ANDROID_SDK_ROOT`/`ANDROID_HOME` env vars, then the OS-conventional Android
-  Studio path) before calling anything missing — the user's "recognize what's already installed,
-  don't re-download it" requirement from earlier this session, now built. `bootstrap()` downloads,
-  SHA-1-verifies, and unpacks `cmdline-tools` itself (through the `Fs` port; the executable bit is
-  fixed up afterward with a real `chmod -R +x` via `ProcessRunner`, since `Fs::write_atomic`
-  carries no permission mode), accepts SDK licenses non-interactively, then asks the real
-  `sdkmanager` to install everything else — reusing its own resolver/downloader rather than
-  reimplementing one. Requires a system JDK 17+ (`java -version`, checked before anything else);
-  see `docs/adr/0006-require-system-jdk.md` for why v1 doesn't bundle a JRE. License-prompt
-  behavior (`N/N: License ...` / `Accept? (y/N):`) was captured from a **real**
-  `sdkmanager --licenses` run against a really-downloaded `cmdline-tools` 19.0, not guessed. The
-  `#[ignore]`d integration test was **actually run**, not just written: it downloaded real
-  `cmdline-tools` + `platform-tools` from Google into a scratch temp dir and got a working
-  `sdkmanager --version` back, ~35s, 2026-09-05.
-- **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (via brew),
-  java 21 (system JDK, exercised for real by task 0012).
+- **Milestone:** M2 — Create & launch one emulator end-to-end (M0 and M1 both stay open on
+  deliberately-deferred/blocked items, see below; `currentMilestone` moved on per user direction)
+- **Phase:** M1 is functionally complete — tasks `0010`–`0013` all **done**. M1 itself stays
+  `in_progress` in `.agent/state.json` because two of its own written DoD lines are intentionally
+  deferred (download queue/pause/cancel; `sdkmanager --list` system-image parsing — see the
+  Milestone checklist below), not because anything is broken. No M2 task files exist yet — that's
+  the very next thing to create.
+- **CI (task 0009) status:** unchanged — still blocked on a GitHub Actions billing/spending-limit
+  issue on the account (`sachinshettigar/emumanager`, **Settings → Billing & plans**), not a repo
+  problem. Nothing to do here until a human fixes it.
+- **M1 tasks 0010–0012** (component catalog, native ports, toolchain bootstrap): see the log
+  entries below for full detail — all done and real-network-tested where it matters.
+- **M1 task 0013 (Dependencies screen wired to real state) done:** two new `tauri-specta`
+  commands (`list_components`, `bootstrap_toolchain` in `src-tauri/src/commands/toolchain.rs`) and
+  one typed event (`BootstrapProgress`, wire name `job://bootstrap`) collapsing
+  `docs/architecture.md` §4's `job://progress`/`job://log`/`job://done` trio into one channel (no
+  real per-job registry exists yet — M3 — and there's only ever one toolchain-bootstrap job at a
+  time). The Dependencies screen (`src/routes/Dependencies.tsx`) now shows the real catalog +
+  installed state, a working "Install" button, and a live progress/log panel — 5 new Vitest tests.
+  This is the **first real construction** of task 0011's native ports (`NativeFs`,
+  `NativeDownloader`, `NativeProcessRunner`) — their `#[allow(dead_code)]` blanket is gone.
+  **Two real bugs found and fixed** while wiring this for real (neither was catchable by
+  `emu-core`'s own unit tests alone): (1) `zip::ZipFile` isn't `Send`, so task 0012's extraction
+  loop wasn't `Send`-safe across its own `.await` points — invisible until a real
+  `#[tauri::command]` (whose async body *must* be `Send`) called into it; fixed by splitting the
+  zip-crate-touching code into a plain synchronous function run via `tokio::task::spawn_blocking`,
+  separate from the async `Fs`-writing loop. (2) `specta-typescript` refuses to export `u64` to a
+  plain TS `number` (bigint precision-loss guard) — `ComponentInfo.size_bytes` is `u32` instead,
+  with a saturating cast at the one construction site.
+- **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0013` — wire the Dependencies screen to real state: new `tauri-specta`
-  commands over `installed_state::scan` + `bootstrap`, `just bindings`, replace the screen's
-  static placeholder content. Last task in M1. Separately: once GitHub billing is fixed, re-watch
-  the next `ci.yml` push run, then flip `0009`/`M0` to `done`.
+- **Next action:** pick M2's first task — "create + launch one emulator end-to-end" — no task
+  files exist for M2 yet, so this starts with scoping them (`docs/architecture.md`, `MILESTONES.md`
+  M2 section, `docs/design/wireframes/` screen 2). Separately: once GitHub billing is fixed,
+  re-watch the next `ci.yml` push run, then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
 - [~] **M0** Skeleton & gate — tasks 0001–0008 done; 0009 (CI) blocked on a GitHub billing issue,
       not code — see Current state
-- [~] M1 Toolchain manager: SDK from zero — tasks 0010, 0011, 0012 done; 0013 queued (last one)
+- [~] M1 Toolchain manager: SDK from zero — tasks 0010–0013 **all done**; milestone itself stays
+      in_progress only because two DoD lines are deliberately deferred with a documented reason
+      (download queue/pause/cancel; `sdkmanager --list` parsing) — see `MILESTONES.md`
 - [ ] M2 Create & launch one emulator end-to-end
 - [ ] M3 Registry & reliable tracking
 - [ ] M4 Profiles: export / import / recreate
@@ -64,6 +57,63 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 7 (Claude Code) — M1 task 0013 (Dependencies screen), M1 wrapped up
+
+- **Task 0013 done** — the last M1 task. `src-tauri/src/commands/toolchain.rs` (new), `src/lib/
+  ipc.ts`, `src/routes/Dependencies.tsx` rewritten from its M0 static placeholder.
+- **Two new commands**: `list_components` (real catalog, task 0010, merged with real installed
+  state, task 0012) and `bootstrap_toolchain` (runs the real `bootstrap()` end to end). **One
+  typed event**: `BootstrapProgress` (wire name `job://bootstrap`) — a deliberate simplification
+  of `docs/architecture.md` §4's three-event scheme into one tagged-enum payload
+  (`Progress`/`Log`/`Done`), because there's no real per-job registry anywhere yet (that's M3) and
+  only one toolchain-bootstrap job ever runs at a time (a fixed `JOB_ID` constant, not generated).
+  Recorded as a deliberate scope decision in the task file, not silently done differently from the
+  spec.
+- **First real construction of task 0011's native ports.** `src-tauri/src/ports/mod.rs`'s blanket
+  `#[allow(dead_code, unused_imports)]` — flagged back in task 0011 as "remove the moment
+  something calls these for real" — is gone. Removing it surfaced two more real, pre-existing
+  issues it had been silently hiding: a genuinely unused `AsyncWriteExt` import in
+  `ports/downloader.rs`'s own tests (fixed), and `SystemClock` truly having no caller yet (given
+  its own small, honest, still-documented allow instead — M2's launch tracking is the expected
+  first user).
+- **Real bug #1: `zip::ZipFile` isn't `Send`.** Task 0012's `extract_cmdline_tools` held a
+  `ZipFile` (which wraps a non-`Send` `&mut dyn Read`) across `.await` points. `emu-core`'s own
+  `#[tokio::test]`s never required the future to be `Send`, so this shipped unnoticed — a real
+  `#[tauri::command]`'s async body *must* be `Send`, and wiring `bootstrap_toolchain` into one is
+  what finally caught it, as a compile error pointing deep into `emu-core`. Fixed in
+  `crates/emu-core/src/toolchain/bootstrap.rs`: split the zip-crate-touching code into a plain,
+  non-`async` function that reads the whole archive into owned data with no `.await` anywhere
+  (run via `tokio::task::spawn_blocking`, which also keeps ~140 MB of real decompression off the
+  async executor), fully separate from the async loop that writes through `Fs`. Documented in
+  both task 0012's and task 0013's Notes, since the bug and the fix both live in 0012's file but
+  were only caught while doing 0013's work.
+- **Real bug #2: `u64` can't cross the IPC seam.** `specta-typescript` refuses to export
+  `u64`/`usize`/etc. to a plain TS `number` (a real bigint-precision-loss guard, not a false
+  positive). `ComponentInfo.size_bytes` is `u32` instead of the catalog's `u64`, narrowed with a
+  saturating cast at the one construction site — every real M1 archive, and even `docs/spec.md`'s
+  largest quoted future system image (~3.5 GB), fits comfortably under `u32::MAX`.
+- **`#[tauri::command]` functions can't be `pub use` re-exported** — their hidden
+  `__cmd__*`/`__specta__fn__*` sibling items stay at the function's defining module path, which a
+  re-export doesn't move. `lib.rs` references `commands::toolchain::{list_components,
+  bootstrap_toolchain}` directly instead of through `commands::{...}`.
+- **Frontend**: `useComponents`/`useBootstrapToolchain`/`useBootstrapProgress` hooks in
+  `src/lib/ipc.ts`; `Dependencies.tsx` shows real installed/not-installed rows (with *where* a
+  component was found), a working Install button, and a live log/progress panel. 5 new Vitest
+  tests. A global `@tauri-apps/api/event` mock was added to `src/test/setup.ts` (mirroring the
+  existing `@tauri-apps/api/core` mock) so route-level tests that render `Dependencies`
+  incidentally don't try to reach a real Tauri event host under jsdom.
+- **M1 wrap-up**: all four M1 tasks (0010–0013) are done. `MILESTONES.md`'s M1 section still has
+  two boxes deliberately left unchecked (download queue/pause/cancel; `sdkmanager --list`
+  parsing), each with a written reason and a pointer to when it'll actually matter (M2+) — so
+  `.agent/state.json` keeps `M1.status: "in_progress"` rather than overclaiming `"done"`, while
+  `currentMilestone` moves to `M2`. Small tooling follow-up: `scripts/progress-check.mjs`'s
+  in-progress-milestone rule (relaxed once already in session 6) needed relaxing again slightly —
+  "contiguous run, none past `currentMilestone`" instead of "ends at `currentMilestone`" — since
+  `currentMilestone` can now be ahead of an M1 that's still legitimately `in_progress`.
+- **Not done here**: no real per-job registry (M3); no download pause/resume/cancel in the UI
+  (task 0011 never built it into the port either); no `sdkmanager --list` parsing (M2, when real
+  system images matter); no M2 task files yet.
 
 ### 2026-09-05 — session 6 (Claude Code) — M1 task 0012 (toolchain bootstrap)
 

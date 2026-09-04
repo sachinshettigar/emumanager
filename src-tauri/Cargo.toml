@@ -48,7 +48,7 @@ tempfile = "3"
 workspace = true
 
 [package.metadata.cargo-machete]
-# Provider crates the shell will wire commands to starting M1/M2 (toolchain
-# manager, create/launch). Not imported by any `src-tauri` source yet, so
-# cargo-machete flags them — that's correct today, not a mistake to fix.
-ignored = ["emu-android", "emu-host"]
+# `emu-host` (host readiness probe) has no consumer until M5 — not imported by any `src-tauri`
+# source yet, so cargo-machete flags it; that's correct today, not a mistake to fix. `emu-android`
+# was on this list too until task 0013 wired its real catalog parser into `commands::toolchain`.
+ignored = ["emu-host"]

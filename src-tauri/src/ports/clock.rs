@@ -4,6 +4,11 @@ use emu_core::ports::Clock;
 use time::OffsetDateTime;
 
 /// The actual wall clock. Stateless — `emu-core`'s `FakeClock` is what tests use instead.
+///
+/// No caller yet — nothing in M1 needs the wall clock through this seam (`crate::ports`'s module
+/// doc has the full picture). Kept real and unit-tested rather than deleted: M2's launch tracking
+/// is the expected first caller.
+#[allow(dead_code)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SystemClock;
 

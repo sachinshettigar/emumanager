@@ -5,22 +5,19 @@
 //! `emu-android` (which only *consumes* an injected `ProcessRunner`) or `emu-core` (which must
 //! stay `tauri`-free).
 //!
-//! No command wires these in yet — that lands with the toolchain manager (task 0012) and the
-//! Dependencies screen (task 0013). Each impl is unit-tested in isolation (real temp dirs, a
-//! one-shot local HTTP server for the downloader) so this module is independently correct before
-//! anything calls it. `#[allow(dead_code)]`: every trait method here (`fetch`/`run`/`spawn`/
-//! `now`/...) is only exercised by those tests until then — constructing-but-never-calling the
-//! structs elsewhere just to silence the lint would add real startup cost (an HTTP client, etc.)
-//! for no behavior, so the allow is the honest option. Remove it the moment task 0012 calls any
-//! of these for real. `unused_imports` is allowed for the same reason on the re-exports below —
-//! nothing imports `crate::ports::*` yet either.
-#![allow(dead_code, unused_imports)]
+//! First wired in for real by `crate::commands::toolchain` (task 0013) — `NativeFs` for
+//! `InstalledState::scan`, and all three of `NativeFs`/`NativeDownloader`/`NativeProcessRunner`
+//! for `bootstrap_toolchain`. `SystemClock` has no caller yet (nothing in M1 needs the wall
+//! clock through this seam) and stays behind a narrow, still-honest `#[allow(dead_code)]` on its
+//! own module rather than a blanket one here.
 
 mod clock;
 mod downloader;
 mod fs;
 mod process;
 
+// No caller yet — nothing in M1 needs the wall clock through this seam (see the module doc).
+#[allow(unused_imports)]
 pub use clock::SystemClock;
 pub use downloader::NativeDownloader;
 pub use fs::NativeFs;

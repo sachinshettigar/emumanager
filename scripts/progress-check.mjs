@@ -44,17 +44,19 @@ const inProgress = Object.entries(state.milestones ?? {}).filter(([, m]) => m.st
 if (inProgress.length > 1) {
   // A milestone can stay "in_progress" instead of "done" when its own DoD has a line that isn't
   // met for reasons outside the codebase (e.g. M0's CI confirmation blocked on a GitHub Actions
-  // billing issue — a human action, not a code bug) while work has already moved on to the next
-  // milestone (per explicit user direction: don't block on it, keep building). That's legitimate
-  // as long as the in_progress set is one contiguous run ending at currentMilestone; anything else
-  // (a gap, or an in_progress milestone ahead of currentMilestone) is still a real inconsistency.
+  // billing issue — a human action, not a code bug; or M1 deliberately deferring a couple of DoD
+  // lines to a later milestone, documented in MILESTONES.md) while work has already moved on
+  // (per explicit user direction: don't block on it, keep building). That's legitimate as long as
+  // the in_progress set is one contiguous run, and none of it is ahead of currentMilestone;
+  // anything else (a gap, or an in_progress milestone past where work has actually moved to) is
+  // still a real inconsistency.
   const nums = inProgress.map(([k]) => Number(k.slice(1))).sort((a, b) => a - b);
   const contiguous = nums.every((n, i) => i === 0 || n === nums[i - 1] + 1);
   const currentNum = Number((state.currentMilestone ?? "").slice(1));
-  const endsAtCurrent = nums[nums.length - 1] === currentNum;
-  if (!contiguous || !endsAtCurrent) {
+  const noneAheadOfCurrent = nums[nums.length - 1] <= currentNum;
+  if (!contiguous || !noneAheadOfCurrent) {
     err(
-      `in_progress milestones must form one contiguous run ending at currentMilestone: ${inProgress
+      `in_progress milestones must form one contiguous run, none past currentMilestone: ${inProgress
         .map(([k]) => k)
         .join(", ")}`,
     );

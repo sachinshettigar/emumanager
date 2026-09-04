@@ -14,7 +14,7 @@ mod commands;
 mod ipc_error;
 mod ports;
 
-use tauri_specta::{collect_commands, Builder};
+use tauri_specta::{collect_commands, collect_events, Builder};
 
 pub use commands::Pong;
 pub use ipc_error::IpcError;
@@ -25,7 +25,13 @@ pub use ipc_error::IpcError;
 /// it to TypeScript. Both call this so the generated bindings can never drift
 /// from what the app actually serves.
 fn specta_builder() -> Builder<tauri::Wry> {
-    Builder::<tauri::Wry>::new().commands(collect_commands![commands::ping])
+    Builder::<tauri::Wry>::new()
+        .commands(collect_commands![
+            commands::ping,
+            commands::toolchain::list_components,
+            commands::toolchain::bootstrap_toolchain,
+        ])
+        .events(collect_events![commands::toolchain::BootstrapProgress])
 }
 
 /// Build and run the desktop application.

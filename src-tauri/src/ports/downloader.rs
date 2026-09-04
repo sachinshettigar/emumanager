@@ -137,7 +137,7 @@ impl Downloader for NativeDownloader {
 mod tests {
     use super::*;
     use emu_core::model::job::JobId;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt as _};
+    use tokio::io::AsyncReadExt;
     use tokio::net::TcpListener;
 
     /// A one-shot HTTP/1.0 server: accepts a single connection, ignores the request, and writes

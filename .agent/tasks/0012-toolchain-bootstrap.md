@@ -194,6 +194,19 @@ toolchain_bootstrap -- --ignored` passed for real on 2026-09-05 — downloaded t
 installed `platform-tools` via a real `sdkmanager`, and `sdkmanager --version` succeeded
 afterward. ~35s with this machine's network.
 
+### Addendum (found in task 0013): `extract_cmdline_tools` wasn't actually `Send`
+
+This task's own tests (`#[tokio::test]`, including the real `--ignored` one above) never require
+the future to be `Send`, so a real bug shipped unnoticed: `zip::ZipFile` holds a `&mut dyn Read`
+with no `Send` bound, and the original extraction loop held one across `.await` points (an `Fs`
+call after reading each entry). Task 0013, wiring this into a real `#[tauri::command]` (whose
+async body *must* be `Send`), caught it at compile time. Fixed in `bootstrap.rs` by splitting
+`extract_cmdline_tools` into a non-`async` `read_cmdline_tools_zip` (reads the whole archive into
+owned, `Send`-safe data, no `.await` anywhere, run via `tokio::task::spawn_blocking` since real
+decompression is ~140 MB of synchronous work) and a separate async loop that only touches that
+owned data plus `Fs`. Full story in task 0013's Notes; recorded here too since the bug — and the
+fix — live in this task's file.
+
 ### Not done here
 
 - No JRE bundling (see the ADR) — a system JDK is required for v1.
