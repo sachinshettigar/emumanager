@@ -15,9 +15,11 @@ if [[ -f Cargo.toml ]]; then
   run cargo test -p emu-core
 fi
 
-if [[ -f package.json ]]; then
+if [[ -f package.json && -d node_modules ]]; then
   run pnpm typecheck
   run pnpm lint
+elif [[ -f package.json ]]; then
+  echo "check-fast: (skip web — node_modules missing; run 'pnpm install' / task 0003)"
 fi
 
 [[ $fail -eq 0 ]] && echo "check-fast: OK" || { echo "check-fast: FAILED"; exit 1; }

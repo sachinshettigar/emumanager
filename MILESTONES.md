@@ -16,7 +16,7 @@ Goal: an empty Tauri app that builds on all three OSes and a validation gate tha
 - [ ] Vite + React + TS (strict) frontend renders an app shell with the 4 nav routes (static)
 - [ ] `tauri-specta` wired: one `ping` command, `src/lib/bindings.ts` generated and used
 - [ ] `sqlx` set up with an initial migration + `.sqlx/` committed; DB opens in the data dir
-- [ ] `justfile` with every recipe in `AGENTS.md` §4; `package.json` script mirrors
+- [x] `justfile` with every recipe in `AGENTS.md` §4; `package.json` script mirrors
 - [ ] `lefthook` installed; pre-commit runs fmt + `bindings` + `db-prepare` and stages results
 - [ ] `just validate` runs and passes: fmt, `tsc`, `clippy -D warnings`, `cargo nextest`, vitest,
       `cargo deny`, schema fixtures, markdownlint, actionlint, gitleaks, `knip`, `cargo machete`

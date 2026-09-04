@@ -31,10 +31,12 @@ else
   echo; echo "(skip: no Cargo.toml yet — pre task 0001)"
 fi
 
-if [[ -f package.json ]]; then
+if [[ -f package.json && -d node_modules ]]; then
   step "web: typecheck / lint / format / test / knip"
   run pnpm typecheck && run pnpm lint && run pnpm format:check && run pnpm test
   if have pnpm && pnpm exec knip --version >/dev/null 2>&1; then run pnpm knip; fi
+elif [[ -f package.json ]]; then
+  echo; echo "(skip: package.json present but node_modules missing — run \`pnpm install\` / task 0003)"
 else
   echo; echo "(skip: no package.json yet — pre task 0003)"
 fi

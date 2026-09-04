@@ -6,18 +6,20 @@ Narrative companion to `.agent/state.json`. Update both together (see
 ## Current state
 
 - **Milestone:** M0 — Skeleton & gate
-- **Phase:** Rust workspace stands up. Task `0001` done — `src-tauri` + the four `emu-*` crates
-  compile; `cargo build/clippy(-D warnings)/fmt/test` all green; `emu-helper` CLI works.
+- **Phase:** Rust workspace + task runner stand up. Tasks `0001` and `0006` done —
+  `src-tauri` + the four `emu-*` crates compile; `just check-fast` / `just --summary` /
+  `just progress` all green; `emu-helper` CLI works; `package.json` script mirror in place
+  (deps land in task 0003).
 - **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 11.25.0, just 1.58.0.
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
-- **Last validated commit:** _pending — `just validate` not fully wired until task 0007; 0001
-  verified via cargo directly._
-- **Next action:** task `0006` (justfile + scripts) so later tasks have a real gate, then `0003`
-  (frontend shell). Order in the session-1 journal entry.
+- **Last validated commit:** _pending — `just validate` not fully wired until task 0007; 0001 +
+  0006 verified via `cargo` + `just check-fast` directly._
+- **Next action:** task `0003` (Vite + React + TS strict app shell, 4 routes), then `0002`
+  (emu-core ports/models), then `0004 → 0005 → 0007 → 0008 → 0009`.
 
 ## Milestone checklist
 
-- [~] **M0** Skeleton & gate — task 0001 done; 0002–0009 open
+- [~] **M0** Skeleton & gate — tasks 0001, 0006 done; 0002–0005, 0007–0009 open
 - [ ] M1 Toolchain manager: SDK from zero
 - [ ] M2 Create & launch one emulator end-to-end
 - [ ] M3 Registry & reliable tracking
@@ -27,6 +29,19 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 2 (Claude Code) — M0 task 0006 (task runner)
+
+- **Task 0006 done** — `justfile` finished: every `AGENTS.md` §4 recipe present with a
+  `just --list` description; `bindings` recipe de-stubbed off the wrong `-p app` crate name to a
+  graceful no-op until task 0004; Windows/WSL guidance in the header.
+- Added `package.json` (scripts-only mirror: `typecheck`/`lint`/`format:check`/`test`/`build`/
+  `validate`; deps + real Vite config land in task 0003).
+- `scripts/validate.sh` + `scripts/check-fast.sh` now guard web steps on `node_modules` so the
+  bare `package.json` doesn't break the gate before `pnpm install`.
+- `Makefile` target list widened to the full recipe set.
+- Verified: `just --summary`, `just progress`, `just check-fast`, `just bindings`, `just test-web`
+  all exit 0.
 
 ### 2026-09-04 — session 1 (Claude Code) — repo published + M0 task 0001
 

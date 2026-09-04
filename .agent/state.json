@@ -1,10 +1,10 @@
 {
   "$schema": "./state.schema.json",
   "project": "emumanager",
-  "updated": "2026-09-04",
+  "updated": "2026-09-05",
   "currentMilestone": "M0",
   "lastValidatedCommit": null,
-  "note": "Toolchains installed on the dev machine: rustc 1.98.1, pnpm 11.25, just 1.58. `just validate` not yet fully wired (task 0007); task 0001 verified via cargo build/clippy/fmt/test directly.",
+  "note": "Toolchains: rustc 1.98.1, pnpm 11.25, just 1.58. `just validate` not fully wired until task 0007 (web steps skip until `pnpm install` in 0003; several lint CLIs not installed). Tasks 0001, 0006 done and verified.",
   "coverageGate": { "rust": null, "web": null },
   "milestones": {
     "M0": { "title": "Skeleton & gate", "status": "in_progress" },
@@ -22,7 +22,7 @@
     { "id": "0003", "title": "Vite + React + TS strict app shell with 4 routes", "milestone": "M0", "status": "todo", "validate": "pnpm -C . run typecheck && pnpm -C . run test" },
     { "id": "0004", "title": "tauri-specta wired: ping command + generated bindings", "milestone": "M0", "status": "todo", "validate": "just bindings && git diff --exit-code src/lib/bindings.ts" },
     { "id": "0005", "title": "sqlx + initial migration + committed .sqlx offline data", "milestone": "M0", "status": "todo", "validate": "cargo sqlx prepare --check --workspace" },
-    { "id": "0006", "title": "justfile + package.json script mirror + scripts/", "milestone": "M0", "status": "todo", "validate": "just --summary" },
+    { "id": "0006", "title": "justfile + package.json script mirror + scripts/", "milestone": "M0", "status": "done", "validate": "just --summary" },
     { "id": "0007", "title": "just validate wired end to end (all static tools)", "milestone": "M0", "status": "todo", "validate": "just validate" },
     { "id": "0008", "title": "lefthook hooks (pre-commit regen+fmt, pre-push validate)", "milestone": "M0", "status": "todo", "validate": "lefthook run pre-commit" },
     { "id": "0009", "title": "CI: ci.yml matrix + schema.yml + emu-core-no-tauri check", "milestone": "M0", "status": "todo", "validate": "actionlint" }
