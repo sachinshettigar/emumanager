@@ -74,6 +74,13 @@ pub enum CoreError {
         detail: String,
     },
 
+    /// A registry database operation failed (connect, migrate, query).
+    #[error("registry database error: {detail}")]
+    Db {
+        /// The underlying `sqlx` error message.
+        detail: String,
+    },
+
     /// The operation was cancelled by the user or a shutdown.
     #[error("operation cancelled")]
     Cancelled,
@@ -94,6 +101,7 @@ impl CoreError {
             CoreError::Process { .. } => "process_failed",
             CoreError::Download { .. } => "download_failed",
             CoreError::Fs { .. } => "fs_error",
+            CoreError::Db { .. } => "db_error",
             CoreError::Cancelled => "cancelled",
         }
     }
@@ -167,6 +175,13 @@ mod tests {
             }
             .code(),
             "fs_error",
+        );
+        assert_eq!(
+            CoreError::Db {
+                detail: "locked".into(),
+            }
+            .code(),
+            "db_error",
         );
         assert_eq!(CoreError::Cancelled.code(), "cancelled");
     }

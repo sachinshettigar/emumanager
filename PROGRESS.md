@@ -6,25 +6,26 @@ Narrative companion to `.agent/state.json`. Update both together (see
 ## Current state
 
 - **Milestone:** M0 — Skeleton & gate
-- **Phase:** Workspace, task runner, frontend shell, `emu-core` domain layer, and the typed
-  Rust↔TS IPC seam all stand up. Tasks `0001`, `0002`, `0003`, `0004`, `0006` done. `emu-core`
-  has the full model + port traits + `Provider` + `testing` fakes (39 tests). `src-tauri`
+- **Phase:** Workspace, task runner, frontend shell, `emu-core` domain + registry, and the typed
+  Rust↔TS IPC seam all stand up. Tasks `0001`–`0006` done (M0: 6/9). `emu-core` has the full
+  model + port traits + `Provider` + `testing` fakes (39 unit tests) and a SQLite `Registry`
+  (`sqlx` 0.8, `migrations/0001_init.sql`, `Registry::open` + 1 integration test). `src-tauri`
   serves a `ping` command through `tauri-specta`; `src/lib/bindings.ts` is generated (6 rust
-  tests). Frontend shell renders 4 routes and calls `ping` via a `usePing()` TanStack Query
-  hook (11 web tests). `cargo test --workspace --all-features`, `clippy -D warnings`, `fmt`,
-  `pnpm {typecheck,lint,test,format:check}`, and `just check-fast` all green.
+  tests). Frontend renders 4 routes and calls `ping` via a `usePing()` hook (11 web tests);
+  `@tauri-apps/cli` added so `just dev` launches a window. `cargo test --workspace
+  --all-features`, `clippy -D warnings`, `fmt`, `pnpm {typecheck,lint,test,format:check}`, and
+  `just check-fast` all green.
 - **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 10.0.0, just 1.58.0.
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** _pending — `just validate` not fully wired until task 0007; the
   individual gates (`cargo test/clippy/fmt`, `pnpm` chain, `just check-fast`) are green._
-- **Next action:** task `0005` (sqlx + initial migration + committed `.sqlx/`). Then
-  `0007 → 0008 → 0009`. Deferred: the mechanical `#[derive(specta::Type)]` pass on the
-  `emu-core` DTOs — moves to the first M1 command that returns an `emu-core` type across IPC
-  (the `tauri-specta`/`specta` version pin it was waiting on is now in place).
+- **Next action:** task `0007` (`just validate` wired end to end). Then `0008 → 0009`.
+  Deferred: `#[derive(specta::Type)]` on the `emu-core` DTOs → first M1 IPC command;
+  `.sqlx/` offline cache + `query!` macros → M3.
 
 ## Milestone checklist
 
-- [~] **M0** Skeleton & gate — tasks 0001–0004, 0006 done; 0005, 0007–0009 open
+- [~] **M0** Skeleton & gate — tasks 0001–0006 done; 0007–0009 open
 - [ ] M1 Toolchain manager: SDK from zero
 - [ ] M2 Create & launch one emulator end-to-end
 - [ ] M3 Registry & reliable tracking
@@ -34,6 +35,25 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 3 (Claude Code) — M0 task 0005 (sqlx registry bootstrap)
+
+- **Task 0005 done** — `emu-core::registry::Registry::open(data_dir)` creates
+  `<data_dir>/db.sqlite` (WAL + foreign keys), runs `sqlx::migrate!("../../migrations")`,
+  re-open is idempotent. `migrations/0001_init.sql`: `emulators`, `images`, `profiles`, `jobs`
+  (minimal — full schema is M3).
+- `sqlx` 0.8, `default-features = false`, features `runtime-tokio` + `sqlite` (bundled, no
+  system lib) + `migrate` + `macros` (only for `migrate!`). **No `query!` macros** → no
+  `DATABASE_URL`, no `.sqlx/` cache; `validate.sh`'s `sqlx prepare --check` step is now gated on
+  `[[ -d .sqlx ]]`. Runtime `query_as` used in the test.
+- `CoreError::Db { detail }` added (code `db_error`). 1 integration test
+  (`tests/registry_open.rs`); `SQLX_OFFLINE=true cargo build -p emu-core` clean.
+- `just db-migrate` simplified to forward-only `cargo sqlx migrate add`.
+- **Also this session:** added `@tauri-apps/cli` 2.11.4 so `just dev` runs — verified the
+  window launches (Vite :1420 + the Rust shell). Commit `b496976`.
+- Deviation: `.sqlx/` + compile-time-checked queries deferred to M3; `Registry` not yet opened
+  from `src-tauri` startup (no consumer until M3); `lefthook.yml` `db-prepare` hook needs the
+  same `[[ -d .sqlx ]]` guard — flagged for task 0008.
 
 ### 2026-09-05 — session 3 (Claude Code) — M0 task 0004 (tauri-specta IPC seam)
 

@@ -23,8 +23,12 @@ if [[ -f Cargo.toml ]]; then
   if have cargo-nextest; then run cargo nextest run --workspace; else run cargo test --workspace; fi
   if have cargo-deny; then run cargo deny check; else echo "   (skip: cargo-deny not installed)"; fi
   if have cargo-machete; then run cargo machete; else echo "   (skip: cargo-machete not installed)"; fi
-  step "sqlx offline metadata current"
-  run cargo sqlx prepare --check --workspace
+  if [[ -d .sqlx ]]; then
+    step "sqlx offline metadata current"
+    run cargo sqlx prepare --check --workspace
+  else
+    echo; echo "   (skip: no .sqlx/ offline cache — no query! macros yet, see task 0005)"
+  fi
   step "ipc bindings fresh"
   run just bindings && run git diff --exit-code src/lib/bindings.ts
 else

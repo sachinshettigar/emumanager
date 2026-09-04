@@ -22,6 +22,16 @@ time = { version = "0.3", default-features = false, features = [
 ] }
 url = { version = "2", features = ["serde"] }
 sha2 = "0.10"
+# Local registry DB. `sqlite` bundles SQLite (no system lib); `migrate` + `macros`
+# give `sqlx::migrate!` (compile-time embed — no DATABASE_URL). Queries are
+# runtime-checked (`query_as`, not `query!`), so there is no `.sqlx/` offline
+# cache until M3 adopts the checked macros.
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "sqlite",
+    "migrate",
+    "macros",
+] }
 
 [features]
 # Enables the in-crate fakes for the port traits (FakeProcessRunner, FakeDownloader,
@@ -31,4 +41,9 @@ testing = []
 [dev-dependencies]
 emu-core = { path = ".", features = ["testing"] }
 serde_json.workspace = true
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
+tempfile = "3"
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "sqlite",
+] }

@@ -45,11 +45,12 @@ bindings:
     cargo test -p emumanager --lib export::export_bindings -- --exact
     @echo "bindings: wrote src/lib/bindings.ts"
 
-# Create a new sqlx migration.
+# Create a new (timestamped, forward-only) migration in migrations/.
 db-migrate name:
-    cargo sqlx migrate add -r "{{name}}"
+    cargo sqlx migrate add "{{name}}"
 
-# Refresh .sqlx/ offline query metadata after changing a query.
+# Refresh .sqlx/ offline query metadata. Only needed once code uses the checked
+# `query!` macros (M3); until then there are no queries to cache.
 db-prepare:
     cargo sqlx prepare --workspace
 

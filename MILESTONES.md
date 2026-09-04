@@ -15,7 +15,8 @@ Goal: an empty Tauri app that builds on all three OSes and a validation gate tha
 - [x] Cargo workspace: `src-tauri` + `crates/emu-core|emu-android|emu-host|emu-helper` compile
 - [x] Vite + React + TS (strict) frontend renders an app shell with the 4 nav routes (static)
 - [x] `tauri-specta` wired: one `ping` command, `src/lib/bindings.ts` generated and used
-- [ ] `sqlx` set up with an initial migration + `.sqlx/` committed; DB opens in the data dir
+- [x] `sqlx` set up with an initial migration; `Registry::open` migrates a SQLite DB in the data
+      dir (`.sqlx/` offline cache deferred to M3 — no `query!` macros yet)
 - [x] `justfile` with every recipe in `AGENTS.md` §4; `package.json` script mirrors
 - [ ] `lefthook` installed; pre-commit runs fmt + `bindings` + `db-prepare` and stages results
 - [ ] `just validate` runs and passes: fmt, `tsc`, `clippy -D warnings`, `cargo nextest`, vitest,

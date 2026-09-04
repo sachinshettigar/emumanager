@@ -21,6 +21,7 @@ pub mod error;
 pub mod model;
 pub mod ports;
 pub mod provider;
+pub mod registry;
 
 #[cfg(feature = "testing")]
 pub mod testing;
