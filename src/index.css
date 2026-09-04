@@ -1,0 +1,35 @@
+@import "./styles/tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--em-bg-app);
+    color: var(--em-text-ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a {
+    color: var(--em-primary);
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: var(--em-primary-hover);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--em-primary);
+    outline-offset: 2px;
+  }
+}

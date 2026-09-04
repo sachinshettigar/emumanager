@@ -1,0 +1,25 @@
+# Prettier governs the frontend (src/**, root TS/JS config). Everything else
+# has its own formatter or format conventions.
+dist/
+coverage/
+target/
+node_modules/
+pnpm-lock.yaml
+Cargo.lock
+*.tsbuildinfo
+
+src-tauri/
+crates/
+.sqlx/
+migrations/
+
+.agent/
+docs/
+schemas/
+scripts/
+.github/
+
+*.md
+*.yaml
+*.yml
+*.toml

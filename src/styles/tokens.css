@@ -1,0 +1,94 @@
+/*
+ * EmuManager design tokens — the single place colors and core scales are defined.
+ * Mirrors the wireframe system (docs/design/wireframes): IBM Plex Sans/Mono,
+ * blue = primary action, green = running / installed, amber = needs attention.
+ * Components and Tailwind utilities read these vars; no component hard-codes hex.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* surfaces */
+  --em-bg-app: #fbfbfa;
+  --em-bg-panel: #f2f1ee;
+  --em-bg-surface: #ffffff;
+  --em-bg-hover: rgba(31, 30, 28, 0.05);
+
+  /* borders */
+  --em-border-subtle: #e4e3de;
+  --em-border-default: #d9d8d3;
+
+  /* text */
+  --em-text-ink: #1f1e1c;
+  --em-text-muted: #6f6e69;
+  --em-text-faint: #9a9992;
+
+  /* semantic */
+  --em-primary: #2f6db3;
+  --em-primary-hover: #24547f;
+  --em-running: #2f8a5f;
+  --em-attention: #b07d2b;
+  --em-danger: #b0432b;
+
+  /* scale */
+  --em-radius-card: 8px;
+  --em-sidebar-w: 204px;
+  --em-topbar-h: 57px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --em-bg-app: #1a1917;
+    --em-bg-panel: #201f1d;
+    --em-bg-surface: #26241f;
+    --em-bg-hover: rgba(255, 255, 255, 0.06);
+
+    --em-border-subtle: #33322d;
+    --em-border-default: #3d3b35;
+
+    --em-text-ink: #f2f1ee;
+    --em-text-muted: #a6a49d;
+    --em-text-faint: #7c7a73;
+
+    --em-primary: #6aa4dd;
+    --em-primary-hover: #8bbce8;
+    --em-running: #57b487;
+    --em-attention: #d0a44f;
+    --em-danger: #d97a63;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --em-bg-app: #1a1917;
+  --em-bg-panel: #201f1d;
+  --em-bg-surface: #26241f;
+  --em-bg-hover: rgba(255, 255, 255, 0.06);
+
+  --em-border-subtle: #33322d;
+  --em-border-default: #3d3b35;
+
+  --em-text-ink: #f2f1ee;
+  --em-text-muted: #a6a49d;
+  --em-text-faint: #7c7a73;
+
+  --em-primary: #6aa4dd;
+  --em-primary-hover: #8bbce8;
+  --em-running: #57b487;
+  --em-attention: #d0a44f;
+  --em-danger: #d97a63;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
