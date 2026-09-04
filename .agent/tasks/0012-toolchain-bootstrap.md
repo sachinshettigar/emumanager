@@ -16,6 +16,15 @@ The orchestration that turns an empty data dir into a working, licensed `sdkmana
 `sdkmanager` to install the rest). Pure orchestration in `emu-core` against the `ports.rs` traits
 — fake-driven unit tests plus one real `#[ignore]`d integration test.
 
+**Reuse what's already on the machine — never re-download a component that's already usable.**
+`InstalledState` must check for an existing system Android SDK (`ANDROID_HOME`/
+`ANDROID_SDK_ROOT`, or an Android Studio default install path per OS) *in addition to* the app's
+own managed `sdk/` dir, and treat a component found there as installed too. `bootstrap()` only
+downloads what's missing from *both* locations. See the new acceptance criterion below — this
+was called out explicitly (not something to skip) because the naive version of this task (scan
+only the app's own dir) would re-download a multi-GB SDK on every machine that already has
+Android Studio, which is exactly the friction `docs/spec.md` goal 1 exists to remove.
+
 ## Context / links
 
 - Architecture: `docs/architecture.md` §3 ("Toolchain manager" bullet), §6 (integration tests are
@@ -39,6 +48,19 @@ The orchestration that turns an empty data dir into a working, licensed `sdkmana
       `cmdline-tools/latest/bin/sdkmanager`, `platform-tools/adb`(`.exe`), `emulator/emulator`)
       — filesystem is the source of truth, nothing cached (matches the `installed` field pattern
       already used on `SystemImage`)
+- [ ] **System-SDK detection.** Before concluding a component is missing, also check: (1)
+      `ANDROID_HOME` / `ANDROID_SDK_ROOT` env vars, (2) the OS-conventional Android Studio SDK
+      path (`~/Library/Android/sdk` macOS, `~/Android/Sdk` Linux, `%LOCALAPPDATA%\Android\Sdk`
+      Windows — cite Android Studio's own docs for these). Same marker-file check as above,
+      against each candidate root. A component found in a system root is reported `installed`
+      with *where* it was found (app-managed vs. system path) so later `create`/`launch` code
+      knows which `sdkmanager`/`adb`/`emulator` binary to invoke — don't just return a bool and
+      lose the location. Env-var/path lookup takes a plain injected function
+      (`Fn(&str) -> Option<String>` or similar), not a new port trait — keeps this unit-testable
+      without expanding `ports.rs` for a one-task need
+- [ ] `bootstrap()` only downloads/installs a component that is missing from **both** the
+      app-managed dir and every detected system root — a component satisfied by a system
+      install is skipped entirely (no copy, no re-download)
 - [ ] `bootstrap(data_dir, components, ports) -> Result<()>`: downloads + unzips
       `cmdline-tools;latest` if missing, runs `sdkmanager --licenses` (feeds `y\n` × N to stdin —
       cite the real license-count/prompt behavior from a captured `--help`/session, don't guess),

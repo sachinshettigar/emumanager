@@ -26,21 +26,30 @@ Narrative companion to `.agent/state.json`. Update both together (see
   given host, picking the right archive by `<host-os>`/`<host-arch>`. Real fixture captured from
   <https://dl.google.com/android/repository/repository2-3.xml> (trimmed, bytes verbatim), 10 new
   tests, no network in tests.
+- **M1 task 0011 (native port impls) done:** `src-tauri/src/ports/`: `NativeProcessRunner`
+  (`tokio::process`, merged stdout/stderr line streaming, real `kill()`), `NativeDownloader`
+  (`reqwest` 0.13 + `rustls`, streamed to a temp file, SHA-256 verified, atomic rename,
+  bounded-rate progress), `SystemClock`, `NativeFs` (`tokio::fs`, atomic write). 10 new tests,
+  including a one-shot local TCP HTTP responder for the downloader (no real network call). Not
+  wired into any command yet (that's 0012/0013) — a scoped, documented `#[allow(dead_code)]`
+  stands in rather than constructing-and-discarding real OS resources for nothing.
 - **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (via brew;
   was missing at the start of this session).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0011` (real `ProcessRunner`/`Downloader`/`Clock`/`Fs` port impls in
-  `src-tauri`) — carries forward two decisions to make there, not silently: the repo manifest's
-  SHA-1 checksums vs. `Downloader::fetch`'s SHA-256 verification, and (in `0012`) whether v1
-  bundles a JRE or requires a system JDK. Separately: once GitHub billing is fixed, re-watch the
-  next `ci.yml` push run, then flip `0009`/`M0` to `done`.
+- **Next action:** task `0012` (toolchain bootstrap + `InstalledState` in `emu-core`) — carries
+  forward two decisions flagged but not made yet (SHA-1-vs-SHA-256 verification;
+  bundled-JRE-vs-system-JDK), plus a new explicit requirement from the user: `InstalledState`
+  must recognize an already-installed system Android SDK (`ANDROID_HOME`/`ANDROID_SDK_ROOT` or
+  the OS-conventional Android Studio path) and skip downloading anything already satisfied there.
+  Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run, then flip
+  `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
 - [~] **M0** Skeleton & gate — tasks 0001–0008 done; 0009 (CI) blocked on a GitHub billing issue,
       not code — see Current state
-- [~] M1 Toolchain manager: SDK from zero — task 0010 done, 0011–0013 queued
+- [~] M1 Toolchain manager: SDK from zero — tasks 0010, 0011 done; 0012, 0013 queued
 - [ ] M2 Create & launch one emulator end-to-end
 - [ ] M3 Registry & reliable tracking
 - [ ] M4 Profiles: export / import / recreate
@@ -49,6 +58,50 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 5 (Claude Code) — M1 task 0011 (native port impls)
+
+- **Task 0011 done** — real, OS/network-facing implementations of the four leaf ports, living in
+  `src-tauri/src/ports/` per the architecture doc's crate-boundary table (these are glue, not
+  domain logic, so they don't belong in `emu-core` or `emu-android`).
+- `NativeProcessRunner` (`process.rs`): `tokio::process::Command`, no shell. `run()` captures
+  stdout/stderr separately via `wait_with_output()`. `spawn()` returns a `ChildProcess` whose
+  `next_line()` streams merged stdout+stderr (two reader tasks forwarding into one channel) —
+  documented trade-off: once merged, `wait()` can't attribute leftover lines back to their
+  original stream, so they fold into `Output::stdout` with `stderr` left empty; every real
+  consumer (tailing `emulator`/`sdkmanager` logs) only needs the merged text anyway. Found and
+  fixed a real hang-prone bug while writing the tests: stdin must be `Stdio::null()` (not always
+  `Stdio::piped()`) when there's nothing to feed, or a child reading stdin to EOF (`cat`,
+  `sdkmanager` without `--licenses` input) blocks forever waiting for a write end that never
+  closes.
+- `NativeDownloader` (`downloader.rs`): `reqwest` streamed to a temp file, SHA-256 hashed
+  incrementally, atomic rename on success, progress reported only when the percentage actually
+  changes (not per-chunk). Flagged, not resolved: Google's repo manifest (task 0010) only
+  publishes SHA-1, this port verifies SHA-256 — task 0012 (the first real caller) has to decide
+  how those reconcile.
+- `SystemClock` / `NativeFs` (`clock.rs`, `fs.rs`): straightforward `time`/`tokio::fs` wrappers,
+  matching the `Fs::write_atomic` temp-file-plus-rename pattern already established.
+- **Real bug this task's own `just validate` run found:** `reqwest`'s `rustls` feature (not
+  `rustls-tls` — that feature name changed since the task was scoped) pulls in
+  `rustls-platform-verifier` → `webpki-root-certs`, licensed `CDLA-Permissive-2.0` — not on
+  `deny.toml`'s allow-list. Added it (data-only crate, Mozilla's root CA bundle, not copyleft
+  code) with a comment. Verified by actually running `cargo deny check` locally, the same
+  discipline as task 0009's CI-bug fixes.
+- 10 new tests (all `#[tokio::test]`, no real network — the downloader tests spin up a one-shot
+  local `TcpListener` HTTP/1.0 responder). `cargo test -p emumanager --all-features`: 16 passed.
+  Full `just validate`: green.
+- **Deliberate `#[allow(dead_code, unused_imports)]`** on `src-tauri/src/ports/mod.rs`, scoped
+  and commented: no command constructs these yet (that's 0012/0013), and constructing-then-never
+  calling them (e.g. a `reqwest::Client` at startup) would add real cost for nothing — reverses
+  what the task file originally assumed ("an allow-free construction"), recorded as such in the
+  task's own Notes.
+- **Not done, by scope:** `NativeDownloader` is one-shot (no pause/resume/cancel/queueing) —
+  `MILESTONES.md`'s fuller M1 "Download engine" bullet stays unticked until that's actually
+  needed.
+- **New requirement from the user, filed into task 0012, not decided/implemented here:**
+  `InstalledState` must recognize an Android SDK the machine already has (env vars or the
+  OS-conventional Android Studio path) and skip downloading a component that's already satisfied
+  there — not just check the app's own managed dir every time.
 
 ### 2026-09-05 — session 4 (Claude Code) — M1 task 0010 (SDK component catalog)
 

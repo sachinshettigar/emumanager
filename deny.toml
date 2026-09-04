@@ -34,6 +34,10 @@ allow = [
     "Zlib",
     "MPL-2.0",
     "CC0-1.0",
+    # `webpki-root-certs` (via reqwest's `rustls` feature -> rustls-platform-verifier, task
+    # 0011's NativeDownloader) — a data-only crate bundling Mozilla's root CA list under CDLA,
+    # not source code under a copyleft term. Permissive in effect for a distributed app.
+    "CDLA-Permissive-2.0",
 ]
 confidence-threshold = 0.9
 exceptions = []

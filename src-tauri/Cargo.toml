@@ -30,6 +30,20 @@ specta = { version = "=2.0.0-rc.25", features = ["derive", "serde_json"] }
 specta-typescript = "=0.0.12"
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 
+# Real port implementations (src-tauri/src/ports/ — task 0011). Versions left unpinned to
+# whatever Tauri's own dependency tree already resolves (tokio 1.53, reqwest 0.13 per
+# Cargo.lock) rather than introducing a second copy.
+async-trait = "0.1"
+url = { version = "2", features = ["serde"] }
+sha2 = "0.10"
+futures-util = "0.3"
+time = { version = "0.3", default-features = false, features = ["std"] }
+tokio = { version = "1", features = ["process", "fs", "rt-multi-thread", "macros", "io-util", "sync", "net"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream"] }
+
+[dev-dependencies]
+tempfile = "3"
+
 [lints]
 workspace = true
 

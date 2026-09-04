@@ -12,6 +12,7 @@
 
 mod commands;
 mod ipc_error;
+mod ports;
 
 use tauri_specta::{collect_commands, Builder};
 
