@@ -1,0 +1,13 @@
+[package]
+name = "emu-host"
+description = "Host + accelerator inspection (KVM / WHPX / AEHD / HVF), disk and memory."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+emu-core.workspace = true

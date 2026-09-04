@@ -1,0 +1,19 @@
+[package]
+name = "emu-helper"
+description = "Standalone elevated helper. Run with OS elevation to do scriptable accelerator setup."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "emu-helper"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true

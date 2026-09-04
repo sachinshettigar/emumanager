@@ -1,0 +1,17 @@
+[package]
+name = "emu-core"
+description = "EmuManager domain logic. Must not depend on `tauri` (AGENTS.md §6)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+thiserror.workspace = true
+
+[features]
+# Enables in-crate fakes for the ports (added in task 0002).
+testing = []

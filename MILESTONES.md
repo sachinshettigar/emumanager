@@ -12,7 +12,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done
 
 Goal: an empty Tauri app that builds on all three OSes and a validation gate that runs.
 
-- [ ] Cargo workspace: `src-tauri` + `crates/emu-core|emu-android|emu-host|emu-helper` compile
+- [x] Cargo workspace: `src-tauri` + `crates/emu-core|emu-android|emu-host|emu-helper` compile
 - [ ] Vite + React + TS (strict) frontend renders an app shell with the 4 nav routes (static)
 - [ ] `tauri-specta` wired: one `ping` command, `src/lib/bindings.ts` generated and used
 - [ ] `sqlx` set up with an initial migration + `.sqlx/` committed; DB opens in the data dir
@@ -21,8 +21,8 @@ Goal: an empty Tauri app that builds on all three OSes and a validation gate tha
 - [ ] `just validate` runs and passes: fmt, `tsc`, `clippy -D warnings`, `cargo nextest`, vitest,
       `cargo deny`, schema fixtures, markdownlint, actionlint, gitleaks, `knip`, `cargo machete`
 - [ ] CI `ci.yml` green on ubuntu + windows + macos; `schema.yml` green
-- [ ] `emu-core` has no `tauri` dependency (CI check in place)
-- [ ] `scripts/progress-check.mjs` passes (`just progress`)
+- [x] `emu-core` has no `tauri` dependency (`scripts/emu-core-no-tauri.sh`; CI job pending task 0009)
+- [x] `scripts/progress-check.mjs` passes (`just progress`)
 
 DoD: fresh clone → `just setup && just validate` passes on all three OSes in CI; `just dev` opens
 a window with the 4 (empty) screens.

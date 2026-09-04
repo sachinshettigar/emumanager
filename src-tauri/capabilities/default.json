@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Base capability set for the main window. Feature permissions are added as milestones land.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

@@ -1,0 +1,42 @@
+[workspace]
+resolver = "2"
+members = [
+    "src-tauri",
+    "crates/emu-core",
+    "crates/emu-android",
+    "crates/emu-host",
+    "crates/emu-helper",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+license = "UNLICENSED"
+repository = "https://github.com/sachinshettigar/emumanager"
+
+[workspace.dependencies]
+emu-core = { path = "crates/emu-core" }
+emu-android = { path = "crates/emu-android" }
+emu-host = { path = "crates/emu-host" }
+
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# Deliberate allows — revisit if they start hiding real issues.
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+
+[profile.dev]
+# Faster incremental builds while iterating on the Rust side.
+opt-level = 0
+
+[profile.release]
+strip = true
+lto = "thin"

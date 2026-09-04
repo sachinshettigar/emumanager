@@ -7,8 +7,9 @@ node_modules
 pnpm-debug.log*
 .pnpm-store
 
-# Vite / frontend build
-dist
+# Vite / frontend build (keep the M0 placeholder until task 0003 wires the real build)
+dist/*
+!dist/index.html
 dist-ssr
 *.local
 

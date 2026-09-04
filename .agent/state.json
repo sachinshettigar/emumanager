@@ -4,6 +4,7 @@
   "updated": "2026-09-04",
   "currentMilestone": "M0",
   "lastValidatedCommit": null,
+  "note": "Toolchains installed on the dev machine: rustc 1.98.1, pnpm 11.25, just 1.58. `just validate` not yet fully wired (task 0007); task 0001 verified via cargo build/clippy/fmt/test directly.",
   "coverageGate": { "rust": null, "web": null },
   "milestones": {
     "M0": { "title": "Skeleton & gate", "status": "in_progress" },
@@ -16,7 +17,7 @@
     "M7": { "title": "Feature-complete v1.0", "status": "todo" }
   },
   "tasks": [
-    { "id": "0001", "title": "Cargo workspace skeleton", "milestone": "M0", "status": "todo", "validate": "cargo build --workspace" },
+    { "id": "0001", "title": "Cargo workspace skeleton", "milestone": "M0", "status": "done", "validate": "cargo build --workspace" },
     { "id": "0002", "title": "emu-core ports and models (no impls)", "milestone": "M0", "status": "todo", "validate": "cargo test -p emu-core" },
     { "id": "0003", "title": "Vite + React + TS strict app shell with 4 routes", "milestone": "M0", "status": "todo", "validate": "pnpm -C . run typecheck && pnpm -C . run test" },
     { "id": "0004", "title": "tauri-specta wired: ping command + generated bindings", "milestone": "M0", "status": "todo", "validate": "just bindings && git diff --exit-code src/lib/bindings.ts" },
