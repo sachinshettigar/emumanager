@@ -1,0 +1,429 @@
+<title>EmuManager Build Plan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
+
+<style>
+  :root {
+    --ground:#fafbfc; --surface:#ffffff; --surface-2:#f3f6f8;
+    --ink:#1b2127; --muted:#59646e; --faint:#8b96a0; --line:#dce2e7;
+    --accent:#2f6db3; --accent-ink:#245a95; --accent-soft:#e9f1f8;
+    --ok:#2f8a5f; --warn:#a9741f; --mono-ink:#39434c;
+    --shadow:0 1px 2px rgba(20,30,40,.04),0 8px 24px rgba(20,30,40,.05);
+    --sans:'IBM Plex Sans',ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;
+    --serif:'IBM Plex Serif',ui-serif,Georgia,'Times New Roman',serif;
+    --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --ground:#0f1419; --surface:#161c22; --surface-2:#1c242c;
+      --ink:#e4e8eb; --muted:#98a4ae; --faint:#6d7883; --line:#28323b;
+      --accent:#66a2d9; --accent-ink:#9cc4e8; --accent-soft:#16232f;
+      --ok:#59bd8d; --warn:#d7a44a; --mono-ink:#aeb9c2;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0f1419; --surface:#161c22; --surface-2:#1c242c;
+    --ink:#e4e8eb; --muted:#98a4ae; --faint:#6d7883; --line:#28323b;
+    --accent:#66a2d9; --accent-ink:#9cc4e8; --accent-soft:#16232f;
+    --ok:#59bd8d; --warn:#d7a44a; --mono-ink:#aeb9c2;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+    font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:812px;margin:0 auto;padding:64px 28px 120px}
+  @media(max-width:640px){.wrap{padding:40px 20px 80px}}
+
+  a{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid var(--line)}
+  a:hover{border-color:var(--accent)}
+  code{font-family:var(--mono);font-size:.86em;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:4px;padding:.08em .38em;color:var(--mono-ink)}
+  h1,h2,h3{font-family:var(--sans);font-weight:600;line-height:1.25;text-wrap:balance}
+
+  /* masthead */
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--faint);margin:0 0 18px}
+  h1{font-family:var(--serif);font-weight:600;font-size:40px;letter-spacing:-.01em;margin:0 0 14px}
+  @media(max-width:640px){h1{font-size:31px}}
+  .lede{font-size:18px;color:var(--muted);margin:0 0 26px;max-width:60ch}
+  .status{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12.5px;
+    background:var(--accent-soft);color:var(--accent-ink);border:1px solid var(--line);
+    border-radius:999px;padding:5px 12px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
+
+  .facts{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:30px 0 8px}
+  @media(max-width:640px){.facts{grid-template-columns:repeat(2,1fr)}}
+  .fact{background:var(--surface);padding:14px 16px}
+  .fact dt{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:0 0 5px}
+  .fact dd{margin:0;font-size:14px;font-weight:500}
+
+  section{margin-top:56px}
+  .snum{font-family:var(--mono);font-size:12.5px;color:var(--accent);margin:0 0 6px}
+  h2{font-size:23px;margin:0 0 14px;padding-bottom:10px;border-bottom:2px solid var(--line)}
+  h3{font-size:16px;margin:26px 0 8px}
+  p{margin:0 0 14px}
+  section p, section li{max-width:66ch}
+  ul{margin:0 0 14px;padding-left:22px}
+  li{margin:4px 0}
+  .note{font-size:14px;color:var(--muted)}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:20px 22px;box-shadow:var(--shadow);margin:18px 0}
+
+  /* diagrams */
+  figure{margin:22px 0}
+  .diagram{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:20px;box-shadow:var(--shadow)}
+  .diagram svg{display:block;width:100%;height:auto}
+  figcaption{font-size:13px;color:var(--muted);margin-top:10px;text-align:center}
+
+  /* tables */
+  .twrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;margin:18px 0;
+    box-shadow:var(--shadow)}
+  table{border-collapse:collapse;width:100%;font-size:13.5px;background:var(--surface)}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  thead th{font-family:var(--mono);font-size:11px;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--faint);background:var(--surface-2);white-space:nowrap}
+  tbody tr:last-child td{border-bottom:0}
+  td.k{font-family:var(--mono);color:var(--mono-ink);white-space:nowrap;font-size:12.5px}
+  .ms{font-family:var(--mono);font-weight:500;color:var(--accent-ink);white-space:nowrap}
+  .pill{display:inline-block;font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:5px;
+    border:1px solid var(--line)}
+  .pill.ok{color:var(--ok)} .pill.warn{color:var(--warn)} .pill.accent{color:var(--accent-ink)}
+
+  pre{font-family:var(--mono);font-size:12.5px;line-height:1.7;background:var(--surface);
+    border:1px solid var(--line);border-radius:12px;padding:18px 20px;overflow-x:auto;
+    color:var(--mono-ink);box-shadow:var(--shadow)}
+  pre b{color:var(--ink);font-weight:600}
+
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:640px){.cols{grid-template-columns:1fr}}
+
+  hr{border:0;border-top:1px solid var(--line);margin:56px 0 0}
+  footer{margin-top:22px;font-size:13px;color:var(--faint)}
+  footer code{font-size:12px}
+
+  @media(prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">Build plan &nbsp;/&nbsp; v1 &nbsp;/&nbsp; 2026-09-04</p>
+  <h1>EmuManager Build Plan</h1>
+  <p class="lede">A cross-platform desktop app to create, launch, track, and share Android
+    emulators &mdash; no Android Studio, no terminal. This is the plan for building it with AI
+    coding agents, in a way that survives switching between them.</p>
+  <span class="status"><span class="dot"></span>Status: pre-M0 &middot; repo scaffolded</span>
+
+  <dl class="facts">
+    <div class="fact"><dt>Scope</dt><dd>Android only (ADR&nbsp;0003)</dd></div>
+    <div class="fact"><dt>Stack</dt><dd>Tauri v2 &middot; Rust &middot; React/TS</dd></div>
+    <div class="fact"><dt>Sharing</dt><dd>Recipe-only <code>.emuprofile</code></dd></div>
+    <div class="fact"><dt>Targets</dt><dd>Windows &middot; Linux &middot; macOS</dd></div>
+  </dl>
+
+  <section>
+    <p class="snum">01</p>
+    <h2>What we&rsquo;re building</h2>
+    <p>From a fresh machine, EmuManager installs every Android SDK component it needs into its own
+      data directory &mdash; command-line tools, <code>platform-tools</code>, the emulator engine,
+      system images &mdash; then lets you browse device models, create an emulator, launch it,
+      watch its logs, and track every emulator you&rsquo;ve made across restarts. Export one as a
+      portable <code>.emuprofile</code> recipe; import it on another machine and it resolves
+      what&rsquo;s missing, downloads it, and recreates the instance.</p>
+    <p><strong>Not in v1:</strong> iOS simulators (they cannot run off macOS &mdash; ADR 0003),
+      physical-device mirroring, cloud/remote emulators, APK building, and cross-machine snapshot
+      bundles (recipes carry no binaries &mdash; ADR 0004).</p>
+    <p class="note">Full detail: <code>docs/spec.md</code>. Design: the four wireframes in
+      <code>docs/design/</code>.</p>
+  </section>
+
+  <section>
+    <p class="snum">02</p>
+    <h2>Architecture</h2>
+    <p>A Tauri v2 shell over a Rust workspace. The rule that keeps it honest:
+      <code>crates/emu-core</code> holds all domain logic and depends on
+      <code>tauri</code> nowhere &mdash; so it stays testable with <code>cargo test</code> alone.
+      <code>src-tauri</code> is glue. Every side effect (spawning a process, downloading, probing
+      the host) is a trait with a real impl and a test fake.</p>
+
+    <figure>
+      <div class="diagram">
+        <svg viewBox="0 0 760 430" role="img" aria-labelledby="arch-t">
+          <title id="arch-t">EmuManager layered architecture</title>
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0 0 L10 5 L0 10 z" fill="var(--faint)"/>
+            </marker>
+          </defs>
+          <!-- frontend -->
+          <rect x="70" y="18" width="620" height="58" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"/>
+          <text x="380" y="42" text-anchor="middle" font-family="var(--sans)" font-size="14" font-weight="600" fill="var(--ink)">Frontend &mdash; Vite + React + TypeScript (strict)</text>
+          <text x="380" y="61" text-anchor="middle" font-family="var(--mono)" font-size="11.5" fill="var(--muted)">Dashboard &nbsp;&middot;&nbsp; Create &nbsp;&middot;&nbsp; Dependencies &nbsp;&middot;&nbsp; Profiles</text>
+
+          <line x1="380" y1="76" x2="380" y2="104" stroke="var(--faint)" stroke-width="1.5" marker-end="url(#ah)" marker-start="url(#ah)"/>
+          <text x="392" y="95" font-family="var(--mono)" font-size="10.5" fill="var(--faint)">typed IPC &mdash; tauri-specta &rarr; src/lib/bindings.ts</text>
+
+          <!-- shell -->
+          <rect x="70" y="106" width="620" height="46" rx="9" fill="var(--surface-2)" stroke="var(--line)"/>
+          <text x="380" y="134" text-anchor="middle" font-family="var(--sans)" font-size="13" font-weight="600" fill="var(--ink)">src-tauri &mdash; commands, events, dependency wiring (no logic)</text>
+
+          <line x1="380" y1="152" x2="380" y2="172" stroke="var(--faint)" stroke-width="1.5" marker-end="url(#ah)"/>
+
+          <!-- core -->
+          <rect x="70" y="174" width="620" height="96" rx="9" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="86" y="196" font-family="var(--mono)" font-size="12" font-weight="600" fill="var(--accent-ink)">crates/emu-core &mdash; no tauri dependency</text>
+          <text x="86" y="217" font-family="var(--sans)" font-size="12" fill="var(--muted)">Orchestrator (jobs) &nbsp;&middot;&nbsp; Registry (SQLite) &nbsp;&middot;&nbsp; Profile engine</text>
+          <text x="86" y="235" font-family="var(--sans)" font-size="12" fill="var(--muted)">Toolchain manager &nbsp;&middot;&nbsp; Ports: Provider, ProcessRunner, Downloader, HostProbe</text>
+          <text x="86" y="255" font-family="var(--sans)" font-size="11.5" fill="var(--faint)">fakes for every port &rarr; unit tests need no network, no real Android binary</text>
+
+          <line x1="200" y1="270" x2="200" y2="300" stroke="var(--faint)" stroke-width="1.5" marker-end="url(#ah)"/>
+          <line x1="380" y1="270" x2="380" y2="300" stroke="var(--faint)" stroke-width="1.5" marker-end="url(#ah)"/>
+          <line x1="560" y1="270" x2="560" y2="300" stroke="var(--faint)" stroke-width="1.5" marker-end="url(#ah)"/>
+
+          <!-- impls -->
+          <rect x="70" y="302" width="240" height="72" rx="9" fill="var(--surface-2)" stroke="var(--line)"/>
+          <text x="190" y="326" text-anchor="middle" font-family="var(--mono)" font-size="12" font-weight="600" fill="var(--ink)">emu-android</text>
+          <text x="190" y="345" text-anchor="middle" font-family="var(--sans)" font-size="11" fill="var(--muted)">drives sdkmanager,</text>
+          <text x="190" y="360" text-anchor="middle" font-family="var(--sans)" font-size="11" fill="var(--muted)">avdmanager, emulator, adb</text>
+
+          <rect x="322" y="302" width="150" height="72" rx="9" fill="var(--surface-2)" stroke="var(--line)"/>
+          <text x="397" y="326" text-anchor="middle" font-family="var(--mono)" font-size="12" font-weight="600" fill="var(--ink)">emu-host</text>
+          <text x="397" y="345" text-anchor="middle" font-family="var(--sans)" font-size="11" fill="var(--muted)">KVM / WHPX / HVF</text>
+          <text x="397" y="360" text-anchor="middle" font-family="var(--sans)" font-size="11" fill="var(--muted)">detection + verdict</text>
+
+          <rect x="484" y="302" width="206" height="72" rx="9" fill="var(--surface-2)" stroke="var(--line)"/>
+          <text x="587" y="326" text-anchor="middle" font-family="var(--mono)" font-size="12" font-weight="600" fill="var(--ink)">emu-helper</text>
+          <text x="587" y="345" text-anchor="middle" font-family="var(--sans)" font-size="11" fill="var(--muted)">separate elevated binary</text>
+          <text x="587" y="360" text-anchor="middle" font-family="var(--sans)" font-size="11" fill="var(--muted)">enable-whpx, add-kvm-group</text>
+
+          <text x="190" y="398" text-anchor="middle" font-family="var(--mono)" font-size="10.5" fill="var(--faint)">&darr; dl.google.com &mdash; SDK, images, checksums</text>
+          <text x="587" y="398" text-anchor="middle" font-family="var(--mono)" font-size="10.5" fill="var(--faint)">&darr; one OS elevation prompt</text>
+        </svg>
+      </div>
+      <figcaption>Layers depend downward only. The frontend never reaches past the typed IPC seam.</figcaption>
+    </figure>
+
+    <p>The Rust&#8596;TS boundary is generated by <code>tauri-specta</code> into
+      <code>src/lib/bindings.ts</code> &mdash; hand-editing it fails CI. Long operations are jobs
+      that stream <code>job://progress</code> and <code>job://log</code> events; the UI never
+      blocks. The registry stores our metadata but re-reads ground truth from
+      <code>avdmanager list avd</code> / <code>adb devices</code> on every launch, so it never
+      lies about state. Full detail: <code>docs/architecture.md</code>.</p>
+  </section>
+
+  <section>
+    <p class="snum">03</p>
+    <h2>Developing across AI harnesses</h2>
+    <p>The whole project context lives in <strong>plain committed files</strong>, so work can move
+      between Claude Code, Cursor, Gemini, Antigravity, or anything else without losing a thing.
+      <code>AGENTS.md</code> is the single operating manual. Each tool&rsquo;s native config file
+      is a <strong>two-line pointer to it</strong> with no copied content &mdash; only
+      <code>CLAUDE.md</code> and <code>GEMINI.md</code> exist today; adding a tool means adding one
+      more one-line stub, never pasting rules (ADR 0005).</p>
+
+    <figure>
+      <div class="diagram">
+        <svg viewBox="0 0 760 300" role="img" aria-labelledby="port-t">
+          <title id="port-t">Harness-agnostic context model</title>
+          <rect x="290" y="120" width="180" height="60" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="380" y="146" text-anchor="middle" font-family="var(--mono)" font-size="14" font-weight="600" fill="var(--accent-ink)">AGENTS.md</text>
+          <text x="380" y="165" text-anchor="middle" font-family="var(--sans)" font-size="10.5" fill="var(--muted)">the one operating manual</text>
+
+          <!-- stubs above -->
+          <g font-family="var(--mono)" font-size="11.5" fill="var(--ink)">
+            <rect x="196" y="34" width="128" height="40" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+            <text x="260" y="58" text-anchor="middle">CLAUDE.md</text>
+            <rect x="336" y="34" width="128" height="40" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+            <text x="400" y="58" text-anchor="middle">GEMINI.md</text>
+            <rect x="476" y="34" width="128" height="40" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-dasharray="4 3"/>
+            <text x="540" y="55" text-anchor="middle" fill="var(--faint)">+ next tool</text>
+            <text x="540" y="68" text-anchor="middle" font-size="9" fill="var(--faint)">one-line stub</text>
+          </g>
+          <g stroke="var(--faint)" stroke-width="1.3" fill="none">
+            <path d="M260 74 L330 120"/><path d="M400 74 L392 118"/><path d="M540 74 L452 120"/>
+          </g>
+          <text x="628" y="108" font-family="var(--sans)" font-size="10.5" fill="var(--faint)">all just redirect &rarr;</text>
+
+          <!-- sources below -->
+          <g font-family="var(--mono)" font-size="11.5" fill="var(--ink)">
+            <rect x="86" y="228" width="150" height="44" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+            <text x="161" y="248" text-anchor="middle">docs/</text>
+            <text x="161" y="263" text-anchor="middle" font-size="9" fill="var(--muted)">spec &middot; architecture &middot; ADRs</text>
+            <rect x="256" y="228" width="150" height="44" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+            <text x="331" y="248" text-anchor="middle">.agent/</text>
+            <text x="331" y="263" text-anchor="middle" font-size="9" fill="var(--muted)">state &middot; tasks &middot; journal</text>
+            <rect x="426" y="228" width="150" height="44" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+            <text x="501" y="248" text-anchor="middle">playbooks/</text>
+            <text x="501" y="263" text-anchor="middle" font-size="9" fill="var(--muted)">the &ldquo;skills&rdquo;</text>
+            <rect x="596" y="228" width="120" height="44" rx="8" fill="var(--surface-2)" stroke="var(--line)"/>
+            <text x="656" y="248" text-anchor="middle">just</text>
+            <text x="656" y="263" text-anchor="middle" font-size="9" fill="var(--muted)">one gate command</text>
+          </g>
+          <g stroke="var(--faint)" stroke-width="1.3" fill="none">
+            <path d="M161 228 L340 180"/><path d="M331 228 L360 182"/><path d="M501 228 L420 182"/><path d="M656 228 L452 180"/>
+          </g>
+        </svg>
+      </div>
+      <figcaption>A new tool reads <code>AGENTS.md</code>, the newest journal entry, and
+        <code>just progress</code> &mdash; then it knows exactly where to resume.</figcaption>
+    </figure>
+
+    <p><strong>Switching tools</strong> is a handoff: finish a coherent slice, run
+      <code>just validate</code>, update the task file + <code>.agent/state.json</code> +
+      <code>PROGRESS.md</code>, and leave a journal entry whose &ldquo;next action&rdquo; line can
+      be started cold. Recipe: <code>docs/playbooks/bootstrap-new-harness.md</code>. Handoff
+      prompt: <code>docs/prompts/handoff.md</code>.</p>
+  </section>
+
+  <section>
+    <p class="snum">04</p>
+    <h2>AI tooling configuration</h2>
+    <p>Every concept a harness offers is mapped to a plain-file equivalent, so nothing is trapped
+      in one tool.</p>
+    <div class="twrap">
+      <table>
+        <thead><tr><th>Concept</th><th>Where it lives here</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="k">memory</td><td><code>docs/context/</code>, <code>docs/adr/</code>, <code>PROGRESS.md</code>, <code>.agent/journal/</code></td><td>Committed. A tool&rsquo;s private memory is scratch only.</td></tr>
+          <tr><td class="k">skills</td><td><code>docs/playbooks/*.md</code></td><td>Claude Code wrappers under <code>.claude/skills/</code> are 3 lines pointing here.</td></tr>
+          <tr><td class="k">prompts</td><td><code>docs/prompts/*.md</code></td><td>onboard, implement-task, review-change, handoff, plan-milestone.</td></tr>
+          <tr><td class="k">hooks</td><td><code>lefthook.yml</code> &rarr; <code>scripts/</code></td><td>Same scripts CI and <code>just</code> call. Pre-commit regenerates bindings + sqlx data and stages them.</td></tr>
+          <tr><td class="k">tools / commands</td><td><code>justfile</code> (mirrored by <code>package.json</code>, <code>Makefile</code>)</td><td>One vocabulary: <code>check-fast</code>, <code>validate</code>, <code>bindings</code>, <code>progress</code>, &hellip;</td></tr>
+          <tr><td class="k">rules</td><td><code>AGENTS.md</code></td><td>§6 golden rules, §7 coding standards. Tool config files only redirect.</td></tr>
+          <tr><td class="k">tasks / backlog</td><td><code>.agent/tasks/NNNN-*.md</code> + <code>.agent/state.json</code></td><td>Acceptance criteria + a validate command per task.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Golden rules, condensed: domain logic stays in <code>emu-core</code> (no
+      <code>tauri</code>); IPC only through generated bindings; never invent Android CLI behavior
+      &mdash; parse against captured fixtures and cite the source; no secrets or personal data; no
+      network in unit tests; keep <code>just validate</code> green on <code>main</code>.</p>
+  </section>
+
+  <section>
+    <p class="snum">05</p>
+    <h2>Validation &amp; static analysis</h2>
+    <p>One command &mdash; <code>just validate</code> &mdash; runs the whole gate. Green here means
+      green in CI. Nothing in it touches the network or spawns a real Android binary.</p>
+    <div class="twrap">
+      <table>
+        <thead><tr><th>Area</th><th>Tools</th><th>Catches</th></tr></thead>
+        <tbody>
+          <tr><td class="k">Rust</td><td><code>rustfmt</code>, <code>clippy -D warnings</code>, <code>cargo-nextest</code>, <code>llvm-cov</code></td><td>style, foot-guns, logic regressions, coverage below the milestone gate</td></tr>
+          <tr><td class="k">Rust deps</td><td><code>cargo-deny</code>, <code>cargo-machete</code>, <code>cargo audit</code></td><td>bad licenses, advisories, banned/duplicate/dead crates</td></tr>
+          <tr><td class="k">Boundaries</td><td><code>scripts/emu-core-no-tauri.sh</code></td><td><code>emu-core</code> gaining a <code>tauri</code> dependency</td></tr>
+          <tr><td class="k">Contracts</td><td><code>git diff</code> after <code>just bindings</code>; <code>sqlx prepare --check</code></td><td>stale IPC bindings; queries changed without refreshing <code>.sqlx/</code></td></tr>
+          <tr><td class="k">TypeScript</td><td><code>tsc</code> strict, <code>typescript-eslint</code> type-checked, Prettier, Vitest, <code>knip</code></td><td>type errors, hook misuse, dead code, component regressions</td></tr>
+          <tr><td class="k">Schema</td><td><code>ajv</code> vs. <code>schemas/emuprofile/</code> fixtures</td><td><code>.emuprofile</code> schema invalid; a fixture in the wrong folder</td></tr>
+          <tr><td class="k">Repo hygiene</td><td><code>markdownlint</code>, <code>lychee</code>, <code>typos</code>, <code>actionlint</code>, <code>gitleaks</code></td><td>broken docs/links, typos, invalid workflows, committed secrets</td></tr>
+          <tr><td class="k">Progress</td><td><code>scripts/progress-check.mjs</code></td><td><code>state.json</code> vs. task files vs. <code>MILESTONES.md</code> drift</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>Heavier, run elsewhere:</strong> real <code>sdkmanager</code>/<code>avdmanager</code>
+      integration tests and full end-to-end (launch app &rarr; create &rarr; boot &rarr; assert)
+      run nightly and per-milestone. Full e2e via <code>tauri-driver</code> is Linux + Windows
+      only; macOS uses Playwright against the dev server plus a manual checklist. Matrix:
+      <code>docs/testing-and-validation.md</code>.</p>
+  </section>
+
+  <section>
+    <p class="snum">06</p>
+    <h2>Milestone roadmap</h2>
+    <p>Production vision cut into shippable slices. Each has a Definition of Done in
+      <code>MILESTONES.md</code>; the coverage gate ratchets up as the product hardens.</p>
+    <div class="twrap">
+      <table>
+        <thead><tr><th>ID</th><th>Slice</th><th>Done when&hellip;</th><th>Cov.</th></tr></thead>
+        <tbody>
+          <tr><td class="ms">M0</td><td>Skeleton &amp; gate</td><td>fresh clone &rarr; <code>just validate</code> green on all 3 OSes in CI; empty app window opens</td><td class="k">&mdash;</td></tr>
+          <tr><td class="ms">M1</td><td>Toolchain manager</td><td>from an empty data dir the app downloads cmdline-tools + JRE and <code>sdkmanager</code> runs through it</td><td class="k">60%</td></tr>
+          <tr><td class="ms">M2</td><td>Create &amp; launch</td><td>e2e: create a Play Store emulator and reach <span class="pill ok">Running</span> in the dashboard, zero terminal commands</td><td class="k">62%</td></tr>
+          <tr><td class="ms">M3</td><td>Registry &amp; tracking</td><td>kill the app mid-boot &rarr; next start reconciles to correct state; wipe / delete / logs work</td><td class="k">65%</td></tr>
+          <tr><td class="ms">M4</td><td>Profiles</td><td>export a recipe, delete the emulator + image, import &rarr; it boots again; cross-OS export/import job passes</td><td class="k">68%</td></tr>
+          <tr><td class="ms">M5</td><td>Host readiness + helper</td><td>host panel reports the right verdict + fix per OS; elevated helper does the scriptable setup</td><td class="k">70%</td></tr>
+          <tr><td class="ms">M6</td><td>Hardening &amp; packaging</td><td>tagged pre-release builds signed installers for all 3 OSes from CI; auto-update works</td><td class="k">72%</td></tr>
+          <tr><td class="ms">M7</td><td>Feature-complete v1.0</td><td>all three <code>spec.md</code> §7 success criteria pass on real machines; docs + license done</td><td class="k">75%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="snum">07</p>
+    <h2>Progress tracking</h2>
+    <div class="cols">
+      <div class="panel">
+        <h3 style="margin-top:0">The loop</h3>
+        <p class="note" style="margin:0">Pick the next <code>todo</code> task for
+          <code>currentMilestone</code> &rarr; implement in its file scope &rarr;
+          <code>just check-fast</code> &rarr; <code>just validate</code> &rarr; update the four
+          progress surfaces &rarr; commit (Conventional Commits, referencing the task id).</p>
+      </div>
+      <div class="panel">
+        <h3 style="margin-top:0">Task lifecycle</h3>
+        <p class="note" style="margin:0"><code>todo</code> &rarr; <code>doing</code> &rarr;
+          <code>review</code> &rarr; <code>done</code> &nbsp;(plus <code>blocked</code>). One task
+          <code>doing</code> at a time. <code>just progress</code> fails the build if a task file
+          and <code>state.json</code> disagree.</p>
+      </div>
+    </div>
+    <p>Four surfaces move together on every task transition
+      (<code>docs/playbooks/update-progress.md</code>): the <strong>task file</strong> (tick real
+      criteria, set status), <strong><code>.agent/state.json</code></strong> (machine-readable
+      state + <code>lastValidatedCommit</code>), <strong><code>PROGRESS.md</code></strong>
+      (narrative + milestone checkboxes), and a <strong>journal entry</strong> (dated handoff
+      note). <code>scripts/progress-check.mjs</code> is the guardrail and already runs today.</p>
+  </section>
+
+  <section>
+    <p class="snum">08</p>
+    <h2>Repo map &amp; getting started</h2>
+<pre><b>AGENTS.md</b>              the one operating manual  (CLAUDE.md / GEMINI.md just point here)
+<b>MILESTONES.md</b>          M0..M7, each with a Definition of Done
+<b>PROGRESS.md</b>            current narrative state + checkboxes
+<b>justfile</b>               task runner  (check-fast, validate, bindings, progress, ...)
+<b>docs/</b>
+  spec.md  architecture.md  testing-and-validation.md
+  adr/                 decisions 0001..0005 (append-only)
+  context/             glossary, domain model
+  playbooks/           step-by-step recipes ("skills")
+  prompts/             reusable prompt templates
+  design/              wireframes
+<b>.agent/</b>                tool-neutral working state
+  state.json           machine-readable progress
+  tasks/NNNN-slug.md   units of work with acceptance criteria
+  journal/             dated session handoff notes
+<b>schemas/emuprofile/</b>    .emuprofile JSON Schema + valid/invalid fixtures
+<b>src/</b>                   frontend (React/TS)
+<b>src-tauri/</b>             Tauri shell  (commands, events, wiring only)
+<b>crates/</b>
+  emu-core/            domain logic  &mdash;  NO tauri dependency
+  emu-android/         drives sdkmanager / avdmanager / emulator / adb
+  emu-host/            host + accelerator inspection
+  emu-helper/          tiny separate elevated binary</pre>
+
+    <h3>Getting started</h3>
+<pre>just setup      <span style="color:var(--faint)"># toolchains + dev deps + git hooks (idempotent)</span>
+just dev        <span style="color:var(--faint)"># run the app</span>
+just validate   <span style="color:var(--faint)"># the full gate &mdash; what CI runs</span>
+just progress   <span style="color:var(--faint)"># check the tracking files are consistent</span></pre>
+    <p class="note">New tool? Point it at <code>AGENTS.md</code>, read the newest
+      <code>.agent/journal/</code> entry, run <code>just progress</code>, and start at the next
+      <code>todo</code> task. That&rsquo;s the whole onboarding.</p>
+  </section>
+
+  <hr>
+  <footer>
+    EmuManager build plan &middot; generated 2026-09-04 &middot; lives in the repo at
+    <code>docs/build-plan.html</code>. Decisions of record are the ADRs; this page is the overview.
+  </footer>
+
+</div>
