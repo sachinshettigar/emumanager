@@ -8,8 +8,8 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Milestone:** M1 — Toolchain manager: SDK from zero (M0 stays open only on the CI task, see
   below; work moved on to M1 per user direction)
 - **Phase:** M0's app skeleton, `just validate` gate, and git hooks are solid and green locally.
-  M0 task `0009` (CI) is **blocked, not broken** — see below. M1 started: task `0010` (SDK
-  component catalog) **done**; `0011`–`0013` scoped and queued.
+  M0 task `0009` (CI) is **blocked, not broken** — see below. M1: tasks `0010`, `0011`, `0012`
+  **done**; `0013` (Dependencies screen IPC wiring) is the last thing left in M1.
 - **CI (task 0009) status:** the workflows themselves are fine — a live run did catch and this
   session fixed three real bugs (SPDX license field, wildcard path deps, unmaintained
   advisories; commit `a97606e`, verified locally with the real tools). The *next* push-triggered
@@ -23,33 +23,39 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **M1 task 0010 (SDK component catalog) done:** `emu-core::model::component` adds
   `Component`/`ComponentId`/`HostOs`/`HostArch`; `emu_android::catalog::parse()` reads Google's
   real repository manifest and resolves `cmdline-tools;latest`/`platform-tools`/`emulator` for a
-  given host, picking the right archive by `<host-os>`/`<host-arch>`. Real fixture captured from
-  <https://dl.google.com/android/repository/repository2-3.xml> (trimmed, bytes verbatim), 10 new
-  tests, no network in tests.
-- **M1 task 0011 (native port impls) done:** `src-tauri/src/ports/`: `NativeProcessRunner`
-  (`tokio::process`, merged stdout/stderr line streaming, real `kill()`), `NativeDownloader`
-  (`reqwest` 0.13 + `rustls`, streamed to a temp file, SHA-256 verified, atomic rename,
-  bounded-rate progress), `SystemClock`, `NativeFs` (`tokio::fs`, atomic write). 10 new tests,
-  including a one-shot local TCP HTTP responder for the downloader (no real network call). Not
-  wired into any command yet (that's 0012/0013) — a scoped, documented `#[allow(dead_code)]`
-  stands in rather than constructing-and-discarding real OS resources for nothing.
-- **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (via brew;
-  was missing at the start of this session).
+  given host, picking the right archive by `<host-os>`/`<host-arch>`.
+- **M1 task 0011 (native port impls) done:** `src-tauri/src/ports/`: `NativeProcessRunner`,
+  `NativeDownloader`, `SystemClock`, `NativeFs`.
+- **M1 task 0012 (toolchain bootstrap) done:** `emu-core/src/toolchain/{installed_state,
+  bootstrap}.rs`. `InstalledState::scan` checks the app-managed `sdk/` dir **and** any existing
+  system Android SDK (`ANDROID_SDK_ROOT`/`ANDROID_HOME` env vars, then the OS-conventional Android
+  Studio path) before calling anything missing — the user's "recognize what's already installed,
+  don't re-download it" requirement from earlier this session, now built. `bootstrap()` downloads,
+  SHA-1-verifies, and unpacks `cmdline-tools` itself (through the `Fs` port; the executable bit is
+  fixed up afterward with a real `chmod -R +x` via `ProcessRunner`, since `Fs::write_atomic`
+  carries no permission mode), accepts SDK licenses non-interactively, then asks the real
+  `sdkmanager` to install everything else — reusing its own resolver/downloader rather than
+  reimplementing one. Requires a system JDK 17+ (`java -version`, checked before anything else);
+  see `docs/adr/0006-require-system-jdk.md` for why v1 doesn't bundle a JRE. License-prompt
+  behavior (`N/N: License ...` / `Accept? (y/N):`) was captured from a **real**
+  `sdkmanager --licenses` run against a really-downloaded `cmdline-tools` 19.0, not guessed. The
+  `#[ignore]`d integration test was **actually run**, not just written: it downloaded real
+  `cmdline-tools` + `platform-tools` from Google into a scratch temp dir and got a working
+  `sdkmanager --version` back, ~35s, 2026-09-05.
+- **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (via brew),
+  java 21 (system JDK, exercised for real by task 0012).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0012` (toolchain bootstrap + `InstalledState` in `emu-core`) — carries
-  forward two decisions flagged but not made yet (SHA-1-vs-SHA-256 verification;
-  bundled-JRE-vs-system-JDK), plus a new explicit requirement from the user: `InstalledState`
-  must recognize an already-installed system Android SDK (`ANDROID_HOME`/`ANDROID_SDK_ROOT` or
-  the OS-conventional Android Studio path) and skip downloading anything already satisfied there.
-  Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run, then flip
-  `0009`/`M0` to `done`.
+- **Next action:** task `0013` — wire the Dependencies screen to real state: new `tauri-specta`
+  commands over `installed_state::scan` + `bootstrap`, `just bindings`, replace the screen's
+  static placeholder content. Last task in M1. Separately: once GitHub billing is fixed, re-watch
+  the next `ci.yml` push run, then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
 - [~] **M0** Skeleton & gate — tasks 0001–0008 done; 0009 (CI) blocked on a GitHub billing issue,
       not code — see Current state
-- [~] M1 Toolchain manager: SDK from zero — tasks 0010, 0011 done; 0012, 0013 queued
+- [~] M1 Toolchain manager: SDK from zero — tasks 0010, 0011, 0012 done; 0013 queued (last one)
 - [ ] M2 Create & launch one emulator end-to-end
 - [ ] M3 Registry & reliable tracking
 - [ ] M4 Profiles: export / import / recreate
@@ -58,6 +64,72 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 6 (Claude Code) — M1 task 0012 (toolchain bootstrap)
+
+- **Task 0012 done** — `crates/emu-core/src/toolchain/{mod,installed_state,bootstrap}.rs`:
+  `InstalledState::scan` + `bootstrap()`, the orchestration that turns an empty data dir into a
+  working, licensed `sdkmanager`.
+- **System-SDK detection built** (the user's mid-session requirement from the previous session):
+  `scan()` checks the app-managed `sdk/` dir first, then `ANDROID_SDK_ROOT`, then `ANDROID_HOME`,
+  then the OS-conventional Android Studio install path (`~/Library/Android/sdk` macOS,
+  `~/Android/Sdk` Linux, `%LOCALAPPDATA%\Android\Sdk` Windows) — each via the same marker-file
+  check, env/path lookup as a plain injected closure rather than a new port trait.
+  `ComponentLocation` records *where* a component was found (`SdkSource::AppManaged` vs.
+  `System(PathBuf)`), not just a bool, so `bootstrap()` (and later `create`/`launch`) know which
+  `sdkmanager`/`adb`/`emulator` to actually run — `toolchain::binary_path()` is the public helper
+  for that. `bootstrap()` only fetches/installs what's missing from *both* locations; a genuinely
+  fully-satisfied `wanted` set is a true no-op (asserted in a unit test — zero process/download
+  calls at all, not even the JDK check).
+- **Design decision, made while building this**: only `cmdline-tools` is ever downloaded and
+  unpacked directly by this module (SHA-1-verified against task 0010's catalog, since
+  `Downloader::fetch` only verifies SHA-256 — verification happens at the call site instead of
+  changing the trait). `platform-tools` and `emulator` are installed by asking the **real**
+  `sdkmanager` to do it (`sdkmanager "platform-tools" "emulator"`, one call, only the still-missing
+  ones) — reusing its own resolver/downloader/checksum logic instead of reimplementing it for two
+  more components. This is a real simplification the task file's literal wording already implied
+  but I confirmed was the right call by actually testing the alternative complexity it avoids.
+- **Archive extraction goes through the `Fs` port, not a bypass.** `zip` (pure-Rust, no system
+  `unzip`/`tar` dependency — matters for `docs/spec.md` goal 1's "zero external setup") reads the
+  archive; every entry is written via `Fs::ensure_dir`/`write_atomic`, so the whole path is
+  exercisable with `InMemoryFs` in fake-driven tests. Since `Fs::write_atomic` carries no
+  permission mode, the executable bit is missing after extraction — fixed with one real
+  `chmod -R +x <bin dir>` call through the existing `ProcessRunner` port (a no-op on Windows,
+  where `chmod` isn't even a real binary) rather than inventing a fifth port trait or bypassing
+  `Fs` to touch `std::fs` permissions directly.
+- **Three real captures, not guesses, this task needed and got:**
+  1. Downloaded the real `cmdline-tools` zip and inspected it — its top-level folder is literally
+     named `cmdline-tools/`, which must be renamed to `latest/` (an Android placement convention
+     the archive itself doesn't encode); confirmed the exec bit really is lost through a plain
+     unzip-then-Fs-write round trip.
+  2. Ran a real `yes | sdkmanager --licenses` against that real `cmdline-tools` (JDK 21 on this
+     machine) end to end: captured the exact `N of N SDK package licenses not accepted.` /
+     `N/N: License <id>:` / `Accept? (y/N):` / `All SDK package licenses accepted` shape, and
+     confirmed the count (7, that day) is not a stable number to hardcode — `bootstrap()` feeds a
+     bounded 50 `y` answers instead of piping `yes` forever.
+  3. Ran real `java -version` and confirmed OpenJDK prints its version line to **stderr**, not
+     stdout — `ensure_jdk` checks whichever stream is non-empty.
+- **JDK decision recorded**: `docs/adr/0006-require-system-jdk.md` — v1 requires a system JDK
+  17+ (checked before any download starts, clear actionable error if missing/too old) rather than
+  bundling a JRE; `docs/spec.md` §8's open question updated to point at the ADR instead of leaving
+  it dangling.
+- **The `#[ignore]`d integration test was actually run, not just written.** `emu-core` can't
+  depend on `src-tauri`/`tauri` (AGENTS.md §6.1), so `crates/emu-core/tests/toolchain_bootstrap.rs`
+  defines small, test-local `TestFs`/`TestDownloader`/`TestProcessRunner` over real
+  `tokio::fs`/`reqwest`/`tokio::process` (plus a dev-dependency on `emu-android`'s real catalog
+  parser — a supported Cargo dev-dependency cycle, test-build-only). Ran it for real:
+  `cargo test -p emu-core --all-features --test toolchain_bootstrap -- --ignored` downloaded the
+  real `cmdline-tools` + `platform-tools` from Google into a scratch temp dir and got a working
+  `sdkmanager --version` back, ~35s, 2026-09-05.
+- **Small tooling fix found and made along the way**: `scripts/progress-check.mjs` only allowed
+  one milestone `in_progress` at a time, which broke the moment M1 legitimately started while M0
+  stays open purely on the externally-blocked CI task. Relaxed the rule to allow a contiguous run
+  of `in_progress` milestones ending at `currentMilestone` (documented inline) rather than fudging
+  M0's status to satisfy the checker.
+- **68 emu-core unit tests + 1 registry integration test + 1 real `--ignored` integration test,
+  all passing.** `just validate` green.
+- **Not done here**: no JRE bundling (ADR 0006); no download progress/IPC wiring (task 0013); no
+  `sdkmanager --list` output parsing (M2, when system images matter).
 
 ### 2026-09-05 — session 5 (Claude Code) — M1 task 0011 (native port impls)
 

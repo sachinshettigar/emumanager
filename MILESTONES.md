@@ -43,17 +43,25 @@ a window with the 4 (empty) screens.
 Goal: from a machine with nothing, the app installs everything needed to make emulators.
 
 - [x] Component catalog: resolve versions from Google's repository XML (behind `Downloader`)
-- [ ] Download engine: queued, resumable, `pause`/`cancel`, SHA-256 verify, progress events
-- [ ] Bootstrap: fetch `cmdline-tools` + JRE into the data dir; run `sdkmanager` through it
-- [ ] Install `platform-tools`, `emulator`; accept licenses non-interactively
-- [ ] `InstalledState` scan of the data dir (versions, sizes) drives the Dependencies screen
+- [ ] Download engine: queued, resumable, `pause`/`cancel`, SHA-256 verify, progress events —
+      **partial**: one-shot fetch+verify+progress lands in task 0011; queueing/pause/resume/cancel
+      are not built (not needed by anything through M1; revisit when the Dependencies screen,
+      task 0013, or real multi-GB system-image downloads make it a real gap)
+- [x] Bootstrap: fetch `cmdline-tools` into the data dir; run `sdkmanager` through it — **no
+      bundled JRE**, a system JDK 17+ is required instead (`docs/adr/0006-require-system-jdk.md`)
+- [x] Install `platform-tools`, `emulator`; accept licenses non-interactively
+- [x] `InstalledState` scan of the data dir (+ any existing system SDK) drives the Dependencies
+      screen (task 0013 wires the UI; the scan itself is done)
 - [ ] Dependencies screen wired to real data: components list, active downloads, storage breakdown
-- [ ] `emu-android` parsers for `sdkmanager --list` / repo XML, tested against captured fixtures
-- [ ] Unit tests with fake `Downloader`/`ProcessRunner`; no network in `just validate`
+- [ ] `emu-android` parsers for `sdkmanager --list` / repo XML, tested against captured fixtures —
+      **partial**: the repo XML component catalog (task 0010) is done; `sdkmanager --list` output
+      parsing (system images) is not — not needed until M2's image list/create flow
+- [x] Unit tests with fake `Downloader`/`ProcessRunner`; no network in `just validate`
 
 DoD: on a clean CI job with an empty data dir, a `--ignored` integration test downloads
 `cmdline-tools` + `platform-tools` and `sdkmanager --version` succeeds through the app's managed
-install.
+install. **Met** (task 0012) — `cargo test -p emu-core --all-features --test toolchain_bootstrap
+-- --ignored` does exactly this against a real scratch temp dir; run for real 2026-09-05.
 
 ---
 

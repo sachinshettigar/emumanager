@@ -41,8 +41,25 @@ if (state.currentMilestone && !milestoneIds.includes(state.currentMilestone))
   err(`currentMilestone ${state.currentMilestone} not present in state.milestones`);
 
 const inProgress = Object.entries(state.milestones ?? {}).filter(([, m]) => m.status === "in_progress");
-if (inProgress.length > 1)
-  err(`more than one milestone is in_progress: ${inProgress.map(([k]) => k).join(", ")}`);
+if (inProgress.length > 1) {
+  // A milestone can stay "in_progress" instead of "done" when its own DoD has a line that isn't
+  // met for reasons outside the codebase (e.g. M0's CI confirmation blocked on a GitHub Actions
+  // billing issue — a human action, not a code bug) while work has already moved on to the next
+  // milestone (per explicit user direction: don't block on it, keep building). That's legitimate
+  // as long as the in_progress set is one contiguous run ending at currentMilestone; anything else
+  // (a gap, or an in_progress milestone ahead of currentMilestone) is still a real inconsistency.
+  const nums = inProgress.map(([k]) => Number(k.slice(1))).sort((a, b) => a - b);
+  const contiguous = nums.every((n, i) => i === 0 || n === nums[i - 1] + 1);
+  const currentNum = Number((state.currentMilestone ?? "").slice(1));
+  const endsAtCurrent = nums[nums.length - 1] === currentNum;
+  if (!contiguous || !endsAtCurrent) {
+    err(
+      `in_progress milestones must form one contiguous run ending at currentMilestone: ${inProgress
+        .map(([k]) => k)
+        .join(", ")}`,
+    );
+  }
+}
 if (state.currentMilestone && state.milestones?.[state.currentMilestone]?.status === "done")
   err(`currentMilestone ${state.currentMilestone} is marked done — advance currentMilestone`);
 

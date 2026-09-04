@@ -33,6 +33,18 @@ sqlx = { version = "0.8", default-features = false, features = [
     "migrate",
     "macros",
 ] }
+# Extracting downloaded SDK component archives (task 0012). `deflate` (pure-Rust, via `flate2`) is
+# the only codec every real Google SDK archive we extract actually uses — checked against the
+# component zips themselves, not guessed. No encryption/write support needed: we only ever read.
+zip = { version = "2", default-features = false, features = ["deflate"] }
+# SHA-1 verification of downloaded components: Google's repository manifest (task 0010) only
+# publishes SHA-1, while `ports::Downloader::fetch` verifies SHA-256 — task 0012 re-hashes the
+# downloaded bytes with this crate at the call site rather than changing the `Downloader` trait.
+sha1 = "0.10"
+# `tokio::task::spawn_blocking` for the (synchronous, real-filesystem) archive extraction step, so
+# it doesn't block the async runtime. Already a real transitive dependency via sqlx's
+# `runtime-tokio` feature; declared directly for clarity, `rt` is all this crate's own code needs.
+tokio = { version = "1", default-features = false, features = ["rt"] }
 
 [features]
 # Enables the in-crate fakes for the port traits (FakeProcessRunner, FakeDownloader,
@@ -42,9 +54,28 @@ testing = []
 [dev-dependencies]
 emu-core = { path = ".", features = ["testing"] }
 serde_json.workspace = true
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "macros"] }
+tokio = { version = "1", features = [
+    "rt",
+    "rt-multi-thread",
+    "macros",
+    "process",
+    "fs",
+    "io-util",
+] }
 tempfile = "3"
 sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio",
     "sqlite",
 ] }
+# Real (non-fake) `Fs`/`Downloader`/`ProcessRunner` for the `#[ignore]`d integration test only —
+# a small, test-local stand-in for `src-tauri`'s `NativeDownloader` (task 0011): `emu-core` can't
+# depend on the `src-tauri` binary crate itself (AGENTS.md §6.1 — `tauri` never flows the other
+# way), so this test proves the same real HTTP+filesystem+process path with its own minimal impls
+# rather than pulling in `src-tauri`.
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
+# `emu-android`'s real catalog parser (task 0010), so the integration test resolves today's actual
+# `cmdline-tools`/`platform-tools` archives instead of a hardcoded URL. A dev-dependency cycle
+# (emu-android depends on emu-core normally; emu-core dev-depends on emu-android for its own
+# tests) is an explicitly supported Cargo pattern — it only affects test builds, not the library
+# emu-android links against.
+emu-android.workspace = true

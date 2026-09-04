@@ -22,6 +22,7 @@ pub mod model;
 pub mod ports;
 pub mod provider;
 pub mod registry;
+pub mod toolchain;
 
 #[cfg(feature = "testing")]
 pub mod testing;

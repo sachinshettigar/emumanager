@@ -120,8 +120,8 @@ page. There is no small, cross-platform GUI that owns the whole lifecycle.
 
 ## 8. Open questions
 
-> QUESTION: bundle a JRE, or require a system JDK 17+? (leaning: bundle, ~40 MB, for true
-> zero-setup). Decide by M1.
+> DECIDED (M1, task 0012): require a system JDK 17+, not a bundled JRE — see
+> `docs/adr/0006-require-system-jdk.md`.
 
 > QUESTION: default headless vs. windowed launch, and how to show the emulator window on Wayland.
 > Decide by M2.
