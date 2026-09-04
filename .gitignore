@@ -41,3 +41,4 @@ target/nextest
 # App data written during local runs
 /.scratch
 /tmp
+.claude/

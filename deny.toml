@@ -3,7 +3,22 @@
 [advisories]
 version = 2
 yanked = "deny"
-ignore = []
+# "unmaintained" notices (not vulnerabilities) from Tauri/wry's own dependency
+# tree — GTK3 bindings (wry's Linux webview backend) and a few small
+# transitive crates. We don't control these; revisit on a Tauri/wry upgrade
+# that drops them. None are exploitable-vulnerability advisories.
+ignore = [
+    # gtk-rs GTK3 bindings, via tauri-runtime-wry (Linux webview backend)
+    "RUSTSEC-2024-0411", "RUSTSEC-2024-0412", "RUSTSEC-2024-0413",
+    "RUSTSEC-2024-0414", "RUSTSEC-2024-0415", "RUSTSEC-2024-0416",
+    "RUSTSEC-2024-0417", "RUSTSEC-2024-0418", "RUSTSEC-2024-0419",
+    "RUSTSEC-2024-0420",
+    # unic-* unicode crates, via urlpattern -> tauri-utils
+    "RUSTSEC-2025-0075", "RUSTSEC-2025-0080", "RUSTSEC-2025-0081",
+    "RUSTSEC-2025-0098", "RUSTSEC-2025-0100",
+    # small transitive proc-macro helpers
+    "RUSTSEC-2024-0370", "RUSTSEC-2024-0436",
+]
 
 [licenses]
 version = 2
@@ -22,10 +37,18 @@ allow = [
 ]
 confidence-threshold = 0.9
 exceptions = []
+# Our own workspace crates (`publish = false`) aren't distributed, so their
+# license field (an SPDX-invalid "UNLICENSED") shouldn't gate this check.
+private = { ignore = true }
 
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
+# Our own workspace crates reference each other by path with no version
+# constraint (`emu-core = { path = "crates/emu-core" }`) — that is exactly
+# what `wildcards = "deny"` exists to catch for *published* crates, but we
+# never publish (`publish = false`), so exempt path dependencies specifically.
+allow-wildcard-paths = true
 # emu-core must not pull tauri transitively (belt-and-braces with scripts/emu-core-no-tauri.sh)
 deny = []
 skip = []

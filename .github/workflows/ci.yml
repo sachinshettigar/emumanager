@@ -31,7 +31,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # Cold Windows builds (MSVC toolchain, no warm rust-cache yet) can run
+    # long; Swatinem/rust-cache makes subsequent runs much faster.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup

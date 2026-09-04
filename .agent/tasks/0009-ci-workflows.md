@@ -91,3 +91,33 @@ this repo pushes straight to `main`, so the ci.yml `push` trigger is what's obse
 - Added `.github/dependabot.yml` (cargo + npm + github-actions, weekly, patch-grouped) — not
   explicitly required by the acceptance list but listed as an option in scope, and it's a
   one-file, zero-maintenance addition.
+
+### Real bugs the first live CI run surfaced (fixed, verified locally with the real tools)
+
+The first push-triggered run (`33881911297`) failed on macOS and ubuntu, both in the same
+`cargo-deny check` step — installed the tools locally to confirm and fix rather than
+round-trip through CI blind:
+
+- **`license = "UNLICENSED"` is not a valid SPDX expression** (that's the npm convention, not
+  Cargo's) — `cargo-deny` correctly flagged every workspace crate as `error[unlicensed]`. Fix:
+  added `publish = false` to `[workspace.package]` (+ `publish.workspace = true` on every
+  member) — these crates are never published, so `[licenses] private = { ignore = true }` in
+  `deny.toml` is what actually matters; `license = "UNLICENSED"` stays as an informational value.
+- **`error[wildcard]`** on `emumanager`/`emu-host`/`emu-android`'s path dependencies
+  (`emu-core = { path = "..." }` has no version) — exactly what `wildcards = "deny"` exists to
+  catch for a *published* crate, but we never publish. Fix: `[bans] allow-wildcard-paths = true`.
+- **17 `unmaintained` advisories**, all transitive through Tauri/wry (10× gtk-rs GTK3 bindings —
+  wry's Linux webview backend, 5× `unic-*` unicode crates via `urlpattern`, `paste`,
+  `proc-macro-error`) — not vulnerabilities, not ours to fix. Added to `deny.toml`
+  `[advisories] ignore` with a comment; revisit on a Tauri/wry upgrade.
+- **`cargo machete`** (once actually installed) flagged `emu-android`/`emu-host` as unused in
+  `src-tauri/Cargo.toml` — true today (no command uses them yet, M1/M2 will). Added
+  `[package.metadata.cargo-machete] ignored = [...]` rather than removing-then-re-adding them.
+- Verified locally after each fix by actually installing `cargo-deny`, `cargo-machete`,
+  `cargo-nextest`, `cargo-llvm-cov` (none were on this machine before) — all four now genuinely
+  run in `just validate` here too, not just in CI.
+- **Windows `gate` job timed out at 20 min**, still mid-`cargo test` compile on a cold cache
+  (not a real failure) — bumped `timeout-minutes` to 30; `Swatinem/rust-cache` should make
+  subsequent runs on `main` much faster.
+- Re-pushed; re-check `gh run list --workflow=ci.yml` for the next run before flipping this task
+  and `M0` to `done`.
