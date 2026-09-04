@@ -24,6 +24,12 @@ for t in just actionlint gitleaks lychee; do
 done
 
 echo "==> git hooks"
-if have lefthook; then lefthook install; else echo "   install lefthook then re-run: https://lefthook.dev"; fi
+if [[ -f package.json ]]; then
+  pnpm exec lefthook install
+elif have lefthook; then
+  lefthook install
+else
+  echo "   lefthook not available — hooks not installed (run \`just hooks\` after \`pnpm install\`)"
+fi
 
 echo "==> done. Try: just validate"

@@ -17,13 +17,13 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 10.0.0, just 1.58.0.
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit` (the task-0007 commit).
-- **Next action:** task `0008` (lefthook pre-commit/pre-push hooks). Then `0009` (CI matrix).
-  Deferred: `#[derive(specta::Type)]` on the `emu-core` DTOs → first M1 IPC command;
-  `.sqlx/` offline cache + `query!` macros → M3.
+- **Next action:** task `0009` (CI: `ci.yml` matrix ubuntu/windows/macos + `schema.yml` +
+  `emu-core`-no-tauri job) — the last M0 task. Deferred: `#[derive(specta::Type)]` on the
+  `emu-core` DTOs → first M1 IPC command; `.sqlx/` offline cache + `query!` macros → M3.
 
 ## Milestone checklist
 
-- [~] **M0** Skeleton & gate — tasks 0001–0007 done; 0008, 0009 open
+- [~] **M0** Skeleton & gate — tasks 0001–0008 done; 0009 (CI) open
 - [ ] M1 Toolchain manager: SDK from zero
 - [ ] M2 Create & launch one emulator end-to-end
 - [ ] M3 Registry & reliable tracking
@@ -33,6 +33,19 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 3 (Claude Code) — M0 task 0008 (lefthook git hooks)
+
+- **Task 0008 done** — `lefthook` is an npm dev-dep (`2.1.12`, bundles the binary); `just setup`
+  runs `pnpm exec lefthook install`, `just hooks` re-installs. Hooks are **active on this repo
+  now**.
+- `pre-commit`: `cargo fmt` on staged `*.rs` + `prettier --write` on staged web files (re-added);
+  `just bindings` when `*.{rs,toml}` staged (re-stages `src/lib/bindings.ts`); `just db-prepare`
+  guarded on `.sqlx/` + `cargo-sqlx` (no-op until M3); `gitleaks protect` guarded on the binary
+  (skip line otherwise); `just progress`.
+- `commit-msg`: Conventional Commits regex (verified: valid → exit 0, `bad` → exit 1).
+- `pre-push`: `just validate`; auto-skips when `CI` set; `LEFTHOOK=0 git push` override.
+- `docs/testing-and-validation.md` gained a "Git hooks" table.
 
 ### 2026-09-05 — session 3 (Claude Code) — M0 task 0007 (`just validate` gate)
 

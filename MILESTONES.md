@@ -18,7 +18,8 @@ Goal: an empty Tauri app that builds on all three OSes and a validation gate tha
 - [x] `sqlx` set up with an initial migration; `Registry::open` migrates a SQLite DB in the data
       dir (`.sqlx/` offline cache deferred to M3 — no `query!` macros yet)
 - [x] `justfile` with every recipe in `AGENTS.md` §4; `package.json` script mirrors
-- [ ] `lefthook` installed; pre-commit runs fmt + `bindings` + `db-prepare` and stages results
+- [x] `lefthook` installed (npm dev-dep); pre-commit runs fmt + `bindings` + `progress` (guarded
+      `db-prepare`/`gitleaks`), commit-msg lints Conventional Commits, pre-push runs `just validate`
 - [x] `just validate` runs and passes: fmt, `tsc`, `clippy -D warnings`, tests, vitest, schema
       fixtures (ajv), markdownlint, `knip` all run green; `cargo nextest/deny/machete`, `typos`,
       `actionlint`, `gitleaks`, `lychee` skip with a message until `just setup` / CI installs them

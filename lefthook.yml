@@ -1,5 +1,8 @@
-# Git hooks (tool-agnostic). CI does not use these — it runs `just validate` directly.
-# Override for an explicit WIP branch with: LEFTHOOK=0 git push
+# Git hooks (tool-agnostic). CI does NOT use these — it runs `just validate`
+# directly, and sets CI=true which skips the pre-push gate here.
+#
+# Install:  just hooks   (or `pnpm exec lefthook install`; `just setup` does it)
+# Skip once: LEFTHOOK=0 git commit ...   /   LEFTHOOK=0 git push
 
 pre-commit:
   parallel: false
@@ -8,23 +11,36 @@ pre-commit:
       glob: "*.rs"
       run: cargo fmt -- {staged_files} && git add {staged_files}
     fmt-web:
-      glob: "*.{ts,tsx,js,jsx,json,css,md,yml,yaml}"
+      glob: "*.{ts,tsx,js,jsx,json,css}"
       run: pnpm exec prettier --write {staged_files} && git add {staged_files}
+    # Regenerate the typed IPC bindings when any Rust changes; re-stage if the
+    # generated file moved. (CI fails if it is stale — this stops that surprise.)
     bindings:
+      glob: "*.{rs,toml}"
       run: just bindings && git add src/lib/bindings.ts
+    # sqlx offline cache — no-op until M3 introduces `query!` macros and a `.sqlx/`.
     db-prepare:
-      run: just db-prepare && git add .sqlx
+      run: |
+        if [ -d .sqlx ] && command -v cargo-sqlx >/dev/null 2>&1; then
+          just db-prepare && git add .sqlx
+        fi
     secrets:
-      run: gitleaks protect --staged --redact --no-banner
+      run: |
+        if command -v gitleaks >/dev/null 2>&1; then
+          gitleaks protect --staged --redact --no-banner
+        else
+          echo "  (skip: gitleaks not installed — \`just setup\`)"
+        fi
     progress:
       run: just progress
 
 commit-msg:
   commands:
     conventional:
-      run: 'grep -qE "^(feat|fix|chore|docs|refactor|test|perf|build|ci)(\(.+\))?!?: .+" {1} || { echo "commit message must be Conventional Commits"; exit 1; }'
+      run: 'grep -qE "^(feat|fix|chore|docs|refactor|test|perf|build|ci)(\(.+\))?!?: .+" {1} || { echo "commit message must be Conventional Commits (feat|fix|chore|docs|refactor|test|perf|build|ci)"; exit 1; }'
 
 pre-push:
   commands:
     validate:
-      run: just validate
+      # CI runs `just validate` itself; don't double-run it in the CI push.
+      run: '[ -n "${CI:-}" ] && echo "  (skip: CI runs validate directly)" || just validate'

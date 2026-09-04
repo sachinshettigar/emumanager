@@ -45,6 +45,18 @@ and CI (task 0009) install the optional tools.
 | workflows | `actionlint` | GitHub Actions syntax/expression errors | optional |
 | secrets | `gitleaks detect` (`.gitleaks.toml`) | committed credentials | optional |
 
+## Git hooks (lefthook)
+
+`lefthook` is a dev-dependency; `just setup` (or `just hooks`) runs `lefthook
+install`. CI never triggers these — it calls `just validate` directly, and the
+`pre-push` hook no-ops when `CI` is set.
+
+| Hook | Runs | Skip |
+| --- | --- | --- |
+| `pre-commit` | `cargo fmt` + `prettier --write` on staged files, `just bindings` (when `*.rs`/`*.toml` staged) + re-stage `src/lib/bindings.ts`, `just db-prepare` (only when `.sqlx/` + `cargo-sqlx` exist), `gitleaks protect` (when installed), `just progress` | `LEFTHOOK=0 git commit …` |
+| `commit-msg` | Conventional Commits regex (`feat\|fix\|chore\|docs\|refactor\|test\|perf\|build\|ci`) | `LEFTHOOK=0` |
+| `pre-push` | `just validate` | `LEFTHOOK=0 git push`; auto-skipped in CI |
+
 ## Notes
 
 - **Not fail-fast by design.** One `just validate` run surfaces every problem, so

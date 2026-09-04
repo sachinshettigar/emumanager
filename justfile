@@ -18,6 +18,10 @@ _default:
 setup:
     ./scripts/setup.sh
 
+# (Re)install the git hooks (lefthook). Folded into `just setup`.
+hooks:
+    pnpm exec lefthook install
+
 # Run the app in dev mode.
 dev:
     pnpm tauri dev
