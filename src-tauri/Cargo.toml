@@ -22,5 +22,12 @@ emu-core.workspace = true
 emu-android.workspace = true
 emu-host.workspace = true
 
+# Typed Rust<->TS IPC seam. Pinned together: tauri-specta pins `specta` with `=`,
+# and `specta-typescript` must match the `specta` it was built against. Bump all
+# three in one commit (AGENTS.md §2 — the IPC seam is typed).
+specta = { version = "=2.0.0-rc.25", features = ["derive", "serde_json"] }
+specta-typescript = "=0.0.12"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+
 [lints]
 workspace = true

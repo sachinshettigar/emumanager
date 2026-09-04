@@ -38,16 +38,12 @@ progress:
 
 # --- codegen (run after the matching change) ----------------------------------
 
-# Real export lands in task 0004; until then this is a no-op that succeeds.
 # Regenerate src/lib/bindings.ts from Rust command signatures (tauri-specta).
+# The `export_bindings` test in `emumanager` (src-tauri/src/lib.rs) writes the file;
+# CI asserts it is up to date with `git diff --exit-code src/lib/bindings.ts`.
 bindings:
-    #!/usr/bin/env bash
-    set -uo pipefail
-    if cargo test -p emumanager_lib export_bindings --quiet 2>/dev/null; then
-      echo "bindings: regenerated src/lib/bindings.ts"
-    else
-      echo "bindings: export-bindings test not wired yet (task 0004) — skipping"
-    fi
+    cargo test -p emumanager --lib export::export_bindings -- --exact
+    @echo "bindings: wrote src/lib/bindings.ts"
 
 # Create a new sqlx migration.
 db-migrate name:

@@ -6,22 +6,25 @@ Narrative companion to `.agent/state.json`. Update both together (see
 ## Current state
 
 - **Milestone:** M0 — Skeleton & gate
-- **Phase:** Workspace, task runner, frontend shell, and the `emu-core` domain layer all stand
-  up. Tasks `0001`, `0002`, `0003`, `0006` done. `emu-core` has the full model + port traits +
-  `Provider` + `testing` fakes (39 tests). Frontend shell renders 4 routes (7 tests).
-  `cargo test --workspace --all-features`, `clippy -D warnings`, `fmt`, and the `pnpm` chain all
-  green.
+- **Phase:** Workspace, task runner, frontend shell, `emu-core` domain layer, and the typed
+  Rust↔TS IPC seam all stand up. Tasks `0001`, `0002`, `0003`, `0004`, `0006` done. `emu-core`
+  has the full model + port traits + `Provider` + `testing` fakes (39 tests). `src-tauri`
+  serves a `ping` command through `tauri-specta`; `src/lib/bindings.ts` is generated (6 rust
+  tests). Frontend shell renders 4 routes and calls `ping` via a `usePing()` TanStack Query
+  hook (11 web tests). `cargo test --workspace --all-features`, `clippy -D warnings`, `fmt`,
+  `pnpm {typecheck,lint,test,format:check}`, and `just check-fast` all green.
 - **Toolchains:** installed on this machine — rustc 1.98.1, pnpm 10.0.0, just 1.58.0.
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** _pending — `just validate` not fully wired until task 0007; the
   individual gates (`cargo test/clippy/fmt`, `pnpm` chain, `just check-fast`) are green._
-- **Next action:** task `0004` (tauri-specta: `ping` command + generated `src/lib/bindings.ts`;
-  also adds `#[derive(specta::Type)]` across the `emu-core` DTOs). Then `0005 → 0007 → 0008 →
-  0009`.
+- **Next action:** task `0005` (sqlx + initial migration + committed `.sqlx/`). Then
+  `0007 → 0008 → 0009`. Deferred: the mechanical `#[derive(specta::Type)]` pass on the
+  `emu-core` DTOs — moves to the first M1 command that returns an `emu-core` type across IPC
+  (the `tauri-specta`/`specta` version pin it was waiting on is now in place).
 
 ## Milestone checklist
 
-- [~] **M0** Skeleton & gate — tasks 0001–0003, 0006 done; 0004, 0005, 0007–0009 open
+- [~] **M0** Skeleton & gate — tasks 0001–0004, 0006 done; 0005, 0007–0009 open
 - [ ] M1 Toolchain manager: SDK from zero
 - [ ] M2 Create & launch one emulator end-to-end
 - [ ] M3 Registry & reliable tracking
@@ -31,6 +34,29 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 3 (Claude Code) — M0 task 0004 (tauri-specta IPC seam)
+
+- **Task 0004 done** — the typed Rust↔TS seam is live.
+- `src-tauri`: `commands::ping(name) -> Result<Pong, IpcError>`; `Pong { message, version }`;
+  `IpcError { code, message, details }` with `impl From<emu_core::CoreError>` so `code` is the
+  pinned `CoreError::code()` string. `specta_builder()` is the single source of truth — `run()`
+  mounts it, the `export::export_bindings` test renders it to `src/lib/bindings.ts`.
+- `just bindings` = that test (`cargo test -p emumanager --lib export::export_bindings`); output
+  is deterministic, so `git diff --exit-code src/lib/bindings.ts` is the CI check.
+- Frontend: `src/lib/ipc.ts` unwraps the tauri-specta `{status}` envelope into a value or an
+  `IpcCallError` (a real `Error` carrying the backend `IpcError` on `.ipc`); `usePing()` is a
+  TanStack Query hook; `main.tsx` gains a `QueryClientProvider`; Dashboard shows
+  "pong, EmuManager from v0.1.0".
+- Tests: 6 rust (`ipc_error`, `commands`) + 4 web (`ipc.test.tsx`, `Dashboard.test.tsx`), total
+  11 web. `cargo test --workspace --all-features`, `clippy -D warnings`, `fmt`, `pnpm lint`,
+  `pnpm format:check`, `scripts/emu-core-no-tauri.sh` all green.
+- Versions pinned together: `tauri-specta =2.0.0-rc.25`, `specta =2.0.0-rc.25`,
+  `specta-typescript =0.0.12`, `@tauri-apps/api 2.11.1`, `@tanstack/react-query 5.102.8`.
+- Deviations: `IpcError.details` exports as TS `unknown` (specta refuses `serde_json::Number`);
+  `#[derive(specta::Type)]` on `emu-core` DTOs still deferred — no `emu-core` type crosses IPC
+  until M1, and 0004's scope is `src-tauri` + frontend. The generated file is excluded from
+  eslint/prettier/coverage.
 
 ### 2026-09-05 — session 2 (Claude Code) — M0 task 0002 (emu-core ports & models)
 

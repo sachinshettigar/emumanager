@@ -1,4 +1,25 @@
 import { Screen, Placeholder } from "../components/Screen";
+import { usePing } from "../lib/ipc";
+
+/** Backend liveness line: proves the typed IPC seam is wired end to end. */
+function BackendStatus(): React.JSX.Element {
+  const { data, error, isPending } = usePing("EmuManager");
+
+  let text: string;
+  if (isPending) {
+    text = "checking backend…";
+  } else if (error) {
+    text = `backend error: ${error.ipc.message}`;
+  } else {
+    text = `${data.message} from v${data.version}`;
+  }
+
+  return (
+    <span data-testid="backend-status" className={error ? "text-danger" : undefined}>
+      {text}
+    </span>
+  );
+}
 
 export function Dashboard(): React.JSX.Element {
   return (
@@ -17,6 +38,8 @@ export function Dashboard(): React.JSX.Element {
         <span>Accelerator: unknown</span>
         <span className="text-faint">|</span>
         <span>Disk free: —</span>
+        <span className="text-faint">|</span>
+        <BackendStatus />
       </div>
 
       <Placeholder>

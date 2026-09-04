@@ -4,5 +4,6 @@ too-many-arguments-threshold = 8
 doc-valid-idents = [
     "EmuManager", "AVD", "AVDs", "SDK", "ABI", "KVM", "WHPX", "AEHD", "HVF",
     "adb", "sdkmanager", "avdmanager", "MiB", "GiB", "KiB", "TiB",
+    "TypeScript", "JavaScript", "JSON",
     "...",
 ]
