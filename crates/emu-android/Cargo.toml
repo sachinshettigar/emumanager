@@ -20,6 +20,9 @@ roxmltree = "0.21"
 # `#[async_trait]` on `impl Provider for AndroidProvider` (task 0015) — same version emu-core's
 # own port traits already use.
 async-trait = "0.1"
+# `devices::parse_from_jar` (task 0017) reads the device-definition XML out of cmdline-tools'
+# `sdklib.core.jar` (a plain zip). Read-only, `deflate` only — same knobs emu-core sets.
+zip = { version = "2", default-features = false, features = ["deflate"] }
 # `launch`'s boot-poll loop (task 0016): `time` for `sleep`/`timeout`/`Instant`, `sync` for the
 # `Mutex` guarding the spawned-emulator child handles `stop` reaps. No `rt`/`macros` — this crate
 # never starts a runtime, only runs on the caller's.

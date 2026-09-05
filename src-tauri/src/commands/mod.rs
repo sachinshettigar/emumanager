@@ -13,6 +13,7 @@
 // `collect_commands!`/`generate_handler!` look those up at the function's *defining* path — a
 // re-export moves the visible name but not those siblings. `lib.rs` refers to
 // `commands::toolchain::{list_components, bootstrap_toolchain}` directly instead.
+pub(crate) mod emulator;
 pub(crate) mod toolchain;
 
 use serde::{Deserialize, Serialize};

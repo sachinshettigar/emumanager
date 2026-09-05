@@ -30,8 +30,17 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::ping,
             commands::toolchain::list_components,
             commands::toolchain::bootstrap_toolchain,
+            commands::emulator::list_devices,
+            commands::emulator::list_images,
+            commands::emulator::list_emulators,
+            commands::emulator::create_emulator,
+            commands::emulator::launch_emulator,
+            commands::emulator::stop_emulator,
         ])
-        .events(collect_events![commands::toolchain::BootstrapProgress])
+        .events(collect_events![
+            commands::toolchain::BootstrapProgress,
+            commands::emulator::EmulatorJob,
+        ])
 }
 
 /// Build and run the desktop application.

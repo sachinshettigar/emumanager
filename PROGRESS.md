@@ -5,13 +5,33 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
-- **Milestone:** M2 — Create & launch one emulator end-to-end (M0 and M1 both stay open on
-  deliberately-deferred/blocked items, see below; `currentMilestone` moved on per user direction)
-- **Phase:** M1 is functionally complete — tasks `0010`–`0013` all **done**. M1 itself stays
-  `in_progress` in `.agent/state.json` because one of its own written DoD lines is intentionally
-  deferred (download queue/pause/cancel — see the Milestone checklist below), not because anything
-  is broken. M2 is scoped into 4 tasks (`0014`–`0017`, `.agent/tasks/`); `0014`, `0015` and `0016`
-  are **done** — only `0017` (IPC + Create wizard + Dashboard) is left.
+- **Milestone:** M3 — Registry & reliable tracking (`currentMilestone` advanced; M0, M1 and M2
+  all stay `in_progress` on deliberately-deferred/blocked DoD lines, see below)
+- **Phase:** M2 is functionally complete — tasks `0014`–`0017` all **done**. M2 itself stays
+  `in_progress` because its one DoD line — a real `tauri-driver` E2E that boots a Play Store
+  emulator — is deferred to M6's e2e-suite work; the whole create → boot → stop flow is wired end
+  to end and covered by fake-driven Rust tests + Vitest, but no automated test boots a real
+  emulator (the honest gap from tasks `0015`/`0016`). No M3 task files exist yet — the next thing
+  is to scope them.
+- **M2 task 0017 (IPC + Create wizard + Dashboard) done:** `src-tauri/src/commands/emulator.rs` —
+  six `tauri-specta` commands (`list_devices` / `list_images` / `list_emulators` /
+  `create_emulator` / `launch_emulator` / `stop_emulator`) + one `EmulatorJob` event
+  (`job://emulator`, mirroring `toolchain::BootstrapProgress`). `AndroidProvider` is built
+  per-command (like `toolchain.rs` builds its ports per call) — documented consequence: the
+  child-handle map from `0016` doesn't persist, so `stop` uses the graceful `adb emu kill` path
+  without a held handle (fine for M2; a shared/managed provider is M3). `list_devices`/`list_images`
+  are done in the **shell**, not on the `Provider` trait (its signatures can't take manifest bytes
+  or a `Downloader`, and `reqwest` in `emu-android` would break "network behind a port"):
+  `devices::parse_from_jar` (new pure fn + `zip` dep on `emu-android`) on the installed `sdklib`
+  jar read from disk, `sysimg::parse` on the six `sys-img2-3.xml` manifests fetched concurrently
+  with `futures_util::try_join_all` — exactly `toolchain::resolve_catalog`'s pattern. New
+  `AndroidProvider` surface: `sdk_root` (now `pub`), `is_image_installed`, `tracked_states()` (a
+  lightweight read-only Dashboard view — registry rows + live `RunState` from `adb`, **not**
+  `reconcile()`); plus `Registry::list_emulators()`. `Create.tsx` rewritten as a 4-step wizard,
+  `Dashboard.tsx` rewritten to list emulators (4 s poll) with per-row Launch/Stop; new hooks in
+  `ipc.ts`. 22 web tests (+9), 3 new Rust unit tests, 114 Rust tests total. Wizard scope trims
+  (hardware form is name/RAM/storage only, inline image download folded into "Create", "Save as
+  profile" is M4, uptime needs the M3 schema) are documented in the task file and `MILESTONES.md`.
 - **M2 task 0014 (device catalog + system-image catalog) done:** two new pure-parser modules in
   `emu-android` — `devices::parse` reads Android's own hardware-profile XML files (`devices.xml`,
   `nexus.xml`, `wear.xml`, `tv.xml`, `automotive.xml`, `desktop.xml`, all shipped inside
@@ -82,13 +102,14 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0017` — `tauri-specta` commands
-  (`list_devices`/`list_images`/`create_emulator`/`launch_emulator`/`stop_emulator`) + a
-  generalized job event, wiring the Create wizard (`src/routes/Create.tsx`) and Dashboard
-  (`src/routes/Dashboard.tsx`) to the real `AndroidProvider`. This also wires
-  `AndroidProvider::list_devices`/`list_images` for real (locate the installed `sdklib.core.jar`,
-  extract the `devices*.xml` entries, fetch `sysimg::MANIFEST_URLS`). Separately: once GitHub
-  billing is fixed, re-watch the next `ci.yml` push run, then flip `0009`/`M0` to `done`.
+- **Next action:** scope M3 — Registry & reliable tracking (`.agent/tasks/` has no M3 files yet).
+  From `MILESTONES.md` M3: full SQLite schema + migrations, `reconcile()` on startup / on demand
+  (adopt out-of-band AVDs, drop vanished rows), a selected-emulator detail panel, wipe / delete /
+  rename / edit-hardware, a per-emulator log console, and kill-safety (SIGKILL mid-boot →
+  reconcile recovers). A shared/managed `AndroidProvider` (so `stop` can force-kill and the app
+  reaps children on exit) and the emulator uptime/launch-timestamp naturally land here too.
+  Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run, then flip
+  `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
@@ -97,10 +118,10 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [~] M1 Toolchain manager: SDK from zero — tasks 0010–0013 **all done**; milestone itself stays
       in_progress only because one DoD line is deliberately deferred with a documented reason
       (download queue/pause/cancel) — see `MILESTONES.md`
-- [~] M2 Create & launch one emulator end-to-end — tasks `0014` (device + system-image catalogs),
-      `0015` (`AndroidProvider` ensure_image + create) and `0016` (`AndroidProvider` launch + stop)
-      done; `0017` (IPC + Create wizard + Dashboard) not started
-- [ ] M3 Registry & reliable tracking
+- [~] M2 Create & launch one emulator end-to-end — tasks `0014`–`0017` **all done**; milestone
+      stays in_progress only on its one DoD line (a real `tauri-driver` E2E boot), deferred to
+      M6's e2e-suite work — see `MILESTONES.md`
+- [ ] M3 Registry & reliable tracking — **current milestone**, no task files yet
 - [ ] M4 Profiles: export / import / recreate
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
@@ -108,7 +129,7 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Log
 
-### 2026-09-05 — session 8 (Claude Code) — M2 scoped (0014–0017); tasks 0014, 0015 and 0016 done
+### 2026-09-05 — session 8 (Claude Code) — M2 scoped (0014–0017); all four tasks done, M2 functionally complete
 
 Rebuilt and relaunched the app first (confirmed the M1/task-0013 build runs), then scoped M2 into
 four tasks the same granularity as M1's — `.agent/tasks/0014-device-and-image-catalogs.md` through
@@ -216,6 +237,31 @@ gap (in 0016's Notes): no unit test drives a real `emulator`/`adb` — argv, the
 timeout branch and the stop fallbacks are all fake-covered; real end-to-end boot is M2's
 `tauri-driver` E2E (task 0017) or a later `--ignored` test, and Unix zombie-reap on app-kill is
 M3's kill-safety milestone. `just validate` green (109 Rust tests); no IPC surface touched.
+
+**Task 0017** wired the whole thing to the UI and closed out M2. `src-tauri/src/commands/emulator.rs`
+adds six `tauri-specta` commands and one `EmulatorJob` event (`job://emulator`), structurally a
+copy of `toolchain::BootstrapProgress`. Key shape decisions, all documented in the task file:
+`AndroidProvider` is constructed per command (matching how `toolchain.rs` builds its ports per
+call) — the trade-off is that `0016`'s spawned-child map doesn't survive between calls, so `stop`
+here leans on the graceful `adb emu kill` path; a shared/managed provider is M3. `list_devices` /
+`list_images` are implemented in the shell rather than on the `Provider` trait — the trait
+signatures can't carry manifest bytes or a `Downloader`, and putting `reqwest` in `emu-android`
+would break the "network lives behind a port" rule — so the command reads the installed `sdklib`
+jar off disk and feeds it to the new pure `devices::parse_from_jar` (which needed a `zip` dep on
+`emu-android`), and fetches the six `sys-img2-3.xml` manifests concurrently with
+`futures_util::try_join_all` before `sysimg::parse` — exactly the `toolchain::resolve_catalog`
+pattern. `AndroidProvider` gained `sdk_root` (made `pub`), `is_image_installed`, and
+`tracked_states()` — a read-only Dashboard view (registry rows + a live `RunState` probed from
+`adb`), explicitly **not** `reconcile()` (no adopting/dropping — that's M3); `Registry` gained
+`list_emulators()`. `Create.tsx` is now a real 4-step wizard (searchable device list → image list
+with installed/size → name+RAM+storage → review → Create / Create & launch, with a live job-log
+panel), `Dashboard.tsx` a polled emulator list with per-row Launch/Stop, and `ipc.ts` got the
+matching hooks. Scope trims (hardware form is name/RAM/storage only; inline image download folded
+into "Create"; "Save as profile" is M4; row uptime needs the M3 launch-timestamp schema;
+`ensure_image` progress is a coarse log line, not `sdkmanager`'s own byte bar) are all recorded in
+the task file and `MILESTONES.md`. 22 web tests (Create.test.tsx new, Dashboard.test.tsx
+rewritten) + 3 new Rust unit tests; `just validate` green (114 Rust tests; the `bindings.ts` diff
+is the normal pre-commit regen the lefthook stages). `currentMilestone` advanced to M3.
 
 ### 2026-09-05 — session 7 (Claude Code) — M1 task 0013 (Dependencies screen), M1 wrapped up
 

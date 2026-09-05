@@ -26,11 +26,33 @@ export const commands = {
 	 *  progress on `job://bootstrap` as it goes.
 	 */
 	bootstrapToolchain: () => typedError<null, IpcError>(__TAURI_INVOKE("bootstrap_toolchain")),
+	/**  Every Google device profile, parsed from the installed `sdklib` jar. */
+	listDevices: () => typedError<DeviceInfo[], IpcError>(__TAURI_INVOKE("list_devices")),
+	/**
+	 *  Today's real system-image catalog (Google's per-tag `sys-img2-3.xml` manifests), merged with
+	 *  local install state.
+	 */
+	listImages: () => typedError<ImageInfo[], IpcError>(__TAURI_INVOKE("list_images")),
+	/**  Every registry-tracked emulator with its live state — what the Dashboard polls. */
+	listEmulators: () => typedError<EmulatorInfo[], IpcError>(__TAURI_INVOKE("list_emulators")),
+	/**
+	 *  Ensure the chosen image is installed, create the AVD, optionally launch it. Streams progress
+	 *  on `job://emulator` with `jobId` `create:<avdName>`. Returns the new tracked id.
+	 */
+	createEmulator: (request: CreateEmulatorRequest) => typedError<string, IpcError>(__TAURI_INVOKE("create_emulator", { request })),
+	/**
+	 *  Launch an already-created emulator and wait for it to boot. Streams on `job://emulator` with
+	 *  `jobId` `launch:<id>`.
+	 */
+	launchEmulator: (id: string) => typedError<null, IpcError>(__TAURI_INVOKE("launch_emulator", { id })),
+	/**  Stop a running emulator (`adb emu kill`). */
+	stopEmulator: (id: string) => typedError<null, IpcError>(__TAURI_INVOKE("stop_emulator", { id })),
 };
 
 /** Events */
 export const events = {
 	jobBootstrap: makeEvent<BootstrapProgress>("job://bootstrap"),
+	jobEmulator: makeEvent<EmulatorJob>("job://emulator"),
 };
 
 /* Types */
@@ -82,6 +104,95 @@ export type ComponentInfo = {
 	installed: boolean,
 	/**  Where it was found — `"app-managed"` or `"system:<path>"` — `None` when not installed. */
 	source: string | null,
+};
+
+/**  Request body for [`create_emulator`]. */
+export type CreateEmulatorRequest = {
+	/**  Display name; the on-disk AVD name is a sanitized version of it. */
+	name: string,
+	/**  `DeviceInfo.id`. */
+	deviceId: string,
+	/**  `ImageInfo.coord`. */
+	imageCoord: string,
+	ramMb: number,
+	storageMb: number,
+	/**  Also launch it once created ("Create & launch"). */
+	launch: boolean,
+};
+
+/**  A hardware profile for the Create wizard's device step. */
+export type DeviceInfo = {
+	/**  `avdmanager -d` id, e.g. `pixel_6`. */
+	id: string,
+	/**  Human name, e.g. `Pixel 6`. */
+	name: string,
+	/**  Manufacturer label; empty when unknown. */
+	oem: string,
+	/**  `phone` / `tablet` / `foldable` / `wear` / `tv` / `automotive` / `desktop`. */
+	formFactor: string,
+	/**  Manufacturer-recommended RAM in MiB. */
+	ramMb: number,
+	/**  `"<width> × <height>"` in pixels. */
+	resolution: string,
+	/**  Screen density in dpi. */
+	densityDpi: number,
+	/**  Physical diagonal in inches. */
+	diagonalIn: number | null,
+};
+
+/**  A tracked emulator plus its live run state. */
+export type EmulatorInfo = {
+	id: string,
+	avdName: string,
+	displayName: string,
+	/**  `stopped` / `booting` / `running` / `error`. */
+	state: string,
+	adbSerial: string | null,
+};
+
+/**  Live progress for an emulator create/launch run, emitted as `job://emulator`. */
+export type EmulatorJob = {
+	/**  `create:<avdName>` or `launch:<id>` — the frontend filters its progress panel by this. */
+	jobId: string,
+	payload: EmulatorJobKind,
+};
+
+/**
+ *  One update from a `create_emulator`/`launch_emulator` run. Same tagged shape as
+ *  `toolchain::BootstrapProgressKind` (`docs/architecture.md` §4's `job://*` events, collapsed);
+ *  the `jobId` on [`EmulatorJob`] says which run it belongs to.
+ */
+export type EmulatorJobKind = 
+/**  A phase and/or percentage update. */
+{ type: "progress"; phase: string | null; pct: number | null } | 
+/**  One log line to append to the run's tail. */
+{ type: "log"; line: string } | 
+/**  The run reached a terminal state. */
+{ type: "done"; ok: boolean; error: IpcError | null };
+
+/**  A system image for the Create wizard's image step. */
+export type ImageInfo = {
+	/**  `sdkmanager` package path — the id passed back to `create_emulator`. */
+	coord: string,
+	/**  Android API level. */
+	api: number,
+	/**  Marketing Android version, e.g. `"14"`. */
+	androidVersion: string,
+	/**  `default` / `google_apis` / `google_apis_playstore` / … */
+	imageType: string,
+	/**  `x86_64` / `arm64-v8a` / … */
+	abi: string,
+	/**  Package revision. */
+	revision: string,
+	/**
+	 *  Archive size in bytes — `u32` (specta won't export a bigint-risking `u64`; every real
+	 *  image is well under 4 GiB), saturating.
+	 */
+	downloadSizeBytes: number,
+	/**  Whether it's already installed in the managed SDK. */
+	installed: boolean,
+	/**  Whether it bundles the Play Store. */
+	hasPlayStore: boolean,
 };
 
 /**  Serializable error surfaced to the frontend across the typed IPC seam. */

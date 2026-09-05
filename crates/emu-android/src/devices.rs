@@ -87,6 +87,42 @@ pub fn parse(xml: &[u8], source: DeviceSource) -> Result<Vec<DeviceProfile>> {
         .collect())
 }
 
+/// Read every [`DEVICE_XML_RESOURCES`] entry out of a `sdklib.core.jar` (a plain zip) and
+/// [`parse`] each. An entry that isn't present contributes nothing rather than erroring — Google
+/// moves/renames these across `cmdline-tools` revisions — but an unreadable jar, or an entry that
+/// isn't well-formed XML, is a [`CoreError`].
+///
+/// This is a plain synchronous function: no `zip` type is ever held across an `.await` (they are
+/// not `Send` — see `crates/emu-core/src/toolchain/bootstrap.rs`'s note), so an async caller must
+/// call this, take the owned `Vec`, and only then continue.
+///
+/// # Errors
+///
+/// [`CoreError::Parse`] for a corrupt jar or malformed device XML; [`CoreError::Fs`] if an entry
+/// can't be read out of the archive.
+pub fn parse_from_jar(jar_bytes: &[u8]) -> Result<Vec<DeviceProfile>> {
+    use std::io::Read as _;
+
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(jar_bytes))
+        .map_err(|e| CoreError::parse("sdklib jar", e.to_string()))?;
+
+    let mut profiles = Vec::new();
+    for (entry_path, source) in DEVICE_XML_RESOURCES {
+        let mut entry = match archive.by_name(entry_path) {
+            Ok(entry) => entry,
+            Err(zip::result::ZipError::FileNotFound) => continue,
+            Err(e) => return Err(CoreError::parse("sdklib jar", e.to_string())),
+        };
+        let mut xml = Vec::with_capacity(usize::try_from(entry.size()).unwrap_or(0));
+        entry.read_to_end(&mut xml).map_err(|e| CoreError::Fs {
+            path: (*entry_path).to_string(),
+            detail: e.to_string(),
+        })?;
+        profiles.extend(parse(&xml, *source)?);
+    }
+    Ok(profiles)
+}
+
 fn build_profile(node: &roxmltree::Node<'_, '_>, source: DeviceSource) -> Option<DeviceProfile> {
     let id = text_of(node, "id")?.to_string();
     let display_name = text_of(node, "name")?.to_string();
@@ -292,5 +328,43 @@ mod tests {
     fn malformed_xml_is_a_parse_error_not_a_panic() {
         let err = parse(b"<not-xml", DeviceSource::Handset).unwrap_err();
         assert_eq!(err.code(), "parse_error");
+    }
+
+    #[test]
+    fn parse_from_jar_reads_and_tags_every_present_entry() {
+        use std::io::Write as _;
+
+        let mut buf = Vec::new();
+        {
+            let mut writer = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+            let opts = zip::write::SimpleFileOptions::default();
+            writer
+                .start_file("com/android/sdklib/devices/nexus.xml", opts)
+                .unwrap();
+            writer.write_all(NEXUS).unwrap();
+            writer
+                .start_file("com/android/sdklib/devices/wear.xml", opts)
+                .unwrap();
+            writer.write_all(WEAR).unwrap();
+            // devices.xml / tv.xml / automotive.xml / desktop.xml deliberately absent — a
+            // partial jar must not error.
+            writer.finish().unwrap();
+        }
+
+        let got = parse_from_jar(&buf).expect("parse jar");
+        assert!(got
+            .iter()
+            .any(|d| d.id == "pixel_6" && d.form_factor == FormFactor::Phone));
+        assert!(got.iter().any(|d| d.form_factor == FormFactor::Wear));
+    }
+
+    #[test]
+    fn parse_from_jar_rejects_a_non_zip() {
+        assert_eq!(
+            parse_from_jar(b"this is not a zip archive")
+                .unwrap_err()
+                .code(),
+            "parse_error"
+        );
     }
 }

@@ -23,7 +23,7 @@ use tokio::time::{sleep, timeout, Instant};
 use emu_core::error::{CoreError, Result};
 use emu_core::model::component::{ComponentId, HostOs};
 use emu_core::model::device::DeviceProfile;
-use emu_core::model::emulator::{EmulatorId, Graphics, LiveState};
+use emu_core::model::emulator::{EmulatorId, Graphics, LiveState, RunState};
 use emu_core::model::image::{ImageCoord, ImageFilter, SystemImage};
 use emu_core::model::job::{JobHandle, Progress};
 use emu_core::model::plan::CreateSpec;
@@ -53,6 +53,22 @@ const LOG_DRAIN_SLICE: Duration = Duration::from_millis(250);
 /// A live child process the provider is responsible for — shared so a background drain can keep
 /// reading its output while `stop` can still `wait`/`kill` it.
 type ChildHandle = Arc<AsyncMutex<Box<dyn ChildProcess>>>;
+
+/// One registry-tracked emulator plus its live run state — [`AndroidProvider::tracked_states`]'s
+/// element type, what the Dashboard renders.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TrackedEmulator {
+    /// Our stable id.
+    pub id: EmulatorId,
+    /// The on-disk AVD name.
+    pub avd_name: String,
+    /// Human-friendly name.
+    pub display_name: String,
+    /// Current lifecycle state, derived from `adb`.
+    pub state: RunState,
+    /// `emulator-NNNN` serial when running/booting.
+    pub adb_serial: Option<String>,
+}
 
 /// Drives `sdkmanager`/`avdmanager`/`emulator`/`adb` via the injected [`ProcessRunner`].
 pub struct AndroidProvider {
@@ -115,7 +131,10 @@ impl AndroidProvider {
     /// "reuse what's already there" rule), falling back to the app-managed dir if nothing has been
     /// scanned as installed yet (a real invocation would then fail with a clear "no such file"
     /// `Process` error, which is honest — there is truly nothing to run).
-    async fn sdk_root(&self) -> Result<PathBuf> {
+    ///
+    /// # Errors
+    /// [`CoreError`] from the filesystem scan.
+    pub async fn sdk_root(&self) -> Result<PathBuf> {
         let app_sdk_dir = self.data_dir.join("sdk");
         let state = toolchain::scan(self.fs.as_ref(), &app_sdk_dir, self.os, |k| {
             std::env::var(k).ok()
@@ -124,6 +143,63 @@ impl AndroidProvider {
         Ok(state
             .location_of(ComponentId::CmdlineTools)
             .map_or(app_sdk_dir, |l| l.sdk_root.clone()))
+    }
+
+    /// `true` when `coord`'s system image is installed under the resolved SDK root — the same
+    /// `source.properties` marker check `ensure_image` uses.
+    ///
+    /// # Errors
+    /// [`CoreError`] from the filesystem port.
+    pub async fn is_image_installed(&self, coord: ImageCoord) -> Result<bool> {
+        let sdk_root = self.sdk_root().await?;
+        self.fs.exists(&image_marker_file(&sdk_root, coord)).await
+    }
+
+    /// Every registry-tracked emulator with its live [`RunState`], probed from `adb`. A
+    /// lightweight, read-only view for the Dashboard — **not** `reconcile()`: it never adopts
+    /// out-of-band AVDs or drops vanished rows (that is M3's milestone), only reports the current
+    /// state of what the registry already knows.
+    ///
+    /// # Errors
+    /// [`CoreError`] from the registry or, for the initial device list, the process port. A
+    /// per-emulator `adb` hiccup is swallowed (that emulator reads as `Stopped`).
+    pub async fn tracked_states(&self) -> Result<Vec<TrackedEmulator>> {
+        let rows = self.registry.list_emulators().await?;
+        if rows.is_empty() {
+            return Ok(Vec::new());
+        }
+        let sdk_root = self.sdk_root().await?;
+        let adb = self.adb_path(&sdk_root);
+        let serials = self.emulator_serials(&adb).await.unwrap_or_default();
+
+        let mut out = Vec::with_capacity(rows.len());
+        for (id, avd_name, display_name) in rows {
+            let mut adb_serial = None;
+            for candidate in &serials {
+                let cmd = Command::new(adb.display().to_string())
+                    .args(["-s", candidate])
+                    .args(["emu", "avd", "name"]);
+                if let Ok(out) = self.process.run(cmd).await {
+                    if out.stdout.lines().next().unwrap_or("").trim() == avd_name {
+                        adb_serial = Some(candidate.clone());
+                        break;
+                    }
+                }
+            }
+            let state = match &adb_serial {
+                None => RunState::Stopped,
+                Some(serial) if self.boot_completed(&adb, serial).await => RunState::Running,
+                Some(_) => RunState::Booting,
+            };
+            out.push(TrackedEmulator {
+                id: EmulatorId(id),
+                avd_name,
+                display_name,
+                state,
+                adb_serial,
+            });
+        }
+        Ok(out)
     }
 
     fn avdmanager_path(&self, sdk_root: &Path) -> PathBuf {

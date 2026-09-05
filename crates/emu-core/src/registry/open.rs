@@ -80,6 +80,23 @@ impl Registry {
         Ok(())
     }
 
+    /// Every tracked emulator as `(id, avd_name, display_name)`, newest first.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::Db`] on any SQL failure.
+    pub async fn list_emulators(&self) -> Result<Vec<(String, String, String)>> {
+        let rows = sqlx::query_as::<_, (String, String, String)>(
+            "SELECT id, avd_name, display_name FROM emulators ORDER BY created_at DESC, id DESC",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| CoreError::Db {
+            detail: e.to_string(),
+        })?;
+        Ok(rows)
+    }
+
     /// Look up a tracked emulator's `(avd_name, display_name)` by id. `None` if untracked.
     ///
     /// # Errors
@@ -132,6 +149,15 @@ mod tests {
             .await
             .expect("query")
             .is_none());
+
+        registry
+            .insert_emulator("01J000000000000000000000CD", "tv_api33", "Android TV")
+            .await
+            .expect("second insert");
+        let all = registry.list_emulators().await.expect("list");
+        assert_eq!(all.len(), 2);
+        assert!(all.iter().any(|(_, avd, _)| avd == "pixel6_api34"));
+        assert!(all.iter().any(|(_, avd, _)| avd == "tv_api33"));
     }
 
     #[tokio::test]

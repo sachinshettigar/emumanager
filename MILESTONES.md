@@ -72,19 +72,31 @@ install. **Met** (task 0012) — `cargo test -p emu-core --all-features --test t
 
 ## M2 — Create & launch one emulator end-to-end  (coverage gate: 62%)
 
-- [~] `list_devices` + `list_images` (filtered) commands + parsers/fixtures — **parsers done**
-      (task `0014`: `emu-android::devices`/`sysimg`, real fixtures); the IPC **commands** land in
-      task `0017` once `0015`/`0016` give them a real `Provider` to call
-- [ ] `ensure_image` downloads a chosen `system-images;...` with progress
-- [ ] `create` → `avdmanager create avd` with hardware flags; parse result; register
-- [ ] `launch` → spawn `emulator @name` with accelerator + graphics flags; stream logs to `job://log`
-- [ ] Poll `adb` for boot-complete; capture serial + ports; emit `job://done`
-- [ ] Create wizard screen wired: device picker, image picker (with inline download), hardware, review
-- [ ] Dashboard shows the new emulator; row flips Stopped→Booting→Running with uptime
-- [ ] `stop` works; app exit doesn't orphan the emulator process
+- [x] `list_devices` + `list_images` commands + parsers/fixtures — parsers (task `0014`,
+      `emu-android::devices`/`sysimg` + `devices::parse_from_jar`), IPC commands (task `0017`,
+      `commands::emulator`) fetching the real `sdklib` jar + `sys-img2-3.xml` manifests
+- [x] `ensure_image` — delegates to a real `sdkmanager` install (task `0015`); progress is a
+      single "downloading (can take minutes)" log line, not a byte bar — **partial**: streaming
+      `sdkmanager`'s own progress is a nicer-UX follow-up (spawn + parse), noted in task `0015`
+- [x] `create` → `avdmanager create avd -n/-k/-d`; parse result; minimal registry row (task `0015`)
+- [x] `launch` → spawn `emulator @name` (+ `-no-window`/`-gpu`/… from `LaunchOpts`); stream log
+      lines onto the job (task `0016`)
+- [x] Poll `adb` for boot-complete; capture serial + pid into `RunningHandle` (task `0016`).
+      `grpc_port` + a continuous post-boot log stream are M3's detail-panel work
+- [x] Create wizard screen wired: device picker, image picker (installed / download size shown),
+      hardware, review (task `0017`). Inline download-from-the-image-picker folded into "Create"
+      (it runs `ensure_image` first) rather than a separate button
+- [x] Dashboard lists tracked emulators; row shows Stopped/Booting/Running, polled every 4 s
+      (task `0017`). Uptime is not shown yet (needs the launch timestamp — M3 registry schema)
+- [x] `stop` works (`adb emu kill` + force-kill fallback, task `0016`). **Partial**: "app exit
+      doesn't orphan" — the provider is built per-command so its child-handle map doesn't persist;
+      a shared/managed provider + reconcile-on-startup is M3's milestone
 
 DoD: E2E (Linux + Windows, `tauri-driver`): launch app → create a Play Store x86_64 emulator →
-assert it reaches Running in the dashboard → stop it. Zero terminal commands in the flow.
+assert it reaches Running in the dashboard → stop it. **Not met** — no e2e suite yet (deferred to
+M6 "E2E suite runs in CI", same as the rest of the harness). The flow is wired end to end and its
+pieces are covered by fake-driven Rust tests + Vitest; a real booted-emulator run is the manual /
+`--ignored` gap noted in tasks `0015`/`0016`. M2 stays `in_progress` on this one line.
 
 ---
 

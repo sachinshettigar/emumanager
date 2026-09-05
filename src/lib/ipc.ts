@@ -15,6 +15,11 @@ import {
   events,
   type BootstrapProgressKind,
   type ComponentInfo,
+  type CreateEmulatorRequest,
+  type DeviceInfo,
+  type EmulatorInfo,
+  type EmulatorJobKind,
+  type ImageInfo,
   type IpcError,
   type Pong,
 } from "./bindings";
@@ -176,6 +181,182 @@ export function useBootstrapProgress(): UseBootstrapProgressResult {
     state,
     reset: () => {
       setState(INITIAL_BOOTSTRAP_RUN_STATE);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// M2 — devices, images, emulators (Create wizard + Dashboard)
+// ---------------------------------------------------------------------------
+
+const EMULATORS_QUERY_KEY = ["emulators"];
+
+/** Google device profiles from the installed SDK. Rejects with {@link IpcCallError}. */
+async function listDevices(): Promise<DeviceInfo[]> {
+  return unwrap(await commands.listDevices());
+}
+
+/** TanStack Query hook for the Create wizard's device step. */
+export function useDevices(): UseQueryResult<DeviceInfo[], IpcCallError> {
+  return useQuery<DeviceInfo[], IpcCallError>({
+    queryKey: ["devices"],
+    queryFn: listDevices,
+  });
+}
+
+/** Today's system-image catalog merged with local install state. */
+async function listImages(): Promise<ImageInfo[]> {
+  return unwrap(await commands.listImages());
+}
+
+/** TanStack Query hook for the Create wizard's image step. */
+export function useImages(): UseQueryResult<ImageInfo[], IpcCallError> {
+  return useQuery<ImageInfo[], IpcCallError>({
+    queryKey: ["images"],
+    queryFn: listImages,
+  });
+}
+
+/** Every tracked emulator with its live run state. */
+async function listEmulators(): Promise<EmulatorInfo[]> {
+  return unwrap(await commands.listEmulators());
+}
+
+/**
+ * TanStack Query hook for the Dashboard. Polls every 4s so a `Booting → Running` transition
+ * shows up without a manual refresh.
+ */
+export function useEmulators(): UseQueryResult<EmulatorInfo[], IpcCallError> {
+  return useQuery<EmulatorInfo[], IpcCallError>({
+    queryKey: EMULATORS_QUERY_KEY,
+    queryFn: listEmulators,
+    refetchInterval: 4000,
+  });
+}
+
+async function createEmulator(request: CreateEmulatorRequest): Promise<string> {
+  return unwrap(await commands.createEmulator(request));
+}
+
+/**
+ * Mutation hook for the Create wizard's "Create" / "Create & launch". Invalidates the emulator
+ * list on success so the new row appears on the Dashboard.
+ */
+export function useCreateEmulator() {
+  const queryClient = useQueryClient();
+  return useMutation<string, IpcCallError, CreateEmulatorRequest>({
+    mutationFn: createEmulator,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: EMULATORS_QUERY_KEY });
+    },
+  });
+}
+
+async function launchEmulator(id: string): Promise<undefined> {
+  unwrap(await commands.launchEmulator(id));
+  return undefined;
+}
+
+/** Mutation hook for a Dashboard row's "Launch" action. */
+export function useLaunchEmulator() {
+  const queryClient = useQueryClient();
+  return useMutation<undefined, IpcCallError, string>({
+    mutationFn: launchEmulator,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: EMULATORS_QUERY_KEY });
+    },
+  });
+}
+
+async function stopEmulator(id: string): Promise<undefined> {
+  unwrap(await commands.stopEmulator(id));
+  return undefined;
+}
+
+/** Mutation hook for a Dashboard row's "Stop" action. */
+export function useStopEmulator() {
+  const queryClient = useQueryClient();
+  return useMutation<undefined, IpcCallError, string>({
+    mutationFn: stopEmulator,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: EMULATORS_QUERY_KEY });
+    },
+  });
+}
+
+/** Live state of the current emulator create/launch job, built up from `job://emulator` events. */
+export interface EmulatorJobState {
+  running: boolean;
+  phase: string | null;
+  pct: number | null;
+  log: string[];
+  error: string | null;
+}
+
+const INITIAL_EMULATOR_JOB_STATE: EmulatorJobState = {
+  running: false,
+  phase: null,
+  pct: null,
+  log: [],
+  error: null,
+};
+
+function applyEmulatorJobEvent(prev: EmulatorJobState, kind: EmulatorJobKind): EmulatorJobState {
+  switch (kind.type) {
+    case "progress":
+      return {
+        ...prev,
+        running: true,
+        phase: kind.phase ?? prev.phase,
+        pct: kind.pct ?? prev.pct,
+      };
+    case "log":
+      return { ...prev, running: true, log: [...prev.log, kind.line] };
+    case "done":
+      return { ...prev, running: false, error: kind.error?.message ?? null };
+  }
+}
+
+interface UseEmulatorJobResult {
+  state: EmulatorJobState;
+  /** Clear before starting a new run — events otherwise accumulate across runs. */
+  reset: () => void;
+}
+
+/**
+ * Subscribes to `job://emulator` while mounted. Only ever one such job is in flight at a time
+ * (same simplification as `job://bootstrap`), so every event is applied regardless of its
+ * `jobId`.
+ */
+export function useEmulatorJob(): UseEmulatorJobResult {
+  const [state, setState] = useState<EmulatorJobState>(INITIAL_EMULATOR_JOB_STATE);
+
+  useEffect(() => {
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+
+    void events.jobEmulator
+      .listen((event) => {
+        setState((prev) => applyEmulatorJobEvent(prev, event.payload.payload));
+      })
+      .then((fn) => {
+        if (cancelled) {
+          fn();
+        } else {
+          unlisten = fn;
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+
+  return {
+    state,
+    reset: () => {
+      setState(INITIAL_EMULATOR_JOB_STATE);
     },
   };
 }
