@@ -20,6 +20,10 @@ roxmltree = "0.21"
 # `#[async_trait]` on `impl Provider for AndroidProvider` (task 0015) — same version emu-core's
 # own port traits already use.
 async-trait = "0.1"
+# `launch`'s boot-poll loop (task 0016): `time` for `sleep`/`timeout`/`Instant`, `sync` for the
+# `Mutex` guarding the spawned-emulator child handles `stop` reaps. No `rt`/`macros` — this crate
+# never starts a runtime, only runs on the caller's.
+tokio = { version = "1", default-features = false, features = ["time", "sync"] }
 
 [dev-dependencies]
 # `emu_core::testing`'s in-memory fakes (FakeProcessRunner, InMemoryFs) for AndroidProvider's own

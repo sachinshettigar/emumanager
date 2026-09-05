@@ -51,6 +51,10 @@ struct SpawnRule {
     contains: Option<String>,
     lines: Vec<String>,
     output: Output,
+    /// When `true`, after `lines` are drained the child's output stream stays open — `next_line`
+    /// never resolves — modelling a long-lived process (an emulator) that keeps running with
+    /// nothing more to say. A caller polling with a `timeout` then sees `Elapsed`, not EOF.
+    lingering: bool,
 }
 
 impl FakeProcessRunner {
@@ -89,13 +93,37 @@ impl FakeProcessRunner {
         self
     }
 
-    /// Expect a `spawn` matching `needle`; the child emits `lines` then exits with `output`.
+    /// Expect a `spawn` matching `needle`; the child emits `lines` then reaches EOF and exits
+    /// with `output`.
     #[must_use]
     pub fn on_spawn(
         self,
         needle: impl Into<String>,
         lines: impl IntoIterator<Item = impl Into<String>>,
         output: Output,
+    ) -> Self {
+        self.push_spawn_rule(needle, lines, output, false)
+    }
+
+    /// Like [`Self::on_spawn`], but after `lines` the child's output stream stays open forever
+    /// (`next_line` never resolves) until [`ChildProcess::kill`] is called — models a process that
+    /// keeps running. `output` is what a post-`kill` `wait` returns.
+    #[must_use]
+    pub fn on_spawn_lingering(
+        self,
+        needle: impl Into<String>,
+        lines: impl IntoIterator<Item = impl Into<String>>,
+        output: Output,
+    ) -> Self {
+        self.push_spawn_rule(needle, lines, output, true)
+    }
+
+    fn push_spawn_rule(
+        self,
+        needle: impl Into<String>,
+        lines: impl IntoIterator<Item = impl Into<String>>,
+        output: Output,
+        lingering: bool,
     ) -> Self {
         self.inner
             .lock()
@@ -105,6 +133,7 @@ impl FakeProcessRunner {
                 contains: Some(needle.into()),
                 lines: lines.into_iter().map(Into::into).collect(),
                 output,
+                lingering,
             });
         self
     }
@@ -157,6 +186,7 @@ impl ProcessRunner for FakeProcessRunner {
             Some(rule) => Ok(Box::new(FakeChild {
                 lines: rule.lines.into(),
                 output: Some(rule.output),
+                lingering: rule.lingering,
             })),
             None => Err(CoreError::invalid(
                 "fake process runner",
@@ -171,6 +201,7 @@ impl ProcessRunner for FakeProcessRunner {
 pub struct FakeChild {
     lines: VecDeque<String>,
     output: Option<Output>,
+    lingering: bool,
 }
 
 #[async_trait]
@@ -180,7 +211,14 @@ impl ChildProcess for FakeChild {
     }
 
     async fn next_line(&mut self) -> Result<Option<String>> {
-        Ok(self.lines.pop_front())
+        if let Some(line) = self.lines.pop_front() {
+            return Ok(Some(line));
+        }
+        if self.lingering {
+            // A still-running process with nothing more to say: never resolve.
+            std::future::pending::<()>().await;
+        }
+        Ok(None)
     }
 
     async fn wait(&mut self) -> Result<Output> {
@@ -192,6 +230,7 @@ impl ChildProcess for FakeChild {
 
     async fn kill(&mut self) -> Result<()> {
         self.lines.clear();
+        self.lingering = false;
         if self.output.is_none() {
             self.output = Some(Output {
                 status: -1,

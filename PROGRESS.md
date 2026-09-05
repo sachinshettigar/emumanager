@@ -10,8 +10,8 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Phase:** M1 is functionally complete — tasks `0010`–`0013` all **done**. M1 itself stays
   `in_progress` in `.agent/state.json` because one of its own written DoD lines is intentionally
   deferred (download queue/pause/cancel — see the Milestone checklist below), not because anything
-  is broken. M2 is scoped into 4 tasks (`0014`–`0017`, `.agent/tasks/`); `0014` and `0015` are
-  **done**.
+  is broken. M2 is scoped into 4 tasks (`0014`–`0017`, `.agent/tasks/`); `0014`, `0015` and `0016`
+  are **done** — only `0017` (IPC + Create wizard + Dashboard) is left.
 - **M2 task 0014 (device catalog + system-image catalog) done:** two new pure-parser modules in
   `emu-android` — `devices::parse` reads Android's own hardware-profile XML files (`devices.xml`,
   `nexus.xml`, `wear.xml`, `tv.xml`, `automotive.xml`, `desktop.xml`, all shipped inside
@@ -44,6 +44,19 @@ Narrative companion to `.agent/state.json`. Update both together (see
   practice" but nothing generated one; `Registry` gained `insert_emulator`/`get_emulator` against
   the existing M1-era `emulators` table (no new migration — full schema is M3). 17 new tests (8
   `emu-core`, 9 `emu-android`), all fixture/fake-driven; `just validate` green.
+- **M2 task 0016 (`AndroidProvider` — `launch` + `stop`) done:** `launch` spawns
+  `emulator @<avd_name>` (+ `-no-window` / `-wipe-data` / `-no-snapshot-load` / `-gpu <mode>` from
+  `LaunchOpts`, + `extra_args` — flags cited from the official emulator command-line reference, not
+  invented), streams its output lines onto the `JobHandle`, and polls
+  `adb -s <serial> shell getprop sys.boot_completed` until `1`, with a wall-clock 300 s timeout
+  (overridable) and a fast-fail if the emulator process exits before boot. The spawned child is
+  **held** in an `EmulatorId → child-handle` map on the provider (not dropped after boot) so
+  `stop` can reap it — "never orphans the process" — and its stdout stays drained. `stop` does a
+  graceful `adb -s <serial> emu kill` (serial found by matching the registry `avd_name` against
+  each running emulator's `adb -s <s> emu avd name`), waits, then force-kills the held child as the
+  fallback; idempotent when nothing is running. Added a general `FakeChild` "lingering" mode
+  (`FakeProcessRunner::on_spawn_lingering`) to `emu-core`'s test fakes so the pure never-boots
+  timeout path is testable. 8 new tests; `just validate` green (109 Rust tests total).
 - **CI (task 0009) status:** unchanged — still blocked on a GitHub Actions billing/spending-limit
   issue on the account (`sachinshettigar/emumanager`, **Settings → Billing & plans**), not a repo
   problem. Nothing to do here until a human fixes it.
@@ -69,9 +82,13 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0016` — `AndroidProvider::launch` (spawn `emulator`, stream logs, poll
-  `adb` for boot-complete) and `stop`. Separately: once GitHub billing is fixed, re-watch the next
-  `ci.yml` push run, then flip `0009`/`M0` to `done`.
+- **Next action:** task `0017` — `tauri-specta` commands
+  (`list_devices`/`list_images`/`create_emulator`/`launch_emulator`/`stop_emulator`) + a
+  generalized job event, wiring the Create wizard (`src/routes/Create.tsx`) and Dashboard
+  (`src/routes/Dashboard.tsx`) to the real `AndroidProvider`. This also wires
+  `AndroidProvider::list_devices`/`list_images` for real (locate the installed `sdklib.core.jar`,
+  extract the `devices*.xml` entries, fetch `sysimg::MANIFEST_URLS`). Separately: once GitHub
+  billing is fixed, re-watch the next `ci.yml` push run, then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
@@ -80,9 +97,9 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [~] M1 Toolchain manager: SDK from zero — tasks 0010–0013 **all done**; milestone itself stays
       in_progress only because one DoD line is deliberately deferred with a documented reason
       (download queue/pause/cancel) — see `MILESTONES.md`
-- [~] M2 Create & launch one emulator end-to-end — tasks `0014` (device + system-image catalogs)
-      and `0015` (`AndroidProvider` ensure_image + create) done; `0016`/`0017` (launch/stop,
-      wizard+dashboard) not started
+- [~] M2 Create & launch one emulator end-to-end — tasks `0014` (device + system-image catalogs),
+      `0015` (`AndroidProvider` ensure_image + create) and `0016` (`AndroidProvider` launch + stop)
+      done; `0017` (IPC + Create wizard + Dashboard) not started
 - [ ] M3 Registry & reliable tracking
 - [ ] M4 Profiles: export / import / recreate
 - [ ] M5 Host readiness & elevated helper
@@ -91,7 +108,7 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Log
 
-### 2026-09-05 — session 8 (Claude Code) — M2 scoped (0014–0017); tasks 0014 and 0015 done
+### 2026-09-05 — session 8 (Claude Code) — M2 scoped (0014–0017); tasks 0014, 0015 and 0016 done
 
 Rebuilt and relaunched the app first (confirmed the M1/task-0013 build runs), then scoped M2 into
 four tasks the same granularity as M1's — `.agent/tasks/0014-device-and-image-catalogs.md` through
@@ -169,6 +186,36 @@ noted gap: `FakeProcessRunner` has no real filesystem side effects, so no unit t
 `cargo test`; a `--ignored` integration test (task `0012`'s own pattern) is the natural next step if
 this gap needs closing. `just validate` green throughout; no IPC surface touched, `bindings.ts`
 regenerated as a no-op diff both times.
+
+**Task 0016** (`AndroidProvider::launch` + `stop`) closed out the provider's runtime surface.
+Emulator flags cited from the official emulator command-line reference
+(<https://developer.android.com/studio/run/emulator-commandline>): `emulator @<avd_name>`,
+`-no-window`, `-gpu <auto|host|swiftshader_indirect>`, `-no-snapshot-load`, `-wipe-data` — `launch`
+passes only what `LaunchOpts` asks for plus `extra_args` (no `-accel`: the emulator's own `auto`
+default handles it, host-readiness is M5; no `-no-audio`: a windowed dev emulator may want it).
+`launch` spawns via `ProcessRunner::spawn`, drains the child's output onto the `JobHandle` in
+~250 ms slices while polling `adb -s <serial> shell getprop sys.boot_completed` until `1`, with a
+wall-clock 300 s deadline (`with_boot_timeout` override for tests) and a fast-fail path when the
+emulator's output stream reaches EOF (process exited) before boot. The spawned child is **kept** in
+an `EmulatorId → Arc<AsyncMutex<Box<dyn ChildProcess>>>` map on the provider rather than dropped:
+that's what lets `stop` reap it (acceptance criterion "never orphans the process") and keeps its
+stdout drained so a chatty emulator never blocks on a full pipe. `stop` finds the serial by
+matching the registry `avd_name` against each running emulator's `adb -s <s> emu avd name` (so it
+never kills the wrong one), sends a graceful `adb -s <serial> emu kill`, waits up to 15 s
+(`with_stop_timeout`), then force-kills the held child as the documented fallback; it's idempotent
+when nothing is running and `NotFound` for an unknown id. `grpc_port` is left `None` (parsing it +
+a continuous post-boot log stream are M3's detail-panel / live-console work).
+
+To test the pure "stream stays open, boot never completes, deadline fires" path (impossible with
+the old `FakeChild`, which always hit EOF and so took the fast-fail branch first), added a general
+`FakeChild` *lingering* mode to `emu-core`'s test fakes: `FakeProcessRunner::on_spawn_lingering` —
+after the scripted lines, `next_line()` never resolves until `kill()`, modelling any long-lived
+child. 8 new tests (launch: boots / streams-then-boots / exits-before-boot / never-boots-timeout;
+stop: `emu kill` to the matched serial / idempotent / unknown-id / force-kill fallback). Honest
+gap (in 0016's Notes): no unit test drives a real `emulator`/`adb` — argv, the poll loop, the
+timeout branch and the stop fallbacks are all fake-covered; real end-to-end boot is M2's
+`tauri-driver` E2E (task 0017) or a later `--ignored` test, and Unix zombie-reap on app-kill is
+M3's kill-safety milestone. `just validate` green (109 Rust tests); no IPC surface touched.
 
 ### 2026-09-05 — session 7 (Claude Code) — M1 task 0013 (Dependencies screen), M1 wrapped up
 
