@@ -26,7 +26,7 @@ time = { version = "0.3", default-features = false, features = [
     "serde-well-known",
 ] }
 url = { version = "2", features = ["serde"] }
-sha2 = "0.10"
+sha2 = "0.11"
 # Local registry DB. `sqlite` bundles SQLite (no system lib); `migrate` + `macros`
 # give `sqlx::migrate!` (compile-time embed — no DATABASE_URL). Queries are
 # runtime-checked (`query` + manual `SqliteRow::try_get`, not `query!`), so there
