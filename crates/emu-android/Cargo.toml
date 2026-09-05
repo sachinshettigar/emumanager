@@ -17,3 +17,14 @@ url = { version = "2", features = ["serde"] }
 # tree walk fits the manifest's shape (find-by-attribute, then read a few children) better than
 # quick-xml's streaming/serde model; no unsafe, no dependencies of its own.
 roxmltree = "0.21"
+# `#[async_trait]` on `impl Provider for AndroidProvider` (task 0015) — same version emu-core's
+# own port traits already use.
+async-trait = "0.1"
+
+[dev-dependencies]
+# `emu_core::testing`'s in-memory fakes (FakeProcessRunner, InMemoryFs) for AndroidProvider's own
+# unit tests — an extra dev-dependency entry on the same crate solely to flip on its `testing`
+# feature, the same pattern emu-core's own Cargo.toml uses on itself.
+emu-core = { path = "../emu-core", features = ["testing"] }
+tokio = { version = "1", features = ["rt", "macros"] }
+tempfile = "3"

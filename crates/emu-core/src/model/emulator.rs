@@ -18,6 +18,13 @@ impl EmulatorId {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    /// A fresh, globally unique id for a newly created emulator — a real ULID
+    /// (<https://github.com/ulid/spec>), lexicographically sortable by creation time.
+    #[must_use]
+    pub fn generate() -> Self {
+        Self(ulid::Ulid::new().to_string())
+    }
 }
 
 impl std::fmt::Display for EmulatorId {
@@ -222,5 +229,17 @@ mod tests {
         assert!(hw.ram_mb >= 2048);
         assert!(hw.snapshots);
         assert!(!hw.cold_boot);
+    }
+
+    #[test]
+    fn generated_ids_are_unique_ulids() {
+        let a = EmulatorId::generate();
+        let b = EmulatorId::generate();
+        assert_ne!(a, b);
+        assert_eq!(
+            a.as_str().len(),
+            26,
+            "a ULID is always 26 Crockford-base32 chars"
+        );
     }
 }

@@ -45,6 +45,9 @@ sha1 = "0.10"
 # it doesn't block the async runtime. Already a real transitive dependency via sqlx's
 # `runtime-tokio` feature; declared directly for clarity, `rt` is all this crate's own code needs.
 tokio = { version = "1", default-features = false, features = ["rt"] }
+# EmulatorId::generate() (task 0015) — real ULIDs (https://github.com/ulid/spec), lexicographically
+# sortable by creation time. No unsafe, no dependencies of its own.
+ulid = "1"
 
 [features]
 # Enables the in-crate fakes for the port traits (FakeProcessRunner, FakeDownloader,

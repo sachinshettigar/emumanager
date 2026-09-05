@@ -8,10 +8,10 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Milestone:** M2 — Create & launch one emulator end-to-end (M0 and M1 both stay open on
   deliberately-deferred/blocked items, see below; `currentMilestone` moved on per user direction)
 - **Phase:** M1 is functionally complete — tasks `0010`–`0013` all **done**. M1 itself stays
-  `in_progress` in `.agent/state.json` because two of its own written DoD lines are intentionally
-  deferred (download queue/pause/cancel; `sdkmanager --list` system-image parsing — see the
-  Milestone checklist below), not because anything is broken. M2 is scoped into 4 tasks
-  (`0014`–`0017`, `.agent/tasks/`); `0014` (device + system-image catalogs) is **done**.
+  `in_progress` in `.agent/state.json` because one of its own written DoD lines is intentionally
+  deferred (download queue/pause/cancel — see the Milestone checklist below), not because anything
+  is broken. M2 is scoped into 4 tasks (`0014`–`0017`, `.agent/tasks/`); `0014` and `0015` are
+  **done**.
 - **M2 task 0014 (device catalog + system-image catalog) done:** two new pure-parser modules in
   `emu-android` — `devices::parse` reads Android's own hardware-profile XML files (`devices.xml`,
   `nexus.xml`, `wear.xml`, `tv.xml`, `automotive.xml`, `desktop.xml`, all shipped inside
@@ -25,6 +25,25 @@ Narrative companion to `.agent/state.json`. Update both together (see
   RAM ships in three different units (GiB/MiB/KiB) across the real files, and an extension-level
   system-image package (`android-34-ext12;...`) doesn't round-trip through the existing
   `ImageCoord::from_str` — reused as the skip signal rather than adding separate detection logic.
+- **M2 task 0015 (`AndroidProvider` — `ensure_image` + `create`) done:** the first real `Provider`
+  implementation. Real research **changed the task's own plan mid-flight**: rather than
+  downloading a system image via `Downloader` and extracting it ourselves (the original scope), a
+  real install (`yes | sdkmanager "system-images;android-34;default;x86_64"` against a real
+  scratch SDK, with a real 720 MB image downloaded for this purpose) proved `sdkmanager` already
+  fetches/verifies/unpacks its own packages correctly — same reasoning
+  `crates/emu-core/src/toolchain/bootstrap.rs` already uses for `platform-tools`/`emulator` — so
+  `ensure_image` ended up `ProcessRunner`-only, no `Downloader`/zip code at all. Real install
+  directory confirmed: `sdkmanager` mirrors the package path directly, `;` → `/`
+  (`system-images/android-34/default/x86_64/`), and the marker it checks (`source.properties`) is
+  the same file every real `sdkmanager` package writes. `create()` drives a real
+  `avdmanager create avd -n/-k/-d`; there's no `--help` for this subcommand, so the real flags came
+  from a live "unknown flag" usage dump, and its three real failure texts (duplicate name, unknown
+  device, invalid package) back a specific `CoreError` for each — `--force` is deliberately never
+  passed (a name collision should error, not silently overwrite). Added `EmulatorId::generate()`
+  (a real `ulid` dependency) since `Emulator`'s own doc comment already promised "a ULID string in
+  practice" but nothing generated one; `Registry` gained `insert_emulator`/`get_emulator` against
+  the existing M1-era `emulators` table (no new migration — full schema is M3). 17 new tests (8
+  `emu-core`, 9 `emu-android`), all fixture/fake-driven; `just validate` green.
 - **CI (task 0009) status:** unchanged — still blocked on a GitHub Actions billing/spending-limit
   issue on the account (`sachinshettigar/emumanager`, **Settings → Billing & plans**), not a repo
   problem. Nothing to do here until a human fixes it.
@@ -50,20 +69,20 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0015` — `AndroidProvider::ensure_image` (download+install a system image)
-  and `create` (`avdmanager create avd`), the first real `Provider` implementation, building on
-  `0014`'s catalogs. Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
-  then flip `0009`/`M0` to `done`.
+- **Next action:** task `0016` — `AndroidProvider::launch` (spawn `emulator`, stream logs, poll
+  `adb` for boot-complete) and `stop`. Separately: once GitHub billing is fixed, re-watch the next
+  `ci.yml` push run, then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
 - [~] **M0** Skeleton & gate — tasks 0001–0008 done; 0009 (CI) blocked on a GitHub billing issue,
       not code — see Current state
 - [~] M1 Toolchain manager: SDK from zero — tasks 0010–0013 **all done**; milestone itself stays
-      in_progress only because two DoD lines are deliberately deferred with a documented reason
-      (download queue/pause/cancel; `sdkmanager --list` parsing) — see `MILESTONES.md`
-- [~] M2 Create & launch one emulator end-to-end — task `0014` (device + system-image catalogs)
-      done; `0015`–`0017` (create, launch/stop, wizard+dashboard) not started
+      in_progress only because one DoD line is deliberately deferred with a documented reason
+      (download queue/pause/cancel) — see `MILESTONES.md`
+- [~] M2 Create & launch one emulator end-to-end — tasks `0014` (device + system-image catalogs)
+      and `0015` (`AndroidProvider` ensure_image + create) done; `0016`/`0017` (launch/stop,
+      wizard+dashboard) not started
 - [ ] M3 Registry & reliable tracking
 - [ ] M4 Profiles: export / import / recreate
 - [ ] M5 Host readiness & elevated helper
@@ -72,7 +91,7 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Log
 
-### 2026-09-05 — session 8 (Claude Code) — M2 scoped (0014–0017); task 0014 done
+### 2026-09-05 — session 8 (Claude Code) — M2 scoped (0014–0017); tasks 0014 and 0015 done
 
 Rebuilt and relaunched the app first (confirmed the M1/task-0013 build runs), then scoped M2 into
 four tasks the same granularity as M1's — `.agent/tasks/0014-device-and-image-catalogs.md` through
@@ -112,6 +131,44 @@ paths are exercised by a real fixture, not just the common one.
 
 `.agent/state.json`: `M2` flipped to `in_progress` (M0/M1/M2 now form one contiguous in-progress
 run, still satisfying `progress-check.mjs`'s rule); tasks `0014`–`0017` registered, `0014` → done.
+
+**Task 0015** (`AndroidProvider` — the first real `Provider` impl) followed immediately. Real
+research **changed the task's own written plan mid-flight** (`AGENTS.md` §9): `ensure_image` was
+scoped to download a system image via `Downloader` and extract it ourselves, mirroring
+`cmdline-tools`' bootstrap. Before writing that, downloaded a real, deliberately small (720 MB)
+system image (`system-images;android-34;default;x86_64`) and ran `yes | sdkmanager
+"system-images;android-34;default;x86_64"` against a real scratch SDK — confirming `sdkmanager`
+already fetches, verifies, and unpacks its own packages correctly, unpacking into exactly
+`<sdk_root>/system-images/android-34/default/x86_64/` (package path with `;` → `/`, same convention
+already visible for `cmdline-tools;latest`), leaving the same `source.properties` marker every real
+`sdkmanager` package writes. That's the same "don't reimplement what the tool already does" choice
+`bootstrap.rs` made for `platform-tools`/`emulator` — so `ensure_image` became `ProcessRunner`-only,
+zero `Downloader`/zip code, and the task file's own scope/acceptance criteria were rewritten to
+match before implementing.
+
+`create()` drives a real `avdmanager create avd`. No `--help` exists for this subcommand — the real
+flags (`-n`, `-k`, `-d`, `-f`, `--skin`, `-b`, `-g`, `-c`, `-p`) came from a live "unrecognized
+flag" usage dump. A full real end-to-end run (against the now-genuinely-installed image) captured:
+success is exit-`0`-only with no positive text at all; and three real, distinct `stderr` failure
+texts — duplicate name, unknown `-d` device id, and an invalid `-k` package path — each mapped to
+its own specific `CoreError` rather than one generic failure. `--force` is deliberately never
+passed: a name collision should be a clear error, not a silent overwrite. `EmulatorId::generate()`
+was added (a real `ulid` dependency, `cargo deny`-clean) since `Emulator`'s own doc comment already
+promised "a ULID string in practice" with nothing generating one yet; `Registry` gained
+`insert_emulator`/`get_emulator` against the existing M1-era `emulators` table (no new migration —
+the full schema is M3's job).
+
+`AndroidProvider` implements all 8 `Provider` trait methods (Rust requires the complete impl) but
+only `ensure_image`/`create` do real work — `list_devices`/`list_images` stub out to task `0017`
+(wiring task `0014`'s parsers to a real installed SDK), `launch`/`stop` to task `0016`, `delete`/
+`reconcile` to M3. 17 new tests (8 `emu-core`: ULID generation + registry insert/lookup/duplicate-
+rejection; 9 `emu-android`: `AndroidProvider`'s no-op/success/failure paths, every real error text
+above, and the package-path-to-directory helper), all fixture/fake-driven, no network. Honestly
+noted gap: `FakeProcessRunner` has no real filesystem side effects, so no unit test proves
+`sdkmanager` actually unpacks files end to end — that's the manual real capture above, not
+`cargo test`; a `--ignored` integration test (task `0012`'s own pattern) is the natural next step if
+this gap needs closing. `just validate` green throughout; no IPC surface touched, `bindings.ts`
+regenerated as a no-op diff both times.
 
 ### 2026-09-05 — session 7 (Claude Code) — M1 task 0013 (Dependencies screen), M1 wrapped up
 
