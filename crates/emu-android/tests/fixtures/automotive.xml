@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Trimmed real capture from cmdline-tools 16111833 (revision 23), macOS arm64 build,
+  `com/android/sdklib/devices/automotive.xml` inside `lib/sdklib/sdklib.core.jar`.
+  Captured 2026-09-05 via:
+    curl -o cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-mac_arm64-16111833_latest.zip
+    unzip -p sdk/cmdline-tools/latest/lib/sdklib/sdklib.core.jar com/android/sdklib/devices/automotive.xml > automotive.xml
+  Only a handful of `<d:device>` elements are kept (trimmed for fixture size); every kept byte
+  is verbatim from the real file.
+-->
+<d:devices xmlns:d="http://schemas.android.com/sdk/devices/8">
+<d:device>
+        <d:name>Automotive (1024p landscape)</d:name>
+        <d:id>automotive_1024p_landscape</d:id>
+        <d:manufacturer>Google</d:manufacturer>
+        <d:playstore-enabled>true</d:playstore-enabled>
+        <d:hardware>
+            <d:screen>
+                <d:screen-size>normal</d:screen-size>
+                <d:diagonal-length>8.4</d:diagonal-length>
+                <d:pixel-density>mdpi</d:pixel-density>
+                <d:screen-ratio>notlong</d:screen-ratio>
+                <d:dimensions>
+                    <d:x-dimension>1024</d:x-dimension>
+                    <d:y-dimension>768</d:y-dimension>
+                </d:dimensions>
+                <d:xdpi>152</d:xdpi>
+                <d:ydpi>152</d:ydpi>
+                <d:touch>
+                    <d:multitouch>basic</d:multitouch>
+                    <d:mechanism>finger</d:mechanism>
+                    <d:screen-type>capacitive</d:screen-type>
+                </d:touch>
+            </d:screen>
+            <d:networking>
+                Bluetooth
+                Wifi
+            </d:networking>
+            <d:sensors>
+                LightSensor
+                GPS
+            </d:sensors>
+            <d:mic>true</d:mic>
+            <d:keyboard>nokeys</d:keyboard>
+            <d:nav>nonav</d:nav>
+            <d:ram unit="KiB">3774492</d:ram>
+            <d:buttons>soft</d:buttons>
+            <d:internal-storage unit="KiB">10255672</d:internal-storage>
+            <d:cpu>Generic CPU</d:cpu>
+            <d:gpu>Generic GPU</d:gpu>
+            <d:abi>
+                armeabi-v7a
+                x86
+            </d:abi>
+            <d:dock/>
+            <d:power-type>plugged-in</d:power-type>
+        </d:hardware>
+        <d:software>
+            <d:api-level>28-</d:api-level>
+            <d:live-wallpaper-support>false</d:live-wallpaper-support>
+            <d:bluetooth-profiles/>
+            <d:gl-version>3.0</d:gl-version>
+            <d:gl-extensions/>
+            <d:status-bar>true</d:status-bar>
+        </d:software>
+        <d:state name="Landscape" default="true">
+            <d:description>The device in landscape orientation</d:description>
+            <d:screen-orientation>land</d:screen-orientation>
+            <d:keyboard-state>keyssoft</d:keyboard-state>
+            <d:nav-state>nonav</d:nav-state>
+        </d:state>
+        <d:tag-id>android-automotive-playstore</d:tag-id>
+    </d:device>
+<d:device deprecated="true">
+        <d:name>Automotive (1080p landscape)</d:name>
+        <d:id>automotive_1080p_landscape</d:id>
+        <d:manufacturer>Google</d:manufacturer>
+        <d:playstore-enabled>false</d:playstore-enabled>
+        <d:hardware>
+            <d:screen>
+                <d:screen-size>normal</d:screen-size>
+                <d:diagonal-length>8.4</d:diagonal-length>
+                <d:pixel-density>ldpi</d:pixel-density>
+                <d:screen-ratio>notlong</d:screen-ratio>
+                <d:dimensions>
+                    <d:x-dimension>1080</d:x-dimension>
+                    <d:y-dimension>600</d:y-dimension>
+                </d:dimensions>
+                <d:xdpi>120</d:xdpi>
+                <d:ydpi>120</d:ydpi>
+                <d:touch>
+                    <d:multitouch>basic</d:multitouch>
+                    <d:mechanism>finger</d:mechanism>
+                    <d:screen-type>capacitive</d:screen-type>
+                </d:touch>
+            </d:screen>
+            <d:networking>Bluetooth Wifi</d:networking>
+            <d:sensors>Accelerometer Gyroscope GPS</d:sensors>
+            <d:mic>true</d:mic>
+            <d:keyboard>nokeys</d:keyboard>
+            <d:nav>nonav</d:nav>
+            <d:ram unit="KiB">6291456</d:ram>
+            <d:buttons>soft</d:buttons>
+            <d:internal-storage unit="KiB">10255672</d:internal-storage>
+            <d:cpu>Generic CPU</d:cpu>
+            <d:gpu>Generic GPU</d:gpu>
+            <d:abi>arm64-v8a x86_64</d:abi>
+            <d:dock/>
+            <d:power-type>plugged-in</d:power-type>
+            <d:skin>automotive_landscape</d:skin>
+        </d:hardware>
+        <d:software>
+            <d:api-level>28-</d:api-level>
+            <d:live-wallpaper-support>false</d:live-wallpaper-support>
+            <d:bluetooth-profiles/>
+            <d:gl-version>3.0</d:gl-version>
+            <d:gl-extensions/>
+            <d:status-bar>true</d:status-bar>
+        </d:software>
+        <d:state name="Landscape" default="true">
+            <d:description>The device in landscape orientation</d:description>
+            <d:screen-orientation>land</d:screen-orientation>
+            <d:keyboard-state>keyssoft</d:keyboard-state>
+            <d:nav-state>nonav</d:nav-state>
+        </d:state>
+        <d:tag-id>android-automotive</d:tag-id>
+    </d:device>
+</d:devices>

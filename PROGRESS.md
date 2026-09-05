@@ -10,8 +10,21 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Phase:** M1 is functionally complete — tasks `0010`–`0013` all **done**. M1 itself stays
   `in_progress` in `.agent/state.json` because two of its own written DoD lines are intentionally
   deferred (download queue/pause/cancel; `sdkmanager --list` system-image parsing — see the
-  Milestone checklist below), not because anything is broken. No M2 task files exist yet — that's
-  the very next thing to create.
+  Milestone checklist below), not because anything is broken. M2 is scoped into 4 tasks
+  (`0014`–`0017`, `.agent/tasks/`); `0014` (device + system-image catalogs) is **done**.
+- **M2 task 0014 (device catalog + system-image catalog) done:** two new pure-parser modules in
+  `emu-android` — `devices::parse` reads Android's own hardware-profile XML files (`devices.xml`,
+  `nexus.xml`, `wear.xml`, `tv.xml`, `automotive.xml`, `desktop.xml`, all shipped inside
+  `cmdline-tools`' `sdklib.core.jar`) directly, since `avdmanager list device`'s plain-text output
+  doesn't carry the screen/RAM/sensor data `DeviceProfile` needs; `sysimg::parse` reads Google's
+  per-tag `sys-img2-3.xml` manifests (system images live outside `repository2-3.xml`, one manifest
+  per Google "tag" family — 6 real, curl-verified URLs). Both real sources were captured fresh
+  (2026-09-05) via a real `cmdline-tools` download + real `sys-img2-3.xml` fetches, trimmed to real,
+  verbatim bytes in `crates/emu-android/tests/fixtures/`. 19 new fixture-driven unit tests, no
+  network in `just validate`. See the task file's Notes for the two data quirks this surfaced:
+  RAM ships in three different units (GiB/MiB/KiB) across the real files, and an extension-level
+  system-image package (`android-34-ext12;...`) doesn't round-trip through the existing
+  `ImageCoord::from_str` — reused as the skip signal rather than adding separate detection logic.
 - **CI (task 0009) status:** unchanged — still blocked on a GitHub Actions billing/spending-limit
   issue on the account (`sachinshettigar/emumanager`, **Settings → Billing & plans**), not a repo
   problem. Nothing to do here until a human fixes it.
@@ -37,10 +50,10 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** pick M2's first task — "create + launch one emulator end-to-end" — no task
-  files exist for M2 yet, so this starts with scoping them (`docs/architecture.md`, `MILESTONES.md`
-  M2 section, `docs/design/wireframes/` screen 2). Separately: once GitHub billing is fixed,
-  re-watch the next `ci.yml` push run, then flip `0009`/`M0` to `done`.
+- **Next action:** task `0015` — `AndroidProvider::ensure_image` (download+install a system image)
+  and `create` (`avdmanager create avd`), the first real `Provider` implementation, building on
+  `0014`'s catalogs. Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
+  then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
@@ -49,7 +62,8 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [~] M1 Toolchain manager: SDK from zero — tasks 0010–0013 **all done**; milestone itself stays
       in_progress only because two DoD lines are deliberately deferred with a documented reason
       (download queue/pause/cancel; `sdkmanager --list` parsing) — see `MILESTONES.md`
-- [ ] M2 Create & launch one emulator end-to-end
+- [~] M2 Create & launch one emulator end-to-end — task `0014` (device + system-image catalogs)
+      done; `0015`–`0017` (create, launch/stop, wizard+dashboard) not started
 - [ ] M3 Registry & reliable tracking
 - [ ] M4 Profiles: export / import / recreate
 - [ ] M5 Host readiness & elevated helper
@@ -57,6 +71,47 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 8 (Claude Code) — M2 scoped (0014–0017); task 0014 done
+
+Rebuilt and relaunched the app first (confirmed the M1/task-0013 build runs), then scoped M2 into
+four tasks the same granularity as M1's — `.agent/tasks/0014-device-and-image-catalogs.md` through
+`0017-create-wizard-and-dashboard.md` — and picked up `0014`.
+
+**Real-source research before writing any parser** (per `AGENTS.md` §6 rule 2 — never invent SDK
+behavior): downloaded the real `commandlinetools-mac_arm64` zip for this host and inspected it.
+`avdmanager list device`'s own plain-text output (captured for real: 15 real device ids, id/Name/
+OEM/Tag columns only) doesn't carry the screen/RAM/sensor data `DeviceProfile` needs — so instead
+of scraping that text, the parser reads the XML files `avdmanager` itself loads them from, found by
+inspecting `sdklib.core.jar`: `devices.xml` (generic + Small/Medium Phone/Tablet), `nexus.xml`
+(Pixel/Nexus — this is where "Pixel 6" actually lives), `wear.xml`, `tv.xml`, `automotive.xml`,
+`desktop.xml` (a 7th, `xr.xml`, exists but is out of scope — no XR `FormFactor` variant, not in
+`docs/spec.md`). Only `wear.xml`/`tv.xml`/`automotive.xml` carry an explicit `<d:tag-id>`; the
+other three don't, so `devices::form_factor_for` infers Phone/Tablet/Foldable from id/name for
+those — a documented heuristic, not something the tool itself emits, called out clearly as such in
+the module doc so nobody mistakes it for cited SDK behavior later.
+
+System images turned out **not** to live in `repository2-3.xml` at all (confirmed by grep — zero
+`system-images` packages in a fresh real fetch) — they ship in one `sys-img2-3.xml` manifest per
+Google "tag" family, at URLs curl-verified for real 2026-09-05 (`sysimg::MANIFEST_URLS`). Real
+capture surfaced "extension-level" packages (`system-images;android-34-ext12;...`) that our
+existing `ImageCoord::from_str` (task `0002`) already can't parse — reused that as the skip signal
+instead of writing separate ext-level detection.
+
+Real fixtures, real bytes, trimmed for size (same trim policy as task `0010`'s
+`repository2-3.xml`): `crates/emu-android/tests/fixtures/{devices,nexus,wear,tv,automotive,
+desktop}.xml` and `sys-img2-3-{android,google-apis-playstore,wear}.xml`. 19 new unit tests, all
+fixture-driven, no network, no process spawn (this task is parsers only — locating/extracting these
+files from an installed SDK is task `0015`'s job, alongside `ensure_image`/`create` which need the
+same install-dir knowledge). `just validate` green; no IPC surface touched, so `bindings.ts` was
+regenerated as a no-op diff.
+
+Also found while writing the RAM-unit converter: the three real files use three different units
+for `<d:ram unit="...">` — GiB (`nexus.xml`), MiB (`wear.xml`), KiB (`automotive.xml`) — all three
+paths are exercised by a real fixture, not just the common one.
+
+`.agent/state.json`: `M2` flipped to `in_progress` (M0/M1/M2 now form one contiguous in-progress
+run, still satisfying `progress-check.mjs`'s rule); tasks `0014`–`0017` registered, `0014` → done.
 
 ### 2026-09-05 — session 7 (Claude Code) — M1 task 0013 (Dependencies screen), M1 wrapped up
 

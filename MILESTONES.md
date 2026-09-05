@@ -55,9 +55,12 @@ Goal: from a machine with nothing, the app installs everything needed to make em
       screen
 - [x] Dependencies screen wired to real data: components list + live install progress. **Partial**:
       no storage-breakdown view yet (not part of task 0013's scope; revisit if a real need shows up)
-- [ ] `emu-android` parsers for `sdkmanager --list` / repo XML, tested against captured fixtures —
-      **partial**: the repo XML component catalog (task 0010) is done; `sdkmanager --list` output
-      parsing (system images) is not — not needed until M2's image list/create flow
+- [x] `emu-android` parsers for the SDK component + system-image catalogs, tested against captured
+      fixtures — repo XML component catalog (task `0010`) and system-image manifests (task `0014`,
+      M2). **Superseded, not literally met**: system images turned out not to be in
+      `sdkmanager --list`'s underlying `repository2-3.xml` at all — task `0014` parses Google's
+      real per-tag `sys-img2-3.xml` manifests directly instead (see its Notes); the plain-text
+      `sdkmanager --list` output itself is still unparsed and not needed
 - [x] Unit tests with fake `Downloader`/`ProcessRunner`; no network in `just validate`
 
 DoD: on a clean CI job with an empty data dir, a `--ignored` integration test downloads
@@ -69,7 +72,9 @@ install. **Met** (task 0012) — `cargo test -p emu-core --all-features --test t
 
 ## M2 — Create & launch one emulator end-to-end  (coverage gate: 62%)
 
-- [ ] `list_devices` (`avdmanager list device`) + `list_images` (filtered) commands + parsers/fixtures
+- [~] `list_devices` + `list_images` (filtered) commands + parsers/fixtures — **parsers done**
+      (task `0014`: `emu-android::devices`/`sysimg`, real fixtures); the IPC **commands** land in
+      task `0017` once `0015`/`0016` give them a real `Provider` to call
 - [ ] `ensure_image` downloads a chosen `system-images;...` with progress
 - [ ] `create` → `avdmanager create avd` with hardware flags; parse result; register
 - [ ] `launch` → spawn `emulator @name` with accelerator + graphics flags; stream logs to `job://log`

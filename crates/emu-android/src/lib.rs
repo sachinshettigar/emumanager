@@ -7,5 +7,7 @@
 #![forbid(unsafe_code)]
 
 pub mod catalog;
+pub mod devices;
+pub mod sysimg;
 
 pub use emu_core::{CoreError, Result};

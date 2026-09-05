@@ -1,0 +1,130 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!--
+  Trimmed real capture of `sys-img2-3.xml`, captured 2026-09-05 from:
+    https://dl.google.com/android/repository/sys-img/google_apis_playstore/sys-img2-3.xml
+  Only a handful of <remotePackage> elements are kept (trimmed for fixture size); every kept
+  byte is verbatim from the real file. <license>/<channel> definitions were dropped (parser
+  doesn't read them), same trim policy as tests/fixtures/repository2-3.xml.
+-->
+<sys-img:sdk-sys-img xmlns:sys-img="http://schemas.android.com/sdk/android/repo/sys-img2/03" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<remotePackage path="system-images;android-34;google_apis_playstore;arm64-v8a">
+    <type-details xsi:type="sys-img:sysImgDetailsType">
+      <api-level>34</api-level>
+      <extension-level>7</extension-level>
+      <base-extension>true</base-extension>
+      <tag>
+        <id>google_apis_playstore</id>
+        <display>Google Play</display>
+      </tag>
+      <vendor>
+        <id>google</id>
+        <display>Google Inc.</display>
+      </vendor>
+      <abi>arm64-v8a</abi>
+    </type-details>
+    <revision>
+      <major>14</major>
+    </revision>
+    <display-name>Google Play ARM 64 v8a System Image</display-name>
+    <uses-license ref="android-sdk-arm-dbt-license"/>
+    <dependencies>
+      <dependency path="emulator">
+        <min-revision>
+          <major>34</major>
+          <minor>2</minor>
+          <micro>16</micro>
+        </min-revision>
+      </dependency>
+    </dependencies>
+    <channelRef ref="channel-0"/>
+    <archives>
+      <archive>
+        <complete>
+          <size>1548905381</size>
+          <checksum type="sha1">c307c3301dc52635ebc78b943c39b3c377856ebc</checksum>
+          <url>arm64-v8a-34_r14.zip</url>
+        </complete>
+      </archive>
+    </archives>
+  </remotePackage>
+<remotePackage path="system-images;android-34;google_apis_playstore;x86_64">
+    <type-details xsi:type="sys-img:sysImgDetailsType">
+      <api-level>34</api-level>
+      <extension-level>7</extension-level>
+      <base-extension>true</base-extension>
+      <tag>
+        <id>google_apis_playstore</id>
+        <display>Google Play</display>
+      </tag>
+      <vendor>
+        <id>google</id>
+        <display>Google Inc.</display>
+      </vendor>
+      <abi>x86_64</abi>
+    </type-details>
+    <revision>
+      <major>14</major>
+    </revision>
+    <display-name>Google Play Intel x86_64 Atom System Image</display-name>
+    <uses-license ref="android-sdk-license"/>
+    <dependencies>
+      <dependency path="emulator">
+        <min-revision>
+          <major>34</major>
+          <minor>2</minor>
+          <micro>16</micro>
+        </min-revision>
+      </dependency>
+    </dependencies>
+    <channelRef ref="channel-0"/>
+    <archives>
+      <archive>
+        <complete>
+          <size>1510752654</size>
+          <checksum type="sha1">01d32617fd1937e540faf8731d70cf50e35af854</checksum>
+          <url>x86_64-34_r14.zip</url>
+        </complete>
+      </archive>
+    </archives>
+  </remotePackage>
+<remotePackage path="system-images;android-34-ext12;google_apis_playstore;arm64-v8a">
+    <type-details xsi:type="sys-img:sysImgDetailsType">
+      <api-level>34x</api-level>
+      <extension-level>12</extension-level>
+      <base-extension>false</base-extension>
+      <tag>
+        <id>google_apis_playstore</id>
+        <display>Google Play</display>
+      </tag>
+      <vendor>
+        <id>google</id>
+        <display>Google Inc.</display>
+      </vendor>
+      <abi>arm64-v8a</abi>
+    </type-details>
+    <revision>
+      <major>1</major>
+    </revision>
+    <display-name>Google Play ARM 64 v8a System Image</display-name>
+    <uses-license ref="android-sdk-arm-dbt-license"/>
+    <dependencies>
+      <dependency path="emulator">
+        <min-revision>
+          <major>32</major>
+          <minor>1</minor>
+          <micro>8</micro>
+        </min-revision>
+      </dependency>
+    </dependencies>
+    <channelRef ref="channel-0"/>
+    <archives>
+      <archive>
+        <complete>
+          <size>1574547899</size>
+          <checksum type="sha1">88405ccf99457b8ede2ef3b796672405c99db5ee</checksum>
+          <url>arm64-v8a-34-ext12_r01.zip</url>
+        </complete>
+      </archive>
+    </archives>
+  </remotePackage>
+</sys-img:sdk-sys-img>

@@ -1,0 +1,45 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!--
+  Trimmed real capture of `sys-img2-3.xml`, captured 2026-09-05 from:
+    https://dl.google.com/android/repository/sys-img/android/sys-img2-3.xml
+  Only a handful of <remotePackage> elements are kept (trimmed for fixture size); every kept
+  byte is verbatim from the real file. <license>/<channel> definitions were dropped (parser
+  doesn't read them), same trim policy as tests/fixtures/repository2-3.xml.
+-->
+<sys-img:sdk-sys-img xmlns:sys-img="http://schemas.android.com/sdk/android/repo/sys-img2/03" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<remotePackage path="system-images;android-34;default;x86_64">
+    <type-details xsi:type="sys-img:sysImgDetailsType">
+      <api-level>34</api-level>
+      <base-extension>true</base-extension>
+      <tag>
+        <id>default</id>
+        <display>Default Android System Image</display>
+      </tag>
+      <abi>x86_64</abi>
+    </type-details>
+    <revision>
+      <major>4</major>
+    </revision>
+    <display-name>Intel x86_64 Atom System Image</display-name>
+    <uses-license ref="android-sdk-license"/>
+    <dependencies>
+      <dependency path="emulator">
+        <min-revision>
+          <major>29</major>
+          <minor>1</minor>
+          <micro>11</micro>
+        </min-revision>
+      </dependency>
+    </dependencies>
+    <channelRef ref="channel-0"/>
+    <archives>
+      <archive>
+        <complete>
+          <size>720747116</size>
+          <checksum type="sha1">5f6a249f9bc3b1b4c459b13ce2eb646c9680bed1</checksum>
+          <url>x86_64-34_r04.zip</url>
+        </complete>
+      </archive>
+    </archives>
+  </remotePackage>
+</sys-img:sdk-sys-img>

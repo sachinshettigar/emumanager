@@ -1,0 +1,36 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!--
+  Trimmed real capture of `sys-img2-3.xml`, captured 2026-09-05 from:
+    https://dl.google.com/android/repository/sys-img/android-wear/sys-img2-3.xml
+  Only a handful of <remotePackage> elements are kept (trimmed for fixture size); every kept
+  byte is verbatim from the real file. <license>/<channel> definitions were dropped (parser
+  doesn't read them), same trim policy as tests/fixtures/repository2-3.xml.
+-->
+<sys-img:sdk-sys-img xmlns:sys-img="http://schemas.android.com/sdk/android/repo/sys-img2/03" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<remotePackage path="system-images;android-34;android-wear;arm64-v8a">
+    <type-details xsi:type="sys-img:sysImgDetailsType">
+      <api-level>34</api-level>
+      <base-extension>true</base-extension>
+      <tag>
+        <id>android-wear</id>
+        <display>Wear OS 5</display>
+      </tag>
+      <abi>arm64-v8a</abi>
+    </type-details>
+    <revision>
+      <major>1</major>
+    </revision>
+    <display-name>Wear OS 5 ARM 64 v8a System Image</display-name>
+    <uses-license ref="android-sdk-license"/>
+    <channelRef ref="channel-0"/>
+    <archives>
+      <archive>
+        <complete>
+          <size>1215167643</size>
+          <checksum type="sha1">0352eee45f1e738b10a64b547a1f51d6d3baee42</checksum>
+          <url>arm64-v8a-34_r01.zip</url>
+        </complete>
+      </archive>
+    </archives>
+  </remotePackage>
+</sys-img:sdk-sys-img>
