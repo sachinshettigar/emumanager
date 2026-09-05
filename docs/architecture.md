@@ -87,9 +87,13 @@ trait Provider {
   pushed to a broadcast channel that `src-tauri` forwards as a Tauri event
   (`job://progress`, `job://log`, `job://done`). The UI subscribes per job.
 - **Registry:** `sqlx` with SQLite. Tables: `emulators`, `images`, `profiles`, `jobs`,
-  `host_snapshots`. It stores *our* metadata (source profile, tags, notes, timestamps);
-  `reconcile()` re-reads ground truth from `avdmanager`/`adb` and updates `state` so the DB never
-  drifts. Offline query metadata in `.sqlx/` is committed so builds need no live DB.
+  `host_snapshots` (schema: `migrations/0001_init.sql` + `0002_registry_m3.sql`). It stores *our*
+  metadata (source profile, tags, notes, hardware, timestamps, last-known run state); compound
+  values are JSON text columns so a struct change needs no migration. `reconcile()` re-reads ground
+  truth from `avdmanager`/`adb` and updates `last_state` so the DB never drifts. The typed
+  `Registry` API (`EmulatorRow` in/out) lives in `crates/emu-core/src/registry/`. Queries are
+  runtime-checked (`sqlx::query` + `SqliteRow::try_get`); a committed `.sqlx/` offline cache +
+  `query!` macros are deferred to M4 (task `0018` Notes).
 - **Toolchain manager:** a static descriptor of required components + their Google repo coords;
   resolves the repository XML for versions; downloads via `Downloader` with SHA verification;
   writes license-hash files to accept licenses; exposes `InstalledState` for the Dependencies

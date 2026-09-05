@@ -5,14 +5,17 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
-- **Milestone:** M3 — Registry & reliable tracking (`currentMilestone` advanced; M0, M1 and M2
-  all stay `in_progress` on deliberately-deferred/blocked DoD lines, see below)
-- **Phase:** M2 is functionally complete — tasks `0014`–`0017` all **done**. M2 itself stays
-  `in_progress` because its one DoD line — a real `tauri-driver` E2E that boots a Play Store
-  emulator — is deferred to M6's e2e-suite work; the whole create → boot → stop flow is wired end
-  to end and covered by fake-driven Rust tests + Vitest, but no automated test boots a real
-  emulator (the honest gap from tasks `0015`/`0016`). No M3 task files exist yet — the next thing
-  is to scope them.
+- **Milestone:** M3 — Registry & reliable tracking, **in progress**. Scoped into four tasks
+  (`0018`–`0021`); `0018` is **done** (in review). M0, M1 and M2 all stay `in_progress` on
+  deliberately-deferred/blocked DoD lines, see below.
+- **Phase:** M3 storage layer landed (task `0018`). `migrations/0002_registry_m3.sql` grows the
+  M0-minimal `emulators` table into the full tracked record (image coord, device profile, hardware,
+  source, tags, notes, live-run columns, timestamps) and adds `host_snapshots`; the `Registry` API
+  is now typed (`EmulatorRow` in/out, `registry/row.rs`) instead of column tuples, with compound
+  values stored as JSON text columns so struct changes don't force a migration. Next: task `0019`
+  (`AndroidProvider::reconcile` + `delete` + kill-safety + the M3 DoD property test).
+- **M2 recap:** tasks `0014`–`0017` all **done**; M2 stays `in_progress` only on its one DoD line
+  (a real `tauri-driver` E2E boot), deferred to M6's e2e-suite work.
 - **M2 task 0017 (IPC + Create wizard + Dashboard) done:** `src-tauri/src/commands/emulator.rs` —
   six `tauri-specta` commands (`list_devices` / `list_images` / `list_emulators` /
   `create_emulator` / `launch_emulator` / `stop_emulator`) + one `EmulatorJob` event
@@ -102,14 +105,13 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** scope M3 — Registry & reliable tracking (`.agent/tasks/` has no M3 files yet).
-  From `MILESTONES.md` M3: full SQLite schema + migrations, `reconcile()` on startup / on demand
-  (adopt out-of-band AVDs, drop vanished rows), a selected-emulator detail panel, wipe / delete /
-  rename / edit-hardware, a per-emulator log console, and kill-safety (SIGKILL mid-boot →
-  reconcile recovers). A shared/managed `AndroidProvider` (so `stop` can force-kill and the app
-  reaps children on exit) and the emulator uptime/launch-timestamp naturally land here too.
-  Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run, then flip
-  `0009`/`M0` to `done`.
+- **Next action:** task `0019` — `AndroidProvider::reconcile()` (adopt on-disk AVDs with no row,
+  flag rows whose AVD vanished, refresh `last_state`/serial/port from adb, reset a `Booting`/
+  `Running` row with a dead `pid` back to `Stopped`), `AndroidProvider::delete(id, wipe)`
+  (`avdmanager delete avd`), and the M3 DoD property test (random create/launch/kill/adopt →
+  `reconcile()` → registry matches ground truth). Then `0020` (shared managed provider + lifecycle
+  commands) and `0021` (detail panel + log console). Separately: once GitHub billing is fixed,
+  re-watch the next `ci.yml` push run, then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
@@ -121,13 +123,58 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [~] M2 Create & launch one emulator end-to-end — tasks `0014`–`0017` **all done**; milestone
       stays in_progress only on its one DoD line (a real `tauri-driver` E2E boot), deferred to
       M6's e2e-suite work — see `MILESTONES.md`
-- [ ] M3 Registry & reliable tracking — **current milestone**, no task files yet
+- [~] M3 Registry & reliable tracking — **current milestone**, scoped into tasks `0018`–`0021`;
+      `0018` (full schema + typed `Registry` API) **done**, `0019`–`0021` todo
 - [ ] M4 Profiles: export / import / recreate
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-05 — session 9 (Claude Code) — M3 scoped (0018–0021); task 0018 done (registry schema)
+
+Scoped M3 — Registry & reliable tracking — into four tasks the same granularity as M1/M2:
+`0018` full SQLite schema + typed `Registry` API, `0019` `AndroidProvider::reconcile` + `delete` +
+kill-safety + the M3 DoD property test, `0020` shared managed provider (`tauri::State`, so the
+spawned-child map persists → real force-kill and app-exit reap) + startup reconcile + the
+rename/edit-hardware/delete/wipe/`reconcile_now`/`emulator_detail` commands, `0021` the
+`/emulator/:id` detail panel + per-emulator log console. Then did `0018`.
+
+**Task `0018` done (in review).** `migrations/0002_registry_m3.sql` `ALTER TABLE ADD COLUMN`s the
+M0-minimal `emulators` table up to the full tracked record — `device_profile_id`, `image_coord`,
+`hardware_json`, `source_json`, `tags_json`, `notes`, `last_state`, `adb_serial`, `grpc_port`,
+`pid`, `launched_at`, `updated_at` — and adds a `host_snapshots` table (M5 fills it; the row type
+and schema exist now so it's complete). **Compound values (`Hardware`, `EmulatorSource`, tag list)
+are one JSON text column each, not one SQL column per field** — `Hardware` has 7 fields and
+`EmulatorSource` is a per-variant-payload enum, so per-column would either lose data or need a
+migration on every future struct change; the cost (can't `WHERE` on them in SQL) is one nothing
+needs. The `hardware_json` migration default is `Hardware::default()` serialized verbatim; a test
+asserts the round trip so a drift in the default is caught.
+
+New `crates/emu-core/src/registry/row.rs`: `EmulatorRow` (fully typed — `Option<ImageCoord>`,
+`Hardware`, `EmulatorSource`, `RunState`, `Vec<String>` tags, `OffsetDateTime` ×3, `Option<u16>`
+port, `Option<u32>` pid) and `HostSnapshotRow`, both mapped from `SqliteRow` with manual
+`try_get` (no `FromRow` derive — the JSON/enum columns need custom decoding anyway). The `Registry`
+API is now **typed** end to end: `upsert_emulator(&EmulatorRow)` (`INSERT … ON CONFLICT(id) DO
+UPDATE`, keeps `created_at`), `get_row`, `list_rows`, `set_run_fields`, `rename`, `set_hardware`,
+`delete_row -> bool`, `insert_host_snapshot`, `latest_host_snapshot`. The old tuple methods
+(`insert_emulator` / `get_emulator` / `list_emulators`) are **deleted**; the only caller,
+`emu-android::provider`, was updated (`create` builds a full `EmulatorRow`; `launch` / `stop` /
+`tracked_states` read the typed rows). `serde_json` added to `emu-core`'s deps, `time` to
+`emu-android`'s (one `now_utc()` call).
+
+`.sqlx/` offline cache + `query!` macros — `migrations/0001`'s comment and `MILESTONES.md` M0 both
+said "in M3". Still deferred, **pointer moved to M4**: runtime `sqlx::query` + manual row mapping
+works and `just validate` is green without a `DATABASE_URL` or a committed cache; adopting the
+checked macros now would mean a build-time DB or a checked-in `.sqlx/` for every query in the
+crate, for a compile-time-vs-first-test convenience. Updated `MILESTONES.md` M0 line, the
+architecture Registry note, and the `Cargo.toml` comment.
+
+117 rust tests (+3 net — registry inline tests 2 → 6: migration-applies + every-column round trip,
+upsert preserves `created_at`, `set_run_fields`/`rename`/`set_hardware`/`delete_row`,
+`list_rows` ordering + duplicate-`avd_name` rejection, `host_snapshots` round trip), 22 web tests;
+`just validate` green. No IPC surface touched — `bindings.ts` regenerated as a no-op diff.
 
 ### 2026-09-05 — session 8 (Claude Code) — M2 scoped (0014–0017); all four tasks done, M2 functionally complete
 

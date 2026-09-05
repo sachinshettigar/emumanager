@@ -27,6 +27,9 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 # `Mutex` guarding the spawned-emulator child handles `stop` reaps. No `rt`/`macros` — this crate
 # never starts a runtime, only runs on the caller's.
 tokio = { version = "1", default-features = false, features = ["time", "sync"] }
+# `OffsetDateTime::now_utc()` for the timestamps on a new `EmulatorRow` (task 0018). Already a
+# transitive dep via emu-core; declared here for the one `now_utc()` call `create` makes.
+time = { version = "0.3", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 # `emu_core::testing`'s in-memory fakes (FakeProcessRunner, InMemoryFs) for AndroidProvider's own

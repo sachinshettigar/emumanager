@@ -13,6 +13,10 @@ workspace = true
 [dependencies]
 thiserror.workspace = true
 serde.workspace = true
+# The registry (task 0018) stores compound values — `Hardware`, `EmulatorSource`, tag lists — as
+# JSON text columns rather than one SQL column per field, so the full struct round-trips without a
+# migration every time a field is added.
+serde_json.workspace = true
 async-trait = "0.1"
 time = { version = "0.3", default-features = false, features = [
     "std",
@@ -25,8 +29,10 @@ url = { version = "2", features = ["serde"] }
 sha2 = "0.10"
 # Local registry DB. `sqlite` bundles SQLite (no system lib); `migrate` + `macros`
 # give `sqlx::migrate!` (compile-time embed — no DATABASE_URL). Queries are
-# runtime-checked (`query_as`, not `query!`), so there is no `.sqlx/` offline
-# cache until M3 adopts the checked macros.
+# runtime-checked (`query` + manual `SqliteRow::try_get`, not `query!`), so there
+# is no `.sqlx/` offline cache. Deferred to M4 (task 0018 Notes): runtime queries
+# against a bundled SQLite work fine and `just validate` is green without it;
+# adopting `query!` would need a build-time DB or a committed `.sqlx/` for every query.
 sqlx = { version = "0.8", default-features = false, features = [
     "runtime-tokio",
     "sqlite",

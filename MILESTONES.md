@@ -16,7 +16,8 @@ Goal: an empty Tauri app that builds on all three OSes and a validation gate tha
 - [x] Vite + React + TS (strict) frontend renders an app shell with the 4 nav routes (static)
 - [x] `tauri-specta` wired: one `ping` command, `src/lib/bindings.ts` generated and used
 - [x] `sqlx` set up with an initial migration; `Registry::open` migrates a SQLite DB in the data
-      dir (`.sqlx/` offline cache deferred to M3 — no `query!` macros yet)
+      dir (`.sqlx/` offline cache + `query!` macros deferred — now to M4, see task `0018` Notes:
+      runtime queries work and `just validate` is green without it)
 - [x] `justfile` with every recipe in `AGENTS.md` §4; `package.json` script mirrors
 - [x] `lefthook` installed (npm dev-dep); pre-commit runs fmt + `bindings` + `progress` (guarded
       `db-prepare`/`gitleaks`), commit-msg lints Conventional Commits, pre-push runs `just validate`
@@ -102,7 +103,11 @@ pieces are covered by fake-driven Rust tests + Vitest; a real booted-emulator ru
 
 ## M3 — Registry & reliable tracking  (coverage gate: 65%)
 
-- [ ] Full SQLite schema (emulators, images, profiles, jobs, host_snapshots) + migrations
+- [x] Full SQLite schema (emulators, images, profiles, jobs, host_snapshots) + migrations —
+      `migrations/0002_registry_m3.sql` grows `emulators` to the full tracked record and adds
+      `host_snapshots`; behind a typed `Registry` API (`EmulatorRow` in/out) in
+      `crates/emu-core/src/registry/`. Task `0018`. Compound values (`Hardware`, `EmulatorSource`,
+      tags) are JSON columns, not one column per field — see the task Notes.
 - [ ] `reconcile()` on startup and on demand: adopt out-of-band AVDs, drop vanished ones, refresh state
 - [ ] Detail panel: image coord, RAM/storage, adb serial, gRPC port, snapshot, source; open folder
 - [ ] Wipe data, delete (with/without AVD removal), rename, edit hardware (recreate if needed)

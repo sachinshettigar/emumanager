@@ -23,14 +23,15 @@ use tokio::time::{sleep, timeout, Instant};
 use emu_core::error::{CoreError, Result};
 use emu_core::model::component::{ComponentId, HostOs};
 use emu_core::model::device::DeviceProfile;
-use emu_core::model::emulator::{EmulatorId, Graphics, LiveState, RunState};
+use emu_core::model::emulator::{EmulatorId, EmulatorSource, Graphics, LiveState, RunState};
 use emu_core::model::image::{ImageCoord, ImageFilter, SystemImage};
 use emu_core::model::job::{JobHandle, Progress};
 use emu_core::model::plan::CreateSpec;
 use emu_core::ports::{ChildProcess, Command, Fs, ProcessRunner};
 use emu_core::provider::{LaunchOpts, Provider, RunningHandle};
-use emu_core::registry::Registry;
+use emu_core::registry::{EmulatorRow, Registry};
 use emu_core::toolchain;
+use time::OffsetDateTime;
 
 /// Feed this many `y\n` lines as stdin to a `sdkmanager`/`avdmanager` invocation that might hit a
 /// license or confirmation prompt — bounded, not an infinite `yes |`, same rationale and count as
@@ -164,7 +165,7 @@ impl AndroidProvider {
     /// [`CoreError`] from the registry or, for the initial device list, the process port. A
     /// per-emulator `adb` hiccup is swallowed (that emulator reads as `Stopped`).
     pub async fn tracked_states(&self) -> Result<Vec<TrackedEmulator>> {
-        let rows = self.registry.list_emulators().await?;
+        let rows = self.registry.list_rows().await?;
         if rows.is_empty() {
             return Ok(Vec::new());
         }
@@ -173,14 +174,14 @@ impl AndroidProvider {
         let serials = self.emulator_serials(&adb).await.unwrap_or_default();
 
         let mut out = Vec::with_capacity(rows.len());
-        for (id, avd_name, display_name) in rows {
+        for row in rows {
             let mut adb_serial = None;
             for candidate in &serials {
                 let cmd = Command::new(adb.display().to_string())
                     .args(["-s", candidate])
                     .args(["emu", "avd", "name"]);
                 if let Ok(out) = self.process.run(cmd).await {
-                    if out.stdout.lines().next().unwrap_or("").trim() == avd_name {
+                    if out.stdout.lines().next().unwrap_or("").trim() == row.avd_name {
                         adb_serial = Some(candidate.clone());
                         break;
                     }
@@ -192,9 +193,9 @@ impl AndroidProvider {
                 Some(_) => RunState::Booting,
             };
             out.push(TrackedEmulator {
-                id: EmulatorId(id),
-                avd_name,
-                display_name,
+                id: row.id,
+                avd_name: row.avd_name,
+                display_name: row.display_name,
                 state,
                 adb_serial,
             });
@@ -397,9 +398,17 @@ impl Provider for AndroidProvider {
         }
 
         let id = EmulatorId::generate();
-        self.registry
-            .insert_emulator(id.as_str(), &spec.avd_name, &spec.display_name)
-            .await?;
+        let row = EmulatorRow::new(
+            id.clone(),
+            spec.avd_name.clone(),
+            spec.display_name.clone(),
+            spec.device_profile_id.clone(),
+            spec.image_coord,
+            spec.hardware.clone(),
+            EmulatorSource::Manual { discovered: false },
+            OffsetDateTime::now_utc(),
+        );
+        self.registry.upsert_emulator(&row).await?;
         Ok(id)
     }
 
@@ -414,14 +423,15 @@ impl Provider for AndroidProvider {
         opts: LaunchOpts,
         job: &JobHandle,
     ) -> Result<RunningHandle> {
-        let (avd_name, _) = self
+        let avd_name = self
             .registry
-            .get_emulator(id.as_str())
+            .get_row(id.as_str())
             .await?
             .ok_or_else(|| CoreError::NotFound {
                 what: "emulator",
                 name: id.to_string(),
-            })?;
+            })?
+            .avd_name;
 
         let sdk_root = self.sdk_root().await?;
         let adb = self.adb_path(&sdk_root);
@@ -478,14 +488,15 @@ impl Provider for AndroidProvider {
     /// [`Self::stop_timeout`], fall back to killing the child process this provider spawned. Reaps
     /// the child handle either way. Idempotent: a `stop` for an AVD that isn't running succeeds.
     async fn stop(&self, id: EmulatorId) -> Result<()> {
-        let (avd_name, _) = self
+        let avd_name = self
             .registry
-            .get_emulator(id.as_str())
+            .get_row(id.as_str())
             .await?
             .ok_or_else(|| CoreError::NotFound {
                 what: "emulator",
                 name: id.to_string(),
-            })?;
+            })?
+            .avd_name;
 
         let sdk_root = self.sdk_root().await?;
         let adb = self.adb_path(&sdk_root);
@@ -798,14 +809,15 @@ mod tests {
 
         let reopened = Registry::open(dir.path()).await.expect("reopen");
         let row = reopened
-            .get_emulator(id.as_str())
+            .get_row(id.as_str())
             .await
             .expect("query")
             .expect("row exists");
-        assert_eq!(
-            row,
-            ("pixel6_api34".to_string(), "Pixel 6 · API 34".to_string())
-        );
+        assert_eq!(row.avd_name, "pixel6_api34");
+        assert_eq!(row.display_name, "Pixel 6 · API 34");
+        assert_eq!(row.device_profile_id, "pixel_6");
+        assert_eq!(row.image_coord, Some(coord()));
+        assert_eq!(row.last_state, RunState::Stopped);
     }
 
     #[tokio::test]
@@ -875,9 +887,19 @@ mod tests {
     /// Register a created emulator's row and return its id.
     async fn seed_emulator(provider: &AndroidProvider) -> EmulatorId {
         let id = EmulatorId::generate();
+        let row = EmulatorRow::new(
+            id.clone(),
+            "pixel6_api34".into(),
+            "Pixel 6 · API 34".into(),
+            "pixel_6".into(),
+            coord(),
+            emu_core::model::emulator::Hardware::default(),
+            EmulatorSource::Manual { discovered: false },
+            OffsetDateTime::now_utc(),
+        );
         provider
             .registry
-            .insert_emulator(id.as_str(), "pixel6_api34", "Pixel 6 · API 34")
+            .upsert_emulator(&row)
             .await
             .expect("seed row");
         id
