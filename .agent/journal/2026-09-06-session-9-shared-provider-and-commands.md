@@ -2,8 +2,8 @@
 
 ## Worked on
 
-- Task `0020` (done, in review): shared managed `AndroidProvider` + startup reconcile + exit reap
-  + the rename / edit-hardware / delete / wipe / detail / reveal_path commands.
+- Task `0020` (done, in review): shared managed `AndroidProvider`, startup reconcile, exit reap,
+  and the rename / edit-hardware / delete / wipe / detail / reveal_path commands.
 - Milestone: `M3`.
 
 ## Changed
