@@ -5,10 +5,15 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
-- **Milestone:** M5 — Host readiness & elevated helper (`currentMilestone` advanced). M4 is
-  **functionally complete** — tasks `0022`–`0024` all `done` (engine, IPC, Profiles screen) — and
-  stays `in_progress` on the export→wipe→import E2E deferred to M6, same as M2/M3. No M5 task files
-  yet.
+- **Milestone:** M5 — Host readiness & elevated helper. Scoped into `0025`–`0027`; `0025`
+  (`emu-host` detection) **done** (in review). M4 stays `in_progress` on the export→wipe→import E2E
+  deferred to M6.
+- **Phase:** `emu-host` now implements `HostProbe`. `crates/emu-host/src/{signals,report,probe}.rs`:
+  a pure `build_report(&HostSignals) -> HostReport` (verdict + fixes, 8 unit tests incl. the M5 DoD
+  "CI runner, no virtualization → `CannotRun`") + a `NativeHostProbe` that gathers signals per OS
+  (`sysinfo` for RAM/disk; `sysctl` / `/dev/kvm` / `powershell` for virtualization + accelerator).
+  Real probe on this Mac: `Hvf/Ok`, `CanAccelerate`. Next: `0026` (`emu-helper` real subcommands +
+  `probe_host` / `run_helper` IPC), then `0027` (host panel + launch-gating).
 - **Phase:** M4 done end to end. `0024`: `src/routes/Profiles.tsx` rewritten — a `FileReader`
   drop zone → `inspect_profile` → a requirement table + Apply / Apply & launch (streams
   `useEmulatorJob`) + Save-to-library; a saved-profiles list with Load / Delete. Emulator detail
@@ -118,11 +123,12 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** scope **M5 — Host readiness & elevated helper** into task files. From
-  `MILESTONES.md` M5: `emu-host` per-OS detection (virtualization, accelerator kind + status, disk,
-  RAM) → `HostReport` + `verdict` + `fixes[]`; the `emu-helper` binary subcommands with structured
-  JSON; `run_helper(fix)` with OS elevation; the Dependencies-screen host panel; graceful
-  degradation when there's no accelerator. Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
+- **Next action:** task `0026` — `emu-helper` real subcommands (`check` / `enable-whpx` /
+  `enable-aehd` / `add-kvm-group` → structured JSON, per-OS `#[cfg]` bodies, `not_applicable` off
+  their platform) + a subprocess output-schema test (the M5 DoD's second half); `probe_host()`
+  (runs `NativeHostProbe`, writes a `host_snapshots` row) and `run_helper(fixId)` (invokes
+  `emu-helper` with OS elevation — `osascript … with administrator privileges` / `pkexec` / UAC).
+  Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
   then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
@@ -141,12 +147,37 @@ Narrative companion to `.agent/state.json`. Update both together (see
       `in_progress` on the same M6 `tauri-driver` E2E line as M0/M1/M2.
 - [~] M4 Profiles: export / import / recreate — tasks `0022`–`0024` all `done` (engine, IPC,
       Profiles screen). Stays `in_progress` on the export→wipe→import E2E deferred to M6.
-- [~] M5 Host readiness & elevated helper — **current milestone**, no task files yet
+- [~] M5 Host readiness & elevated helper — **current milestone**, tasks `0025`–`0027`; `0025`
+      (`emu-host` detection) **done**, `0026`–`0027` todo
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-06 — session 9 (continued) (Claude Code) — M5 scoped; task 0025 done (emu-host detection)
+
+M5 scoped into `0025` (`emu-host` detection), `0026` (`emu-helper` + `probe_host` / `run_helper`
+IPC), `0027` (Dependencies host panel + launch-gating).
+
+**Task `0025` done.** `emu-host` implements `HostProbe`:
+- `signals.rs` — `HostSignals` (os / arch / `virtualization` / `accel: AccelSignal` /
+  `ram_bytes` / `disk_free_bytes`), the OS-independent input.
+- `report.rs` — `build_report(&HostSignals) -> HostReport`, **pure, no `#[cfg]`**. Verdict:
+  `CannotRun` for `DisabledInFirmware` / RAM < 4 GB / disk-free < 8 GB / accelerator `Missing`;
+  `Degraded` for `NoPermission` / `Disabled` / RAM < 8 GB / disk-free < 25 GB; else
+  `CanAccelerate`; `Unknown` signals never hard-block. `fixes[]` cite the real commands
+  (`enable-virtualization` non-scriptable+reboot, `add-kvm-group` scriptable, `enable-whpx`
+  scriptable+reboot, …). 8 unit tests, including the M5 DoD's "CI runner, no virtualization →
+  `CannotRun` + the BIOS fix".
+- `probe.rs` — `NativeHostProbe`: RAM/disk via `sysinfo 0.36`; `platform_probe()` per OS —
+  macOS `sysctl -n kern.hv_support`, Linux `/dev/kvm` read/write open (`EACCES` → `NoPermission`),
+  Windows `powershell Get-WindowsOptionalFeature` (best-effort, **untested on this Mac** — verify
+  on a Windows runner in M6). One `#[ignore]` real-machine test; ran it here →
+  `os=macos accel=Hvf/Ok verdict=CanAccelerate`.
+
+New `emu-host` deps: `sysinfo` (system + disk only), `async-trait`, `tokio` (dev). 149 rust tests,
+`just validate` green.
 
 ### 2026-09-06 — session 9 (continued) (Claude Code) — task 0024 done (Profiles screen); M4 functionally complete
 
