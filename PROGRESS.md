@@ -5,10 +5,10 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
-- **Milestone:** M3 — Registry & reliable tracking, **functionally complete**. All four tasks
-  (`0018`–`0021`) done, in review; every M3 DoD box + the property-test DoD are met. M3 flips to
-  `done` (and `currentMilestone` → M4) once the tasks are verified `done`. M0, M1 and M2 stay
-  `in_progress` on deliberately-deferred/blocked DoD lines, see below.
+- **Milestone:** M4 — Profiles: export / import / recreate (`currentMilestone` advanced). M3 is
+  **functionally complete** — all four tasks (`0018`–`0021`) `done`, every DoD box + the
+  property-test DoD met — and stays `in_progress` only on the same `tauri-driver` E2E line M0/M1/M2
+  wait on (deferred to M6). No M4 task files yet.
 - **Phase:** M3 done end to end. `0018`: full schema + typed `Registry` API. `0019`: `reconcile()`,
   `delete()`, kill-safety, and the DoD property test (real `avdmanager list avd` fixture captured
   from a real SDK). `0020`: the `AndroidProvider` is now one shared `tauri::State`
@@ -112,11 +112,13 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** verify `0018`–`0021` (`review` → `done`), flip `M3` to `done` and
-  `currentMilestone` to `M4`, then scope **M4 — Profiles: export / import / recreate**
-  (`EmuProfile` ↔ `schemas/emuprofile/v1.schema.json`, `inspect_profile` / `apply_profile`, the
-  Profiles screen, a round-trip test). Separately: once GitHub billing is fixed, re-watch the next
-  `ci.yml` push run, then flip `0009`/`M0` to `done`.
+- **Next action:** scope **M4 — Profiles: export / import / recreate** into task files
+  (`0022`–`0024`). From `MILESTONES.md` M4: `EmuProfile` ↔ `schemas/emuprofile/v1.schema.json` kept
+  in sync by a test; `resolve(profile, installed) -> RequirementDiff`; `inspect_profile(bytes)` /
+  `apply_profile(plan)`; export from an emulator and from the Create wizard; the Profiles screen
+  (drop zone, requirement diff + sizes, saved list); a round-trip export→wipe→import test.
+  Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run, then flip
+  `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
@@ -128,11 +130,11 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [~] M2 Create & launch one emulator end-to-end — tasks `0014`–`0017` **all done**; milestone
       stays in_progress only on its one DoD line (a real `tauri-driver` E2E boot), deferred to
       M6's e2e-suite work — see `MILESTONES.md`
-- [~] M3 Registry & reliable tracking — **functionally complete**, tasks `0018`–`0021` all done
-      (in review): schema + typed `Registry` API; `reconcile` + `delete` + kill-safety + the DoD
-      property test; shared managed provider + lifecycle commands + exit reap; detail panel + log
-      console. Flips to `done` once tasks are verified.
-- [ ] M4 Profiles: export / import / recreate
+- [~] M3 Registry & reliable tracking — **functionally complete**, tasks `0018`–`0021` all `done`:
+      schema + typed `Registry` API; `reconcile` + `delete` + kill-safety + the DoD property test;
+      shared managed provider + lifecycle commands + exit reap; detail panel + log console. Stays
+      `in_progress` on the same M6 `tauri-driver` E2E line as M0/M1/M2.
+- [~] M4 Profiles: export / import / recreate — **current milestone**, no task files yet
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0

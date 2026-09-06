@@ -137,9 +137,10 @@ always converges to ground truth after `reconcile()`. **Met** (task `0019`) —
 running arrangements, each asserts every row's `last_state` == ground truth and every loadable AVD
 is tracked. Fake-driven, in `just validate`.
 
-**All six boxes + the DoD are met** — every M3 task (`0018`–`0021`) is done (in review). M3 flips
-to `done` in `.agent/state.json` once the tasks are verified `done`; `currentMilestone` then moves
-to M4.
+**All six boxes + the DoD are met** — every M3 task (`0018`–`0021`) is `done`. The milestone itself
+stays `in_progress` in `.agent/state.json`, consistent with M0/M1/M2: the one thing left is a real
+`tauri-driver` E2E boot, which is deferred to M6's "E2E suite runs in CI" line along with the rest
+of the harness. `currentMilestone` has moved to M4.
 
 ---
 

@@ -2,7 +2,7 @@
 id: "0018"
 title: "Full registry schema + migration + typed Registry API"
 milestone: "M3"
-status: "review"
+status: "done"
 owner: "Claude Code"
 created: "2026-09-05"
 updated: "2026-09-05"

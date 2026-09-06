@@ -2,7 +2,7 @@
 id: "0019"
 title: "AndroidProvider::reconcile + delete + kill-safety"
 milestone: "M3"
-status: "review"
+status: "done"
 owner: "Claude Code"
 created: "2026-09-05"
 updated: "2026-09-06"
