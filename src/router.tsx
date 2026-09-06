@@ -3,11 +3,13 @@ import { App } from "./App";
 import { Dashboard } from "./routes/Dashboard";
 import { Create } from "./routes/Create";
 import { Dependencies } from "./routes/Dependencies";
+import { EmulatorDetail } from "./routes/EmulatorDetail";
 import { Profiles } from "./routes/Profiles";
 
 export const routeChildren = [
   { index: true, element: <Dashboard /> },
   { path: "create", element: <Create /> },
+  { path: "emulator/:id", element: <EmulatorDetail /> },
   { path: "dependencies", element: <Dependencies /> },
   { path: "profiles", element: <Profiles /> },
 ] as const;

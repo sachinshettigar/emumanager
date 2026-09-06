@@ -285,6 +285,41 @@ impl AndroidProvider {
         Ok(())
     }
 
+    /// The on-disk launch-log file for `avd_name`: `<data_dir>/logs/<avd_name>.log`. `launch`
+    /// truncates it at the start of each run and tees every streamed line into it; the detail
+    /// panel tails it (`read_log_tail`).
+    #[must_use]
+    pub fn log_path(&self, avd_name: &str) -> PathBuf {
+        self.data_dir.join("logs").join(format!("{avd_name}.log"))
+    }
+
+    /// The last `max_lines` lines of `id`'s launch log, oldest first. Empty (not an error) when the
+    /// emulator has never been launched or the log can't be read.
+    ///
+    /// # Errors
+    /// [`CoreError::NotFound`] for an unknown id.
+    pub async fn read_log_tail(&self, id: &EmulatorId, max_lines: usize) -> Result<Vec<String>> {
+        let row = self.detail(id).await?;
+        let Ok(bytes) = self.fs.read(&self.log_path(&row.avd_name)).await else {
+            return Ok(Vec::new());
+        };
+        let text = String::from_utf8_lossy(&bytes);
+        let lines: Vec<&str> = text.lines().collect();
+        let start = lines.len().saturating_sub(max_lines);
+        Ok(lines[start..].iter().map(|s| (*s).to_string()).collect())
+    }
+
+    /// Report `line` on the job stream *and* append it to the emulator's on-disk log. One
+    /// read-modify-write per line — fine for a boot log (a few KB); a streaming `Fs::append` is a
+    /// future port addition if it ever matters.
+    async fn emit_log(&self, job: &JobHandle, log_path: &Path, line: String) {
+        job.report(Progress::log(line.clone()));
+        let mut contents = self.fs.read(log_path).await.unwrap_or_default();
+        contents.extend_from_slice(line.as_bytes());
+        contents.push(b'\n');
+        let _ = self.fs.write_atomic(log_path, &contents).await;
+    }
+
     /// Kill and reap every emulator child process this provider still holds. Call on app shutdown
     /// so quitting never orphans an emulator we launched. Best-effort and time-boxed per child.
     pub async fn shutdown(&self) {
@@ -551,12 +586,21 @@ impl Provider for AndroidProvider {
         }
         cmd = cmd.args(opts.extra_args.iter().cloned());
 
-        job.report(Progress::log(format!("launching {}", cmd.display())));
+        // Fresh log file for this run: `<data_dir>/logs/<avd>.log`.
+        let log_path = self.log_path(&avd_name);
+        let _ = self.fs.ensure_dir(&self.data_dir.join("logs")).await;
+        let _ = self.fs.write_atomic(&log_path, b"").await;
+
+        self.emit_log(job, &log_path, format!("launching {}", cmd.display()))
+            .await;
         let child = self.process.spawn(cmd).await?;
         let pid = child.pid();
         let child: ChildHandle = Arc::new(AsyncMutex::new(child));
 
-        let serial = match self.wait_for_boot(&adb, &avd_name, &child, job).await {
+        let serial = match self
+            .wait_for_boot(&adb, &avd_name, &child, &log_path, job)
+            .await
+        {
             Ok(serial) => serial,
             Err(e) => {
                 // Boot failed — don't leave the child we spawned unreaped.
@@ -572,7 +616,8 @@ impl Provider for AndroidProvider {
             .expect("running map poisoned")
             .insert(id.clone(), Arc::clone(&child));
 
-        job.report(Progress::log(format!("{avd_name} booted ({serial})")));
+        self.emit_log(job, &log_path, format!("{avd_name} booted ({serial})"))
+            .await;
         Ok(RunningHandle {
             id,
             adb_serial: Some(serial),
@@ -892,6 +937,7 @@ impl AndroidProvider {
         adb: &Path,
         avd_name: &str,
         child: &ChildHandle,
+        log_path: &Path,
         job: &JobHandle,
     ) -> Result<String> {
         let deadline = Instant::now() + self.boot_timeout;
@@ -926,7 +972,10 @@ impl AndroidProvider {
 
             let mut guard = child.lock().await;
             match timeout(LOG_DRAIN_SLICE, guard.next_line()).await {
-                Ok(Ok(Some(line))) => job.report(Progress::log(line)),
+                Ok(Ok(Some(line))) => {
+                    drop(guard);
+                    self.emit_log(job, log_path, line).await;
+                }
                 Ok(Ok(None)) => {
                     // The emulator's output stream closed — the process has exited. One last boot
                     // check in case it handed off, then fail fast rather than waiting out the
@@ -1407,6 +1456,68 @@ mod tests {
         let (provider, _dir) = provider_with(FakeProcessRunner::new(), fs).await;
 
         let err = provider.stop(EmulatorId::generate()).await.unwrap_err();
+        assert_eq!(err.code(), "not_found");
+    }
+
+    // ---- per-emulator log tee / tail (task 0021) -------------------------------------------
+
+    #[tokio::test]
+    async fn launch_tees_output_to_a_log_file_that_read_log_tail_returns() {
+        let fs = InMemoryFs::new();
+        let process = FakeProcessRunner::new()
+            .on_spawn(
+                "emulator @pixel6_api34",
+                ["emulator: line one", "emulator: line two"],
+                ok(""),
+            )
+            .on_run(
+                "adb devices",
+                ok("List of devices attached\nemulator-5554\tdevice\n"),
+            )
+            // "0" on the first poll so the loop drains the child's lines before the EOF-triggered
+            // final boot check consumes the "1".
+            .on_run("shell getprop sys.boot_completed", ok("0\n"))
+            .on_run("shell getprop sys.boot_completed", ok("1\n"));
+        let (provider, _dir) = provider_with(process, fs).await;
+        let id = seed_emulator(&provider).await;
+
+        provider
+            .launch(id.clone(), LaunchOpts::default(), &job())
+            .await
+            .expect("launch");
+
+        let tail = provider.read_log_tail(&id, 100).await.expect("tail");
+        assert!(tail.first().unwrap().contains("launching"));
+        assert!(tail.iter().any(|l| l.contains("line one")));
+        assert!(tail.iter().any(|l| l.contains("line two")));
+        assert!(tail.iter().any(|l| l.contains("booted")));
+
+        // `max_lines` caps from the end.
+        let last_two = provider.read_log_tail(&id, 2).await.expect("tail 2");
+        assert_eq!(last_two.len(), 2);
+        assert!(last_two.iter().any(|l| l.contains("booted")));
+    }
+
+    #[tokio::test]
+    async fn read_log_tail_is_empty_for_a_never_launched_emulator() {
+        let fs = InMemoryFs::new();
+        let (provider, _dir) = provider_with(FakeProcessRunner::new(), fs).await;
+        let id = seed_emulator(&provider).await;
+        assert!(provider
+            .read_log_tail(&id, 50)
+            .await
+            .expect("tail")
+            .is_empty());
+    }
+
+    #[tokio::test]
+    async fn read_log_tail_of_an_unknown_id_is_not_found() {
+        let fs = InMemoryFs::new();
+        let (provider, _dir) = provider_with(FakeProcessRunner::new(), fs).await;
+        let err = provider
+            .read_log_tail(&EmulatorId::generate(), 10)
+            .await
+            .unwrap_err();
         assert_eq!(err.code(), "not_found");
     }
 

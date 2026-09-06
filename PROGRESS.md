@@ -5,20 +5,22 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
-- **Milestone:** M3 — Registry & reliable tracking, **in progress**. Tasks `0018`–`0021`;
-  `0018` + `0019` + `0020` **done** (in review), `0021` (detail panel + log console) left. M0, M1
-  and M2 all stay `in_progress` on deliberately-deferred/blocked DoD lines, see below.
-- **Phase:** M3 storage + reconciliation + the shared provider are in. `0018`: full schema + typed
-  `Registry` API. `0019`: `reconcile()` + `delete()` + kill-safety + the DoD property test. `0020`:
-  the `AndroidProvider` is now one shared `tauri::State` (`src-tauri/src/provider_state.rs`,
-  `OnceCell`-built on first command) — so its spawned-child map persists (`stop_emulator` reaches
-  the force-kill fallback) and a `RunEvent::ExitRequested` handler reaps every child on quit
-  (**the M2 "app exit orphans an emulator" gap is closed**). `reconcile()` runs once at startup
-  (spawned from `setup`). New commands: `reconcile_now`, `rename_emulator`, `edit_hardware`,
-  `delete_emulator`, `wipe_emulator_data`, `emulator_detail`, `reveal_path` (16 commands total).
-  Dashboard got a "Refresh" button (`reconcile_now`); the detail-panel `ipc.ts` hooks are held for
-  `0021` (their commands + `EmulatorDetail` type are already in `bindings.ts`) so `knip` stays green.
-  Next: task `0021` — the `/emulator/:id` detail panel + per-emulator log console.
+- **Milestone:** M3 — Registry & reliable tracking, **functionally complete**. All four tasks
+  (`0018`–`0021`) done, in review; every M3 DoD box + the property-test DoD are met. M3 flips to
+  `done` (and `currentMilestone` → M4) once the tasks are verified `done`. M0, M1 and M2 stay
+  `in_progress` on deliberately-deferred/blocked DoD lines, see below.
+- **Phase:** M3 done end to end. `0018`: full schema + typed `Registry` API. `0019`: `reconcile()`,
+  `delete()`, kill-safety, and the DoD property test (real `avdmanager list avd` fixture captured
+  from a real SDK). `0020`: the `AndroidProvider` is now one shared `tauri::State`
+  (`src-tauri/src/provider_state.rs`, `OnceCell`-built on first command) — its spawned-child map
+  persists (`stop_emulator` reaches the force-kill fallback) and a `RunEvent::ExitRequested`
+  handler reaps every child on quit (**the M2 "app exit orphans an emulator" gap is closed**);
+  `reconcile()` runs once at startup; 7 new lifecycle commands. `0021`: the `/emulator/:id` detail
+  panel (`src/routes/EmulatorDetail.tsx`) — config + live state, inline rename, RAM/storage/graphics
+  form, Wipe/Delete (with confirm) / Launch-or-Stop, "Open folder" (`reveal_path`) — and a
+  per-emulator log console: `launch` tees its output stream to `<data_dir>/logs/<avd>.log`,
+  `emulator_log_tail` reads the history tail, live lines come off `job://emulator`. 17 commands total.
+  Next: verify M3 tasks → `done`, flip M3, start M4 (Profiles: export / import / recreate).
 - **M2 recap:** tasks `0014`–`0017` all **done**; M2 stays `in_progress` only on its one DoD line
   (a real `tauri-driver` E2E boot), deferred to M6's e2e-suite work.
 - **M2 task 0017 (IPC + Create wizard + Dashboard) done:** `src-tauri/src/commands/emulator.rs` —
@@ -110,13 +112,11 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0021` — the `/emulator/:id` detail panel (config + live state + "Open
-  folder" via `reveal_path`, inline rename, RAM/storage/graphics form → `edit_hardware`, Wipe /
-  Delete buttons) and the per-emulator log console (tee `launch`'s output stream to
-  `<data_dir>/logs/<avd>.log`, an `emulator_log_tail` command, live lines via the existing
-  `job://emulator` `Log` event). Adds the thin `ipc.ts` hooks for the `0020` commands that don't
-  have one yet. Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run, then
-  flip `0009`/`M0` to `done`.
+- **Next action:** verify `0018`–`0021` (`review` → `done`), flip `M3` to `done` and
+  `currentMilestone` to `M4`, then scope **M4 — Profiles: export / import / recreate**
+  (`EmuProfile` ↔ `schemas/emuprofile/v1.schema.json`, `inspect_profile` / `apply_profile`, the
+  Profiles screen, a round-trip test). Separately: once GitHub billing is fixed, re-watch the next
+  `ci.yml` push run, then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
@@ -128,16 +128,46 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [~] M2 Create & launch one emulator end-to-end — tasks `0014`–`0017` **all done**; milestone
       stays in_progress only on its one DoD line (a real `tauri-driver` E2E boot), deferred to
       M6's e2e-suite work — see `MILESTONES.md`
-- [~] M3 Registry & reliable tracking — **current milestone**, tasks `0018`–`0021`; `0018` (schema
-      + typed `Registry` API), `0019` (`reconcile` + `delete` + kill-safety + DoD property test) and
-      `0020` (shared managed provider + lifecycle commands + exit reap) **done**, `0021` (detail
-      panel + log console) left
+- [~] M3 Registry & reliable tracking — **functionally complete**, tasks `0018`–`0021` all done
+      (in review): schema + typed `Registry` API; `reconcile` + `delete` + kill-safety + the DoD
+      property test; shared managed provider + lifecycle commands + exit reap; detail panel + log
+      console. Flips to `done` once tasks are verified.
 - [ ] M4 Profiles: export / import / recreate
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-06 — session 9 (continued) (Claude Code) — task 0021 done (detail panel + log console); M3 functionally complete
+
+**Per-emulator log.** `AndroidProvider::launch` now tees every streamed line into
+`<data_dir>/logs/<avd_name>.log` (truncated at launch start) as well as onto the job — one helper,
+`emit_log`, called from `launch`'s framing lines and `wait_for_boot`'s per-line drain (not a second
+drain). `Fs` has no append, so `emit_log` does a read-modify-write per line — fine for a boot log
+(a few KB); a real `Fs::append` is the follow-up if a continuous post-boot stream is added.
+`AndroidProvider::read_log_tail(id, max_lines)` + the `emulator_log_tail` command return the tail
+(empty, not an error, when never launched; `NotFound` for an unknown id).
+
+**Detail panel** — `src/routes/EmulatorDetail.tsx` at `/emulator/:id`: `emulator_detail` config +
+live state, inline-editable name → `rename_emulator`, a RAM/storage/graphics form → `edit_hardware`
+(with the "applied on next AVD recreate" caveat shown), Wipe data / Delete (inline confirm + "also
+remove the AVD" checkbox) / Launch-or-Stop, "Open folder" → the `reveal_path` command (chose it
+over `@tauri-apps/plugin-opener` — one `std::process` spawn, no plugin dep / capability entry). The
+log console shows the `emulator_log_tail` history then appends live `job://emulator` `Log` lines
+(deduped against the tail); copy-to-clipboard + "Open AVD folder". gRPC port shows `—` (still not
+parsed). Dashboard rows link to the route. `ipc.ts` got the `0020`+`0021` hooks
+(`useEmulatorDetail`, `useEmulatorLogTail`, `useRenameEmulator`, `useEditHardware`,
+`useDeleteEmulator`, `useWipeEmulatorData`, `revealPath`).
+
+17 commands total. 3 new Rust tests (log tee round-trips through `read_log_tail`, empty for
+never-launched, `NotFound`), 4 new Vitest (`EmulatorDetail.test.tsx`). 131 rust tests, 27 web
+tests; `just validate` green (the `bindings.ts` diff is the usual pre-commit regen the lefthook
+stages).
+
+**M3 is functionally complete** — all six DoD boxes + the property-test DoD (task `0019`) are met.
+`.agent/state.json` keeps M3 `in_progress` / tasks `review` until a verification pass flips them,
+then M3 → `done` and `currentMilestone` → M4.
 
 ### 2026-09-06 — session 9 (continued) (Claude Code) — task 0020 done (shared managed provider + lifecycle commands)
 

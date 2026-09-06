@@ -114,15 +114,19 @@ pieces are covered by fake-driven Rust tests + Vitest; a real booted-emulator ru
       (never hard-deletes), refreshes `last_state` / serial / port / pid from adb. Run once at
       startup (spawned from `setup`) and via the `reconcile_now` command / Dashboard "Refresh"
       button (task `0020`).
-- [ ] Detail panel: image coord, RAM/storage, adb serial, gRPC port, snapshot, source; open folder —
-      the backend (`emulator_detail` command + `EmulatorDetail`) is done (task `0020`); the panel
-      UI is task `0021`.
+- [x] Detail panel — `/emulator/:id` (`src/routes/EmulatorDetail.tsx`, task `0021`): image coord +
+      API + Play Store, RAM/storage/graphics (editable → `edit_hardware`), adb serial, source,
+      created/updated, "Open folder" (`reveal_path`), inline rename, Wipe/Delete/Launch-or-Stop.
+      gRPC port shows `—` (not parsed yet). Snapshot management is M7.
 - [x] Wipe data, delete (with/without AVD removal), rename, edit hardware — commands all in place:
       `delete_emulator(id, wipe)` (task `0019`), `wipe_emulator_data` (deletes the AVD's writable
       images so the next launch rebuilds them), `rename_emulator`, `edit_hardware` (records the row;
       a live `config.ini` rewrite / AVD recreate is a documented follow-up) — task `0020`. Panel
       wiring is task `0021`.
-- [ ] Per-emulator log console with history tail + live stream; copy / open log file
+- [x] Per-emulator log console (task `0021`): `launch` tees its output stream to
+      `<data_dir>/logs/<avd>.log`, `emulator_log_tail` reads the history tail, live lines come from
+      the `job://emulator` `Log` event; copy-to-clipboard + "Open AVD folder". (A continuous
+      post-boot stream — beyond the boot window — would need an `Fs::append` port method; noted.)
 - [x] Kill-safety: a `Booting`/`Running` registry row whose emulator is no longer in `adb devices`
       (app SIGKILLed mid-boot) is reset to `Stopped` with `pid` cleared by `reconcile()` (task
       `0019`) — tested (`reconcile_kill_safety_resets_a_stale_running_row`).
@@ -132,6 +136,10 @@ always converges to ground truth after `reconcile()`. **Met** (task `0019`) —
 `reconcile_converges_to_ground_truth_over_random_scenarios`: 48 pseudo-random loadable/broken/
 running arrangements, each asserts every row's `last_state` == ground truth and every loadable AVD
 is tracked. Fake-driven, in `just validate`.
+
+**All six boxes + the DoD are met** — every M3 task (`0018`–`0021`) is done (in review). M3 flips
+to `done` in `.agent/state.json` once the tasks are verified `done`; `currentMilestone` then moves
+to M4.
 
 ---
 

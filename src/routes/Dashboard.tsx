@@ -49,7 +49,13 @@ function EmulatorRow({ emulator }: { emulator: EmulatorInfo }): React.JSX.Elemen
       className="flex items-center justify-between rounded-card border border-border-default bg-surface px-3.5 py-3 text-[13px]"
     >
       <div className="flex flex-col gap-0.5">
-        <span>{emulator.displayName}</span>
+        <Link
+          to={`/emulator/${emulator.id}`}
+          data-testid={`detail-link-${emulator.id}`}
+          className="hover:underline"
+        >
+          {emulator.displayName}
+        </Link>
         <span className="text-[11px] text-muted">
           {emulator.avdName}
           {emulator.adbSerial ? ` · ${emulator.adbSerial}` : ""}

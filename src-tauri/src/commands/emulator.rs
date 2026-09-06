@@ -711,6 +711,25 @@ pub async fn emulator_detail(
     })
 }
 
+/// The tail of an emulator's launch log — history for the detail-panel console. Live lines arrive
+/// separately on `job://emulator`. Empty (not an error) when it's never been launched.
+#[tauri::command]
+#[specta::specta]
+pub async fn emulator_log_tail(
+    mgr: State<'_, ManagedProvider>,
+    id: String,
+    max_lines: u32,
+) -> Result<Vec<String>, IpcError> {
+    let provider = mgr.get().await?;
+    provider
+        .read_log_tail(
+            &EmulatorId(id),
+            usize::try_from(max_lines).unwrap_or(usize::MAX),
+        )
+        .await
+        .map_err(IpcError::from)
+}
+
 /// Reveal a path in the OS file manager (Finder / Explorer / the default file browser).
 #[tauri::command]
 #[specta::specta]

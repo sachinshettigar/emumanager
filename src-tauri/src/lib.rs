@@ -46,6 +46,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::emulator::delete_emulator,
             commands::emulator::wipe_emulator_data,
             commands::emulator::emulator_detail,
+            commands::emulator::emulator_log_tail,
             commands::emulator::reveal_path,
         ])
         .events(collect_events![

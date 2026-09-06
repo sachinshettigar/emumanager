@@ -17,6 +17,7 @@ import {
   type ComponentInfo,
   type CreateEmulatorRequest,
   type DeviceInfo,
+  type EmulatorDetail,
   type EmulatorInfo,
   type EmulatorJobKind,
   type ImageInfo,
@@ -285,9 +286,7 @@ export function useStopEmulator() {
 }
 
 // ---------------------------------------------------------------------------
-// M3 — reconcile (task 0020). The detail-panel hooks (rename / edit / delete /
-// wipe / emulator_detail / revealPath) land in task 0021 with the panel that
-// consumes them; their backend commands already exist in `bindings.ts`.
+// M3 — reconcile (task 0020) + detail panel / log console (task 0021)
 // ---------------------------------------------------------------------------
 
 async function reconcileNow(): Promise<EmulatorInfo[]> {
@@ -303,6 +302,122 @@ export function useReconcileNow() {
       queryClient.setQueryData(EMULATORS_QUERY_KEY, list);
     },
   });
+}
+
+function emulatorDetailKey(id: string): [string, string] {
+  return ["emulator-detail", id];
+}
+
+async function emulatorDetail(id: string): Promise<EmulatorDetail> {
+  return unwrap(await commands.emulatorDetail(id));
+}
+
+/** TanStack Query hook for the detail panel. Polls every 4s so live state stays fresh. */
+export function useEmulatorDetail(id: string): UseQueryResult<EmulatorDetail, IpcCallError> {
+  return useQuery<EmulatorDetail, IpcCallError>({
+    queryKey: emulatorDetailKey(id),
+    queryFn: () => emulatorDetail(id),
+    refetchInterval: 4000,
+  });
+}
+
+async function emulatorLogTail(id: string): Promise<string[]> {
+  return unwrap(await commands.emulatorLogTail(id, 500));
+}
+
+/** History tail of an emulator's launch log. Live lines arrive on `job://emulator` separately. */
+export function useEmulatorLogTail(id: string): UseQueryResult<string[], IpcCallError> {
+  return useQuery<string[], IpcCallError>({
+    queryKey: ["emulator-log", id],
+    queryFn: () => emulatorLogTail(id),
+  });
+}
+
+/** Invalidate the emulator list and, when given, one emulator's detail. */
+function useEmulatorInvalidator(): (id?: string) => void {
+  const queryClient = useQueryClient();
+  return (id?: string) => {
+    void queryClient.invalidateQueries({ queryKey: EMULATORS_QUERY_KEY });
+    if (id !== undefined) {
+      void queryClient.invalidateQueries({ queryKey: emulatorDetailKey(id) });
+    }
+  };
+}
+
+async function renameEmulator(vars: { id: string; displayName: string }): Promise<undefined> {
+  unwrap(await commands.renameEmulator(vars.id, vars.displayName));
+  return undefined;
+}
+
+/** Mutation hook for the detail panel's inline rename. */
+export function useRenameEmulator() {
+  const invalidate = useEmulatorInvalidator();
+  return useMutation<undefined, IpcCallError, { id: string; displayName: string }>({
+    mutationFn: renameEmulator,
+    onSuccess: (_data, vars) => {
+      invalidate(vars.id);
+    },
+  });
+}
+
+interface EditHardwareVars {
+  id: string;
+  ramMb: number;
+  storageMb: number;
+  graphics: string;
+}
+
+async function editHardware(vars: EditHardwareVars): Promise<undefined> {
+  unwrap(await commands.editHardware(vars.id, vars.ramMb, vars.storageMb, vars.graphics));
+  return undefined;
+}
+
+/** Mutation hook for the detail panel's hardware form. */
+export function useEditHardware() {
+  const invalidate = useEmulatorInvalidator();
+  return useMutation<undefined, IpcCallError, EditHardwareVars>({
+    mutationFn: editHardware,
+    onSuccess: (_data, vars) => {
+      invalidate(vars.id);
+    },
+  });
+}
+
+async function deleteEmulator(vars: { id: string; wipe: boolean }): Promise<undefined> {
+  unwrap(await commands.deleteEmulator(vars.id, vars.wipe));
+  return undefined;
+}
+
+/** Mutation hook for the detail panel's "Delete" (with an "also remove the AVD" choice). */
+export function useDeleteEmulator() {
+  const invalidate = useEmulatorInvalidator();
+  return useMutation<undefined, IpcCallError, { id: string; wipe: boolean }>({
+    mutationFn: deleteEmulator,
+    onSuccess: () => {
+      invalidate();
+    },
+  });
+}
+
+async function wipeEmulatorData(id: string): Promise<undefined> {
+  unwrap(await commands.wipeEmulatorData(id));
+  return undefined;
+}
+
+/** Mutation hook for the detail panel's "Wipe data". */
+export function useWipeEmulatorData() {
+  const invalidate = useEmulatorInvalidator();
+  return useMutation<undefined, IpcCallError, string>({
+    mutationFn: wipeEmulatorData,
+    onSuccess: (_data, id) => {
+      invalidate(id);
+    },
+  });
+}
+
+/** Reveal a path in the OS file manager. Rejects with {@link IpcCallError}. */
+export async function revealPath(path: string): Promise<void> {
+  unwrap(await commands.revealPath(path));
 }
 
 /** Live state of the current emulator create/launch job, built up from `job://emulator` events. */

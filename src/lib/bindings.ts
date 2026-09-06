@@ -74,6 +74,11 @@ export const commands = {
 	wipeEmulatorData: (id: string) => typedError<null, IpcError>(__TAURI_INVOKE("wipe_emulator_data", { id })),
 	/**  Full detail for one emulator — its stored config plus live run state. */
 	emulatorDetail: (id: string) => typedError<EmulatorDetail, IpcError>(__TAURI_INVOKE("emulator_detail", { id })),
+	/**
+	 *  The tail of an emulator's launch log — history for the detail-panel console. Live lines arrive
+	 *  separately on `job://emulator`. Empty (not an error) when it's never been launched.
+	 */
+	emulatorLogTail: (id: string, maxLines: number) => typedError<string[], IpcError>(__TAURI_INVOKE("emulator_log_tail", { id, maxLines })),
 	/**  Reveal a path in the OS file manager (Finder / Explorer / the default file browser). */
 	revealPath: (path: string) => typedError<null, IpcError>(__TAURI_INVOKE("reveal_path", { path })),
 };
