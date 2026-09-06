@@ -211,6 +211,27 @@
       "milestone": "M4",
       "status": "done",
       "validate": "just bindings && git diff --exit-code src/lib/bindings.ts"
+    },
+    {
+      "id": "0025",
+      "title": "emu-host \u2014 NativeHostProbe: virtualization / accelerator / disk / RAM",
+      "milestone": "M5",
+      "status": "doing",
+      "validate": "cargo test -p emu-host --all-features"
+    },
+    {
+      "id": "0026",
+      "title": "emu-helper real subcommands + probe_host / run_helper IPC",
+      "milestone": "M5",
+      "status": "todo",
+      "validate": "just bindings && git diff --exit-code src/lib/bindings.ts"
+    },
+    {
+      "id": "0027",
+      "title": "Dependencies host panel + launch-gating on the verdict",
+      "milestone": "M5",
+      "status": "todo",
+      "validate": "just bindings && git diff --exit-code src/lib/bindings.ts"
     }
   ]
 }
