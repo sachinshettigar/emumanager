@@ -5,10 +5,14 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
-- **Milestone:** M4 — Profiles: export / import / recreate (`currentMilestone` advanced). M3 is
-  **functionally complete** — all four tasks (`0018`–`0021`) `done`, every DoD box + the
-  property-test DoD met — and stays `in_progress` only on the same `tauri-driver` E2E line M0/M1/M2
-  wait on (deferred to M6). No M4 task files yet.
+- **Milestone:** M4 — Profiles: export / import / recreate. Scoped into `0022`–`0024`; `0022`
+  (profile engine) **done** (in review). M3 stays `in_progress` on the same M6 `tauri-driver` E2E
+  line as M0/M1/M2.
+- **Phase:** M4 engine landed (`0022`). `emu_core::profile::resolve(profile, &InstalledState,
+  image_installed, image_size_bytes) -> Plan` — pure, effect-free; `EmuProfile::from_emulator` /
+  `from_create_spec` for export; a `jsonschema` dev-dep test locks the serde model to
+  `v1.schema.json`. Next: `0023` (IPC — `inspect_profile` / `apply_profile` / `export_profile` +
+  the saved-profiles registry), then `0024` (Profiles screen + export actions).
 - **Phase:** M3 done end to end. `0018`: full schema + typed `Registry` API. `0019`: `reconcile()`,
   `delete()`, kill-safety, and the DoD property test (real `avdmanager list avd` fixture captured
   from a real SDK). `0020`: the `AndroidProvider` is now one shared `tauri::State`
@@ -112,13 +116,13 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** scope **M4 — Profiles: export / import / recreate** into task files
-  (`0022`–`0024`). From `MILESTONES.md` M4: `EmuProfile` ↔ `schemas/emuprofile/v1.schema.json` kept
-  in sync by a test; `resolve(profile, installed) -> RequirementDiff`; `inspect_profile(bytes)` /
-  `apply_profile(plan)`; export from an emulator and from the Create wizard; the Profiles screen
-  (drop zone, requirement diff + sizes, saved list); a round-trip export→wipe→import test.
-  Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run, then flip
-  `0009`/`M0` to `done`.
+- **Next action:** task `0023` — Profile IPC: `inspect_profile(bytes)` (parse → `EmuProfile::validate`
+  → `profile::resolve` against real `InstalledState` + a `sys-img2-3.xml` size lookup → a preview
+  DTO, with specific rejection messages for non-JSON / non-android / unknown-version), `apply_profile`
+  (ensure image → `create` with `source: Imported` → optional launch), `export_profile(id)`, and a
+  saved-profiles registry (`migrations/0003_*.sql` adds a JSON column to `profiles`). Then `0024`
+  (Profiles screen). Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
+  then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
@@ -134,12 +138,36 @@ Narrative companion to `.agent/state.json`. Update both together (see
       schema + typed `Registry` API; `reconcile` + `delete` + kill-safety + the DoD property test;
       shared managed provider + lifecycle commands + exit reap; detail panel + log console. Stays
       `in_progress` on the same M6 `tauri-driver` E2E line as M0/M1/M2.
-- [~] M4 Profiles: export / import / recreate — **current milestone**, no task files yet
+- [~] M4 Profiles: export / import / recreate — **current milestone**, tasks `0022`–`0024`; `0022`
+      (profile engine — `resolve` + export + schema-sync test) **done**, `0023`–`0024` todo
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-06 — session 9 (continued) (Claude Code) — M3 closed out; M4 scoped; task 0022 done (profile engine)
+
+M3 tasks `0018`–`0021` flipped to `done`; M3 stays `in_progress` on the same M6 `tauri-driver` E2E
+line as M0/M1/M2; `currentMilestone` → M4. M4 (Profiles) scoped into `0022` (engine), `0023`
+(IPC + apply), `0024` (screen).
+
+**Task `0022` done (in review)** — the pure profile engine, all in `emu-core`, no IPC:
+- `crates/emu-core/src/profile/{mod,resolve}.rs` (new): `resolve(profile, &InstalledState,
+  image_installed, image_size_bytes) -> Result<Plan>` — reuses the existing `plan::Plan`
+  (`{ diff, create_spec }`, already has `total_download_bytes()`/`is_ready()`) rather than a new
+  `RequirementDiff` type. One `Requirement` per component (`CmdlineTools`/`PlatformTools`/`Emulator`
+  from `InstalledState`, `SystemImage` from the caller's bool + size). **`platforms;android-NN` is
+  not emitted** — task `0019`'s real capture showed `avdmanager create avd` succeeds without it.
+  `sanitize_avd_name` moved here (still duplicated in `commands/emulator.rs` — a later cleanup).
+- `model/profile.rs`: reverse `From<ImageType>` / `From<Graphics>` impls + `EmuProfile::from_emulator`
+  / `from_create_spec` / `to_json_pretty` — the export direction. An adopted emulator's empty
+  `device_profile_id` exports as `pixel_6` so the file still schema-validates.
+- Schema-sync test `model_round_trip_stays_schema_valid` — a new `jsonschema` dev-dep
+  (`default-features = false`, 0.33 for rustc 1.82), round-trips every `valid/*.json` through the
+  model and re-validates against `v1.schema.json`. `cargo deny` passes with its ~17 transitive dev
+  deps. Runtime schema validation stays the frontend's `ajv`.
+- 7 new tests, `just validate` green. `docs/architecture.md` §3 profile-engine note updated.
 
 ### 2026-09-06 — session 9 (continued) (Claude Code) — task 0021 done (detail panel + log console); M3 functionally complete
 

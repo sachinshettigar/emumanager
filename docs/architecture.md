@@ -102,9 +102,15 @@ trait Provider {
   resolves the repository XML for versions; downloads via `Downloader` with SHA verification;
   writes license-hash files to accept licenses; exposes `InstalledState` for the Dependencies
   screen.
-- **Profile engine:** `EmuProfile` serde struct ↔ `schemas/emuprofile/v1.schema.json` (kept in
-  sync by a test). `resolve(profile, installed) -> Plan { downloads: [...], create: CreateSpec }`.
-  `apply(plan, jobs)` executes it. Pure resolution is unit-tested; `apply` uses the ports.
+- **Profile engine** (`crates/emu-core/src/profile/`, task `0022`): `EmuProfile` serde struct
+  (`model::profile`) ↔ `schemas/emuprofile/v1.schema.json`, kept in sync by
+  `model_round_trip_stays_schema_valid` (a `jsonschema` dev-dep test — round-trips every valid
+  fixture through the model and re-validates). `profile::resolve(profile, &InstalledState,
+  image_installed, image_size_bytes) -> Plan { diff: Vec<Requirement>, create_spec: CreateSpec }` —
+  pure, effect-free (the caller supplies the two SDK facts). The reverse (`EmuProfile::from_emulator`
+  / `from_create_spec`) is the export direction. `apply` (task `0023`) runs the plan through the
+  provider. `platforms;android-NN` is deliberately not a requirement — `avdmanager create avd`
+  doesn't need it.
 
 ## 4. IPC contract
 

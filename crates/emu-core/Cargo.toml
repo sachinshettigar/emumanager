@@ -88,3 +88,9 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 # tests) is an explicitly supported Cargo pattern — it only affects test builds, not the library
 # emu-android links against.
 emu-android.workspace = true
+# Schema-sync test only (task 0022): validates the `EmuProfile` serde model's own round-tripped
+# JSON against `schemas/emuprofile/v1.schema.json`, so a model field that drifts from the schema
+# fails a test rather than shipping. `default-features = false` drops its `reqwest`/`resolve-http`
+# ($id remote-ref) feature — the schema is a local file with only internal refs. Dev-only; runtime
+# schema validation is the frontend's `ajv` (`scripts/validate-schema.mjs`).
+jsonschema = { version = "0.33", default-features = false }

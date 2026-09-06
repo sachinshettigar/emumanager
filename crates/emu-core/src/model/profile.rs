@@ -15,8 +15,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::error::CoreError;
-use crate::model::emulator::{Graphics, Hardware};
+use crate::model::emulator::{Emulator, Graphics, Hardware};
 use crate::model::image::{Abi, ImageCoord, ImageType};
+use crate::model::plan::CreateSpec;
 
 /// Current `.emuprofile` schema version string.
 pub const SCHEMA_VERSION: &str = "1.0";
@@ -115,6 +116,20 @@ impl From<ProfileImageType> for ImageType {
     }
 }
 
+impl From<ImageType> for ProfileImageType {
+    fn from(t: ImageType) -> Self {
+        match t {
+            ImageType::Default => ProfileImageType::Default,
+            ImageType::GoogleApis => ProfileImageType::GoogleApis,
+            ImageType::GoogleApisPlaystore => ProfileImageType::GoogleApisPlaystore,
+            ImageType::AndroidWear => ProfileImageType::AndroidWear,
+            ImageType::AndroidTv => ProfileImageType::AndroidTv,
+            ImageType::AndroidAutomotive => ProfileImageType::AndroidAutomotive,
+            ImageType::AndroidAutomotivePlaystore => ProfileImageType::AndroidAutomotivePlaystore,
+        }
+    }
+}
+
 /// Image section of a profile.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -149,6 +164,16 @@ impl From<ProfileGraphics> for Graphics {
             ProfileGraphics::Auto => Graphics::Auto,
             ProfileGraphics::Hardware => Graphics::Host,
             ProfileGraphics::SwiftshaderIndirect => Graphics::SwiftshaderIndirect,
+        }
+    }
+}
+
+impl From<Graphics> for ProfileGraphics {
+    fn from(g: Graphics) -> Self {
+        match g {
+            Graphics::Auto => ProfileGraphics::Auto,
+            Graphics::Host => ProfileGraphics::Hardware,
+            Graphics::SwiftshaderIndirect => ProfileGraphics::SwiftshaderIndirect,
         }
     }
 }
@@ -267,6 +292,78 @@ impl EmuProfile {
             dpi_override: hw.dpi,
         }
     }
+
+    /// Pretty-printed JSON — the `.emuprofile` file body an export writes.
+    #[must_use]
+    pub fn to_json_pretty(&self) -> String {
+        serde_json::to_string_pretty(self).expect("EmuProfile serializes")
+    }
+
+    /// Build a recipe from a tracked emulator (the "Export profile" direction).
+    #[must_use]
+    pub fn from_emulator(e: &Emulator) -> Self {
+        Self::from_parts(
+            &e.display_name,
+            &e.device_profile_id,
+            e.image_coord,
+            &e.hardware,
+            e.notes.clone(),
+        )
+    }
+
+    /// Build a recipe from a create spec (the Create wizard's "Save as profile").
+    #[must_use]
+    pub fn from_create_spec(spec: &CreateSpec) -> Self {
+        Self::from_parts(
+            &spec.display_name,
+            &spec.device_profile_id,
+            spec.image_coord,
+            &spec.hardware,
+            String::new(),
+        )
+    }
+
+    fn from_parts(
+        name: &str,
+        device_profile_id: &str,
+        coord: ImageCoord,
+        hw: &Hardware,
+        description: String,
+    ) -> Self {
+        EmuProfile {
+            schema_version: SCHEMA_VERSION.to_string(),
+            name: name.to_string(),
+            platform: "android".to_string(),
+            description: Some(description).filter(|d| !d.is_empty()),
+            device: ProfileDevice {
+                // The schema's `device.profile` pattern is `^[a-z0-9_]+$`; an emulator adopted
+                // out-of-band may have an unknown (empty) profile id — fall back to a valid
+                // placeholder so the exported file still validates. The importer treats an
+                // unknown profile id as "pick the closest device".
+                profile: if device_profile_id.is_empty() {
+                    "pixel_6".to_string()
+                } else {
+                    device_profile_id.to_string()
+                },
+                custom: None,
+            },
+            image: ProfileImage {
+                api: coord.api,
+                image_type: coord.image_type.into(),
+                abi: coord.abi,
+            },
+            hardware: ProfileHardware {
+                ram_mb: hw.ram_mb.max(512),
+                storage_gb: hw.storage_mb.div_ceil(1024).max(2),
+                dpi: hw.dpi_override,
+                graphics: hw.graphics.into(),
+                snapshots: hw.snapshots,
+                cold_boot: hw.cold_boot,
+                device_frame: hw.device_frame,
+            },
+            seed: None,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -333,5 +430,63 @@ mod tests {
         let hw = profile.hardware();
         assert_eq!(hw.storage_mb % 1024, 0, "GiB should convert to whole MiB");
         let _ = profile.image_coord(); // must not panic
+    }
+
+    /// The serde model and `schemas/emuprofile/v1.schema.json` must not drift: every valid fixture,
+    /// parsed into `EmuProfile` and serialized straight back out, must still validate against the
+    /// schema. Catches a renamed / dropped / wrongly-typed field before it ships.
+    #[test]
+    fn model_round_trip_stays_schema_valid() {
+        let schema_raw = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../schemas/emuprofile/v1.schema.json"
+        ))
+        .expect("read schema");
+        let schema: serde_json::Value = serde_json::from_str(&schema_raw).expect("schema json");
+        let validator = jsonschema::validator_for(&schema).expect("compile schema");
+
+        for name in ["minimal.json", "full.json", "custom-device.json"] {
+            let profile: EmuProfile =
+                serde_json::from_str(&read(VALID_DIR, name)).expect("parse fixture");
+            let reserialized: serde_json::Value =
+                serde_json::from_str(&profile.to_json_pretty()).expect("reparse model output");
+            assert!(
+                validator.is_valid(&reserialized),
+                "{name}: model round-trip is not schema-valid: {:?}",
+                validator
+                    .iter_errors(&reserialized)
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+
+    #[test]
+    fn export_from_an_emulator_round_trips_the_recipe_fields() {
+        use crate::model::emulator::{EmulatorId, EmulatorSource};
+        use time::macros::datetime;
+
+        let original: EmuProfile =
+            serde_json::from_str(&read(VALID_DIR, "full.json")).expect("parse");
+        let emulator = crate::model::emulator::Emulator {
+            id: EmulatorId("01J000000000000000000000AB".into()),
+            avd_name: "qa_baseline".into(),
+            display_name: original.name.clone(),
+            device_profile_id: original.device.profile.clone(),
+            image_coord: original.image_coord(),
+            hardware: original.hardware(),
+            source: EmulatorSource::Manual { discovered: false },
+            tags: Vec::new(),
+            notes: String::new(),
+            created_at: datetime!(2026-09-06 10:00 UTC),
+            updated_at: datetime!(2026-09-06 10:00 UTC),
+        };
+
+        let exported = EmuProfile::from_emulator(&emulator);
+        assert_eq!(exported.name, original.name);
+        assert_eq!(exported.device.profile, original.device.profile);
+        assert_eq!(exported.image_coord(), original.image_coord());
+        assert_eq!(exported.hardware(), original.hardware());
+        assert!(exported.validate().is_ok());
     }
 }
