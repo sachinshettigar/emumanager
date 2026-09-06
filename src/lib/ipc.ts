@@ -20,6 +20,8 @@ import {
   type EmulatorDetail,
   type EmulatorInfo,
   type EmulatorJobKind,
+  type HelperOutcomeDto,
+  type HostReportDto,
   type ImageInfo,
   type IpcError,
   type Pong,
@@ -587,4 +589,39 @@ export function useDeleteProfile() {
 /** The JSON body of a saved profile — feed it (as bytes) to {@link useApplyProfile}. */
 export async function getSavedProfile(name: string): Promise<string> {
   return unwrap(await commands.getSavedProfile(name));
+}
+
+// ---------------------------------------------------------------------------
+// M5 — host readiness (task 0027)
+// ---------------------------------------------------------------------------
+
+const HOST_REPORT_QUERY_KEY = ["host-report"];
+
+async function probeHost(): Promise<HostReportDto> {
+  return unwrap(await commands.probeHost());
+}
+
+/** The host-readiness report. Refetched every 30s — it shells out, so not on the 4s cadence. */
+export function useHostReport(): UseQueryResult<HostReportDto, IpcCallError> {
+  return useQuery<HostReportDto, IpcCallError>({
+    queryKey: HOST_REPORT_QUERY_KEY,
+    queryFn: probeHost,
+    refetchInterval: 30000,
+  });
+}
+
+async function runHelper(fixId: string): Promise<HelperOutcomeDto> {
+  return unwrap(await commands.runHelper(fixId));
+}
+
+/** Mutation hook for a "Fix it" button. Re-probes the host on settle (Windows returns a
+ * synthetic outcome, so the report is the source of truth). */
+export function useRunHelper() {
+  const queryClient = useQueryClient();
+  return useMutation<HelperOutcomeDto, IpcCallError, string>({
+    mutationFn: runHelper,
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: HOST_REPORT_QUERY_KEY });
+    },
+  });
 }

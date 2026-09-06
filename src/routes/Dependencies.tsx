@@ -1,6 +1,12 @@
 import { Screen, Placeholder } from "../components/Screen";
-import type { ComponentInfo } from "../lib/bindings";
-import { useBootstrapProgress, useBootstrapToolchain, useComponents } from "../lib/ipc";
+import type { ComponentInfo, HostReportDto } from "../lib/bindings";
+import {
+  useBootstrapProgress,
+  useBootstrapToolchain,
+  useComponents,
+  useHostReport,
+  useRunHelper,
+} from "../lib/ipc";
 import type { BootstrapRunState } from "../lib/ipc";
 
 function formatSize(bytes: number): string {
@@ -74,8 +80,104 @@ function RunProgress({
   );
 }
 
+const VERDICT_STYLE: Record<string, string> = {
+  canAccelerate: "border-running text-running",
+  degraded: "border-attention text-attention",
+  cannotRun: "border-danger text-danger",
+};
+
+function Tile({ label, value }: { label: string; value: string }): React.JSX.Element {
+  return (
+    <div className="rounded-card border border-border-default bg-surface px-3 py-2">
+      <div className="text-[10.5px] uppercase tracking-wide text-faint">{label}</div>
+      <div className="text-[12.5px] text-ink">{value}</div>
+    </div>
+  );
+}
+
+function HostPanel({ report }: { report: HostReportDto }): React.JSX.Element {
+  const runHelper = useRunHelper();
+  const gb = (mb: number): string => (mb > 0 ? `${(mb / 1024).toFixed(1)} GB` : "unknown");
+
+  return (
+    <section data-testid="host-panel" className="flex flex-col gap-3">
+      <h2 className="text-[13px] font-semibold text-ink">Host</h2>
+      <div
+        data-testid="host-verdict"
+        data-verdict={report.verdict}
+        className={`rounded-card border bg-surface px-3.5 py-2.5 text-[12.5px] ${
+          VERDICT_STYLE[report.verdict] ?? "border-border-default text-muted"
+        }`}
+      >
+        {report.verdict === "canAccelerate"
+          ? "Ready — emulators will run with hardware acceleration."
+          : report.verdictReason}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Tile label="Virtualization" value={report.virtualization} />
+        <Tile
+          label="Accelerator"
+          value={`${report.acceleratorKind} · ${report.acceleratorStatus}`}
+        />
+        <Tile label="RAM" value={gb(report.ramMb)} />
+        <Tile label="Disk free" value={gb(report.diskFreeMb)} />
+      </div>
+
+      {report.fixes.length > 0 ? (
+        <ul className="flex flex-col gap-2" data-testid="host-fixes">
+          {report.fixes.map((fix) => (
+            <li
+              key={fix.id}
+              data-testid={`fix-${fix.id}`}
+              className="rounded-card border border-border-default bg-surface px-3.5 py-3 text-[12.5px]"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-ink">{fix.title}</span>
+                {fix.scriptable ? (
+                  <button
+                    type="button"
+                    data-testid={`fix-run-${fix.id}`}
+                    disabled={runHelper.isPending}
+                    onClick={() => {
+                      runHelper.mutate(fix.id);
+                    }}
+                    className="rounded-md bg-primary px-3 py-1.5 text-[12px] font-medium text-white disabled:opacity-50"
+                  >
+                    Fix it
+                  </button>
+                ) : (
+                  <span className="text-[11px] text-faint">manual</span>
+                )}
+              </div>
+              <p className="mt-1 text-muted">{fix.description}</p>
+              {fix.needsReboot ? (
+                <p className="mt-1 text-attention">A reboot is required after this fix.</p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {runHelper.data ? (
+        <p data-testid="fix-result" className="text-[12px] text-muted">
+          {runHelper.data.message}
+        </p>
+      ) : null}
+      {runHelper.error ? (
+        <p className="text-[12px] text-danger">
+          {runHelper.error.ipc.code === "cancelled"
+            ? "The administrator prompt was dismissed — nothing changed."
+            : runHelper.error.ipc.message}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 export function Dependencies(): React.JSX.Element {
   const { data: components, error, isPending } = useComponents();
+  const host = useHostReport();
   const bootstrap = useBootstrapToolchain();
   const { state: run, reset } = useBootstrapProgress();
 
@@ -129,6 +231,12 @@ export function Dependencies(): React.JSX.Element {
       {body}
 
       <RunProgress run={run} extraError={bootstrap.error?.ipc.message ?? null} />
+
+      {host.data ? (
+        <HostPanel report={host.data} />
+      ) : host.error ? (
+        <Placeholder>Could not probe the host: {host.error.ipc.message}</Placeholder>
+      ) : null}
 
       <Placeholder>
         Components resolve live from Google&apos;s repository and install into EmuManager&apos;s own

@@ -175,16 +175,28 @@ else in M4 is done and covered by Rust unit + Vitest tests.
 
 ## M5 — Host readiness & elevated helper  (coverage gate: 70%)
 
-- [ ] `emu-host` detection per OS: virtualization (cpuid/registry/sysctl), accelerator kind+status,
-      disk, RAM → `HostReport` + `verdict` + `fixes[]`
-- [ ] `emu-helper` binary: `check`, `enable-whpx`, `enable-aehd`, `add-kvm-group`; structured JSON out
-- [ ] `run_helper(fix)` invokes it with OS elevation (UAC / `pkexec`/`sudo`), then re-probes
-- [ ] Dependencies screen host panel: live tiles, per-fix buttons, reboot/firmware checklist
-- [ ] Graceful degradation: no accelerator → app still lists/creates, warns about speed, blocks
-      launch with a clear reason + link to the fix
+- [x] `emu-host` detection per OS → `HostReport` + `verdict` + `fixes[]` — `crates/emu-host/src/`
+      (task `0025`): a pure `build_report(&HostSignals)` (8 unit tests incl. the DoD's CI-runner
+      case) + `NativeHostProbe` gathering signals per OS (`sysinfo` RAM/disk; `sysctl` /
+      `/dev/kvm` / `powershell` for virtualization + accelerator). **Windows probe untested** — M6 CI.
+- [x] `emu-helper` binary: `check` / `enable-whpx` / `enable-aehd` / `add-kvm-group`, real per-OS
+      `#[cfg]` bodies, camelCase `{command,status,message,needsReboot}` JSON, `notApplicable` off
+      platform (task `0026`). Output-schema test (`tests/schema.rs`) — the DoD's second half.
+- [x] `run_helper(fix)` invokes `emu-helper` with OS elevation via a pure `elevated_argv` wrapper
+      (`osascript … with administrator privileges` / `pkexec` / `Start-Process -Verb RunAs`), then
+      re-probes; a dismissed prompt → `cancelled` (task `0026`). **Elevation path untested end to
+      end** (manual / `--ignored`); Windows can't capture the child's stdout (synthetic outcome).
+- [x] Dependencies-screen host panel: verdict banner, four tiles, per-fix "Fix it" buttons +
+      manual-steps text + reboot notes (task `0027`).
+- [x] Graceful degradation: only *launch* is gated (`cannotRun` disables it with the reason on the
+      Dashboard + detail panel); the component list / create / emulator list all still work with
+      no accelerator (task `0027`).
 
 DoD: on a CI runner without nested virt, the host panel correctly reports `CannotRun` with the
-right reason and the right fix; helper `check` output schema is tested.
+right reason and the right fix; helper `check` output schema is tested. **Helper schema test: met**
+(`emu-helper/tests/schema.rs`). **CI-runner verdict: logic met** (`build_report`'s
+`ci_runner_without_virtualization_cannot_run_and_offers_the_bios_fix`); the live-CI assertion is
+deferred to M6 along with the rest of the harness. M5 stays `in_progress` on that one line.
 
 ---
 

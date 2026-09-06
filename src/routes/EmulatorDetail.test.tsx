@@ -18,6 +18,23 @@ vi.mock("../lib/bindings", () => ({
     launchEmulator: vi.fn(),
     stopEmulator: vi.fn(),
     revealPath: vi.fn(),
+    exportProfile: vi.fn(),
+    probeHost: vi.fn().mockResolvedValue({
+      status: "ok",
+      data: {
+        os: "macos",
+        arch: "aarch64",
+        virtualization: "enabled",
+        acceleratorKind: "hvf",
+        acceleratorStatus: "ok",
+        diskFreeMb: 400_000,
+        ramMb: 32_768,
+        verdict: "canAccelerate",
+        verdictReason: "",
+        fixes: [],
+      },
+    }),
+    runHelper: vi.fn(),
   },
   events: {
     jobEmulator: { listen: vi.fn().mockResolvedValue(() => {}) },

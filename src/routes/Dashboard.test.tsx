@@ -17,6 +17,22 @@ vi.mock("../lib/bindings", () => ({
     launchEmulator: vi.fn(),
     stopEmulator: vi.fn(),
     reconcileNow: vi.fn(),
+    probeHost: vi.fn().mockResolvedValue({
+      status: "ok",
+      data: {
+        os: "macos",
+        arch: "aarch64",
+        virtualization: "enabled",
+        acceleratorKind: "hvf",
+        acceleratorStatus: "ok",
+        diskFreeMb: 400_000,
+        ramMb: 32_768,
+        verdict: "canAccelerate",
+        verdictReason: "",
+        fixes: [],
+      },
+    }),
+    runHelper: vi.fn(),
   },
   events: {
     jobBootstrap: { listen: vi.fn().mockResolvedValue(() => {}) },
@@ -27,6 +43,7 @@ vi.mock("../lib/bindings", () => ({
 const listEmulatorsMock = vi.mocked(commands.listEmulators);
 const stopEmulatorMock = vi.mocked(commands.stopEmulator);
 const reconcileNowMock = vi.mocked(commands.reconcileNow);
+const probeHostMock = vi.mocked(commands.probeHost);
 
 const RUNNING: EmulatorInfo = {
   id: "01J0RUNNING",
@@ -111,6 +128,31 @@ describe("Dashboard", () => {
       expect(reconcileNowMock).toHaveBeenCalled();
       expect(screen.getByTestId("emulator-01J0STOPPED")).toHaveTextContent("Android TV");
     });
+  });
+
+  it("disables Launch and shows the reason when the host can't run emulators", async () => {
+    listEmulatorsMock.mockResolvedValue({ status: "ok", data: [STOPPED] });
+    probeHostMock.mockResolvedValueOnce({
+      status: "ok",
+      data: {
+        os: "linux",
+        arch: "x86_64",
+        virtualization: "disabledInFirmware",
+        acceleratorKind: "kvm",
+        acceleratorStatus: "missing",
+        diskFreeMb: 100_000,
+        ramMb: 16_384,
+        verdict: "cannotRun",
+        verdictReason: "hardware virtualization is turned off in your firmware (BIOS/UEFI)",
+        fixes: [],
+      },
+    });
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("launch-01J0STOPPED")).toBeDisabled();
+    });
+    expect(screen.getByTestId("launch-blocked-01J0STOPPED")).toHaveTextContent("firmware");
   });
 
   it("surfaces a load failure", async () => {

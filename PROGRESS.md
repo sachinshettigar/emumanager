@@ -5,17 +5,19 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
-- **Milestone:** M5 — Host readiness & elevated helper. Scoped into `0025`–`0027`; `0025`
-  (`emu-host` detection) **done** (in review). M4 stays `in_progress` on the export→wipe→import E2E
-  deferred to M6.
-- **Phase:** `emu-host` (`0025`) + the helper/IPC (`0026`) are in. `0026`: `emu-helper`'s
-  subcommands do real per-OS work and print `{command,status,message,needsReboot}` (schema-tested
-  as a subprocess — the M5 DoD's second half); `probe_host()` runs `NativeHostProbe` and snapshots
-  the report; `run_helper(fixId)` invokes `emu-helper` **with an OS elevation prompt**
-  (`osascript` / `pkexec` / `Start-Process -Verb RunAs`) via a pure, unit-tested `elevated_argv`
-  wrapper, and returns a `cancelled` error if the prompt is dismissed. `emu-host` is now a real
-  `src-tauri` dependency (its `cargo-machete` ignore entry is gone). Next: `0027` — the
-  Dependencies host panel + launch-gating.
+- **Milestone:** M6 — Cross-platform hardening & packaging (`currentMilestone` advanced). M5 is
+  **functionally complete** — `0025`–`0027` all `done` (host detection, `emu-helper` + elevation
+  IPC, host panel + launch-gating) — and stays `in_progress` on the live-CI "no nested virt →
+  `CannotRun`" DoD assertion + Windows verification, both deferred to M6's CI. M4/M3/M2 likewise
+  wait on M6's E2E line.
+- **Phase:** M5 done end to end. `0027`: `Dependencies.tsx` gets a `HostPanel` — a verdict banner,
+  four tiles (virtualization / accelerator / RAM / disk-free) from `probe_host`, and per-fix rows
+  with a "Fix it" button (`run_helper` + re-probe) for the scriptable ones. `cannotRun` disables
+  "Launch" on the Dashboard and the detail panel with the verdict reason shown. `useHostReport` /
+  `useRunHelper` share one query key so a fix re-probes everywhere. Next milestone: **M6** —
+  cross-platform hardening & packaging, which is largely **CI-gated** (signed installers,
+  notarization, the E2E matrix) and can't finish while GitHub Actions is blocked on the account's
+  billing.
 - **Phase:** M4 done end to end. `0024`: `src/routes/Profiles.tsx` rewritten — a `FileReader`
   drop zone → `inspect_profile` → a requirement table + Apply / Apply & launch (streams
   `useEmulatorJob`) + Save-to-library; a saved-profiles list with Load / Delete. Emulator detail
@@ -125,10 +127,12 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0027` — the Dependencies-screen host panel: a verdict banner + four tiles
-  (virtualization / accelerator / disk / RAM) from `probe_host`, a "Fix it" button per scriptable
-  fix (→ `run_helper`), and launch-gating (Dashboard + detail "Launch" disabled with the reason
-  when `verdict.kind === 'cannotRun'`). Adds `useHostReport` / `useRunHelper`. Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
+- **Next action:** M6 (Cross-platform hardening & packaging) is next but its DoD — signed +
+  notarized installers built by CI, the E2E suite running per-PR, an auto-updating pre-release —
+  is **unreachable from code alone** while GitHub Actions is billing-blocked (needs a human in
+  Settings → Billing). The buildable slices (least-privilege Tauri capability audit; a
+  `release.yml` / updater config that CI would run; the E2E harness itself) can still be written.
+  Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
   then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
@@ -147,14 +151,42 @@ Narrative companion to `.agent/state.json`. Update both together (see
       `in_progress` on the same M6 `tauri-driver` E2E line as M0/M1/M2.
 - [~] M4 Profiles: export / import / recreate — tasks `0022`–`0024` all `done` (engine, IPC,
       Profiles screen). Stays `in_progress` on the export→wipe→import E2E deferred to M6.
-- [~] M5 Host readiness & elevated helper — **current milestone**, tasks `0025`–`0027`; `0025`
-      (`emu-host` detection) and `0026` (`emu-helper` + `probe_host`/`run_helper` IPC) **done**,
-      `0027` (host panel + launch-gating) todo
+- [~] M5 Host readiness & elevated helper — tasks `0025`–`0027` all `done` (detection, helper +
+      IPC, host panel + gating). Stays `in_progress` on the live-CI DoD + Windows verification (M6).
+- [~] M6 Cross-platform hardening & packaging — **current milestone**; largely CI/signing-gated
+      (blocked on GitHub billing)
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-06 — session 9 (continued) (Claude Code) — task 0027 done (host panel + launch-gating); M5 functionally complete
+
+`src/routes/Dependencies.tsx` gets a `HostPanel`: a verdict banner coloured by `verdict`
+(`canAccelerate` / `degraded` / `cannotRun`, showing `verdictReason`), four `Tile`s
+(virtualization, accelerator `kind · status`, RAM, disk-free) from `probe_host`, and — when there
+are fixes — a row per fix with its description, a "Fix it" button for the `scriptable` ones
+(`run_helper(fix.id)` → shows the helper `message`; a `cancelled` error → "the prompt was
+dismissed"), a "manual" tag for the rest, and a reboot note when `needsReboot`.
+
+Launch-gating: `Dashboard`'s `EmulatorRow` and `EmulatorDetail` both call `useHostReport` (shared
+`["host-report"]` query key) and disable "Launch" when `verdict === "cannotRun"`, with
+`verdictReason` shown beside the button and as a `title`. `degraded` isn't gated — the banner
+already carries that warning. `useRunHelper`'s `onSettled` invalidates the host report, so a fix
+re-probes everywhere.
+
+Every screen test that renders a host-report consumer (Dependencies / Dashboard / EmulatorDetail)
+gained a `probeHost` (+ `runHelper`) bindings mock — without it `commands.probeHost()` is
+`undefined` and the render crashes on `host.error.ipc.message`. 3 new Vitest (Dependencies +2,
+Dashboard +1). 154 rust tests, 34 web tests, `just validate` green (`bindings.ts` unchanged — the
+commands shipped in `0026`).
+
+**M5 is functionally complete** — `0025` (detection) + `0026` (helper + elevation IPC) + `0027`
+(panel + gating). The helper-schema half of the DoD is met (`emu-helper/tests/schema.rs`); the
+"live CI runner, no nested virt → `CannotRun`" half is met in *logic* (`build_report`'s unit test)
+and the real CI run + the Windows probe/helper verification are deferred to M6. `currentMilestone`
+→ M6.
 
 ### 2026-09-06 — session 9 (continued) (Claude Code) — task 0026 done (emu-helper + probe_host / run_helper)
 

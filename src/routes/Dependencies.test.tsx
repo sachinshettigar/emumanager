@@ -10,6 +10,8 @@ vi.mock("../lib/bindings", () => ({
   commands: {
     listComponents: vi.fn(),
     bootstrapToolchain: vi.fn(),
+    probeHost: vi.fn(),
+    runHelper: vi.fn(),
   },
   events: {
     jobBootstrap: { listen: vi.fn() },
@@ -18,7 +20,49 @@ vi.mock("../lib/bindings", () => ({
 
 const listComponentsMock = vi.mocked(commands.listComponents);
 const bootstrapToolchainMock = vi.mocked(commands.bootstrapToolchain);
+const probeHostMock = vi.mocked(commands.probeHost);
+const runHelperMock = vi.mocked(commands.runHelper);
 const listenMock = vi.mocked(events.jobBootstrap.listen);
+
+const HOST_OK = {
+  status: "ok" as const,
+  data: {
+    os: "macos",
+    arch: "aarch64",
+    virtualization: "enabled",
+    acceleratorKind: "hvf",
+    acceleratorStatus: "ok",
+    diskFreeMb: 400_000,
+    ramMb: 32_768,
+    verdict: "canAccelerate",
+    verdictReason: "",
+    fixes: [],
+  },
+};
+
+const HOST_NO_KVM = {
+  status: "ok" as const,
+  data: {
+    os: "linux",
+    arch: "x86_64",
+    virtualization: "enabled",
+    acceleratorKind: "kvm",
+    acceleratorStatus: "noPermission",
+    diskFreeMb: 100_000,
+    ramMb: 16_384,
+    verdict: "degraded",
+    verdictReason: "your user account can't use KVM yet",
+    fixes: [
+      {
+        id: "add-kvm-group",
+        title: "Add your user to the kvm group",
+        scriptable: true,
+        needsReboot: false,
+        description: "Runs sudo usermod -aG kvm $USER.",
+      },
+    ],
+  },
+};
 
 const CMDLINE_TOOLS: ComponentInfo = {
   id: "cmdline-tools;latest",
@@ -55,6 +99,9 @@ describe("Dependencies screen", () => {
   beforeEach(() => {
     listComponentsMock.mockReset();
     bootstrapToolchainMock.mockReset();
+    probeHostMock.mockReset();
+    runHelperMock.mockReset();
+    probeHostMock.mockResolvedValue(HOST_OK);
     listenMock.mockReset();
     listenMock.mockImplementation((cb) => {
       // The real bindings pass a full tauri `Event<T>`; only `.payload` is ever read.
@@ -162,6 +209,41 @@ describe("Dependencies screen", () => {
 
     await waitFor(() => {
       expect(screen.getByText("sdkmanager exited with 1")).toBeInTheDocument();
+    });
+  });
+
+  it("renders the host verdict and tiles", async () => {
+    listComponentsMock.mockResolvedValue({ status: "ok", data: [CMDLINE_TOOLS] });
+    renderDependencies();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("host-verdict")).toHaveAttribute("data-verdict", "canAccelerate");
+    });
+    expect(screen.getByTestId("host-panel")).toHaveTextContent("hvf · ok");
+  });
+
+  it("shows a scriptable fix and runs it", async () => {
+    listComponentsMock.mockResolvedValue({ status: "ok", data: [CMDLINE_TOOLS] });
+    probeHostMock.mockResolvedValue(HOST_NO_KVM);
+    runHelperMock.mockResolvedValue({
+      status: "ok",
+      data: {
+        command: "add-kvm-group",
+        status: "ok",
+        message: "Added you to the kvm group. Log out and back in.",
+        needsReboot: false,
+      },
+    });
+    renderDependencies();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("fix-add-kvm-group")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("fix-run-add-kvm-group"));
+
+    await waitFor(() => {
+      expect(runHelperMock).toHaveBeenCalledWith("add-kvm-group");
+      expect(screen.getByTestId("fix-result")).toHaveTextContent("kvm group");
     });
   });
 });
