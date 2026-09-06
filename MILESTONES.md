@@ -89,9 +89,9 @@ install. **Met** (task 0012) — `cargo test -p emu-core --all-features --test t
       (it runs `ensure_image` first) rather than a separate button
 - [x] Dashboard lists tracked emulators; row shows Stopped/Booting/Running, polled every 4 s
       (task `0017`). Uptime is not shown yet (needs the launch timestamp — M3 registry schema)
-- [x] `stop` works (`adb emu kill` + force-kill fallback, task `0016`). **Partial**: "app exit
-      doesn't orphan" — the provider is built per-command so its child-handle map doesn't persist;
-      a shared/managed provider + reconcile-on-startup is M3's milestone
+- [x] `stop` works (`adb emu kill` + force-kill fallback, task `0016`). "App exit doesn't orphan"
+      — **resolved in M3 task `0020`**: the provider is now shared `tauri::State`, so its
+      child-handle map persists and a `RunEvent::ExitRequested` handler reaps every child on quit.
 
 DoD: E2E (Linux + Windows, `tauri-driver`): launch app → create a Play Store x86_64 emulator →
 assert it reaches Running in the dashboard → stop it. **Not met** — no e2e suite yet (deferred to
@@ -108,16 +108,20 @@ pieces are covered by fake-driven Rust tests + Vitest; a real booted-emulator ru
       `host_snapshots`; behind a typed `Registry` API (`EmulatorRow` in/out) in
       `crates/emu-core/src/registry/`. Task `0018`. Compound values (`Hardware`, `EmulatorSource`,
       tags) are JSON columns, not one column per field — see the task Notes.
-- [x] `reconcile()` **on demand** — `AndroidProvider::reconcile` (task `0019`): parses
-      `avdmanager list avd`, adopts loadable AVDs with no row (`Manual { discovered: true }`,
+- [x] `reconcile()` **on demand and on startup** — `AndroidProvider::reconcile` (task `0019`):
+      parses `avdmanager list avd`, adopts loadable AVDs with no row (`Manual { discovered: true }`,
       enriched from `config.ini`), flags rows whose AVD is missing or un-loadable as `Error`
-      (never hard-deletes), refreshes `last_state` / serial / port / pid from adb. **On startup**
-      (running it once when the app launches) is task `0020`'s shared-provider work.
-- [ ] Detail panel: image coord, RAM/storage, adb serial, gRPC port, snapshot, source; open folder
-- [~] Wipe data, delete (with/without AVD removal), rename, edit hardware (recreate if needed) —
-      **delete done** (`Provider::delete(id, wipe)`, task `0019`: `wipe` = `avdmanager delete avd`
-      + untrack, `!wipe` = untrack only; refuses while running). Wipe-data / rename / edit-hardware
-      are task `0020`'s commands.
+      (never hard-deletes), refreshes `last_state` / serial / port / pid from adb. Run once at
+      startup (spawned from `setup`) and via the `reconcile_now` command / Dashboard "Refresh"
+      button (task `0020`).
+- [ ] Detail panel: image coord, RAM/storage, adb serial, gRPC port, snapshot, source; open folder —
+      the backend (`emulator_detail` command + `EmulatorDetail`) is done (task `0020`); the panel
+      UI is task `0021`.
+- [x] Wipe data, delete (with/without AVD removal), rename, edit hardware — commands all in place:
+      `delete_emulator(id, wipe)` (task `0019`), `wipe_emulator_data` (deletes the AVD's writable
+      images so the next launch rebuilds them), `rename_emulator`, `edit_hardware` (records the row;
+      a live `config.ini` rewrite / AVD recreate is a documented follow-up) — task `0020`. Panel
+      wiring is task `0021`.
 - [ ] Per-emulator log console with history tail + live stream; copy / open log file
 - [x] Kill-safety: a `Booting`/`Running` registry row whose emulator is no longer in `adb devices`
       (app SIGKILLed mid-boot) is reset to `Stopped` with `pid` cleared by `reconcile()` (task

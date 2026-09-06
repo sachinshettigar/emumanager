@@ -36,6 +36,11 @@ export const commands = {
 	/**  Every registry-tracked emulator with its live state — what the Dashboard polls. */
 	listEmulators: () => typedError<EmulatorInfo[], IpcError>(__TAURI_INVOKE("list_emulators")),
 	/**
+	 *  Reconcile the registry against on-disk / adb reality, then return the refreshed list. The
+	 *  Dashboard's "Refresh" action and a manual recovery from drift.
+	 */
+	reconcileNow: () => typedError<EmulatorInfo[], IpcError>(__TAURI_INVOKE("reconcile_now")),
+	/**
 	 *  Ensure the chosen image is installed, create the AVD, optionally launch it. Streams progress
 	 *  on `job://emulator` with `jobId` `create:<avdName>`. Returns the new tracked id.
 	 */
@@ -45,8 +50,32 @@ export const commands = {
 	 *  `jobId` `launch:<id>`.
 	 */
 	launchEmulator: (id: string) => typedError<null, IpcError>(__TAURI_INVOKE("launch_emulator", { id })),
-	/**  Stop a running emulator (`adb emu kill`). */
+	/**
+	 *  Stop a running emulator: graceful `adb emu kill`, then force-kill the held child if it doesn't
+	 *  exit (the shared provider means that held handle now actually persists — task 0020).
+	 */
 	stopEmulator: (id: string) => typedError<null, IpcError>(__TAURI_INVOKE("stop_emulator", { id })),
+	/**  Rename a tracked emulator (display name only — the on-disk AVD name never changes). */
+	renameEmulator: (id: string, displayName: string) => typedError<null, IpcError>(__TAURI_INVOKE("rename_emulator", { id, displayName })),
+	/**
+	 *  Update an emulator's stored RAM / storage / graphics. Recorded now; applied when the AVD is next
+	 *  (re)created — see `AndroidProvider::set_hardware`.
+	 */
+	editHardware: (id: string, ramMb: number, storageMb: number, graphics: string) => typedError<null, IpcError>(__TAURI_INVOKE("edit_hardware", { id, ramMb, storageMb, graphics })),
+	/**
+	 *  Delete a tracked emulator. `wipe` also removes the AVD from disk (`avdmanager delete avd`);
+	 *  `wipe = false` just untracks it.
+	 */
+	deleteEmulator: (id: string, wipe: boolean) => typedError<null, IpcError>(__TAURI_INVOKE("delete_emulator", { id, wipe })),
+	/**
+	 *  Wipe an emulator's user data (deletes the AVD's writable images + snapshots; next launch
+	 *  rebuilds them). Refuses while running.
+	 */
+	wipeEmulatorData: (id: string) => typedError<null, IpcError>(__TAURI_INVOKE("wipe_emulator_data", { id })),
+	/**  Full detail for one emulator — its stored config plus live run state. */
+	emulatorDetail: (id: string) => typedError<EmulatorDetail, IpcError>(__TAURI_INVOKE("emulator_detail", { id })),
+	/**  Reveal a path in the OS file manager (Finder / Explorer / the default file browser). */
+	revealPath: (path: string) => typedError<null, IpcError>(__TAURI_INVOKE("reveal_path", { path })),
 };
 
 /** Events */
@@ -138,6 +167,34 @@ export type DeviceInfo = {
 	densityDpi: number,
 	/**  Physical diagonal in inches. */
 	diagonalIn: number | null,
+};
+
+/**  Full config + live state for the detail panel. */
+export type EmulatorDetail = {
+	id: string,
+	avdName: string,
+	displayName: string,
+	deviceProfileId: string,
+	/**  `sdkmanager` package path, when known. */
+	imageCoord: string | null,
+	/**  Android API level from the image coord, when known. */
+	api: number | null,
+	hasPlayStore: boolean,
+	ramMb: number,
+	storageMb: number,
+	/**  `auto` / `host` / `swiftshader`. */
+	graphics: string,
+	/**  `created here` / `adopted` / `from profile` / `imported`. */
+	source: string,
+	/**  Live: `stopped` / `booting` / `running` / `error`. */
+	state: string,
+	adbSerial: string | null,
+	/**  RFC 3339. */
+	createdAt: string,
+	/**  RFC 3339. */
+	updatedAt: string,
+	/**  `<avd home>/<avd_name>.avd`, for the "Open folder" button. `None` if the home can't be resolved. */
+	avdPath: string | null,
 };
 
 /**  A tracked emulator plus its live run state. */

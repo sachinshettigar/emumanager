@@ -7,65 +7,34 @@
 //! `toolchain::resolve_catalog` does for the component catalog), construct the real port impls,
 //! and map results into `#[derive(specta::Type)]` DTOs or [`IpcError`].
 //!
-//! `AndroidProvider` is built **per command**, not held as shared state. Its in-memory
-//! spawned-child map (task 0016) therefore doesn't persist across calls, so `stop` relies on the
-//! graceful `adb emu kill` path rather than a held handle. That's fine for M2's "create → boot →
-//! stop" flow; a shared, managed provider (so `stop` can force-kill and the app can reap children
-//! on exit) is part of M3's "Registry & reliable tracking" milestone.
+//! The `AndroidProvider` is held as shared [`tauri::State`] (`crate::provider_state`), built once
+//! and kept for the app's lifetime — so its spawned-emulator child-handle map (task 0016)
+//! persists across commands. That is what lets [`stop_emulator`] force-kill a stuck emulator and
+//! the app reap every child on exit (`RunEvent::ExitRequested`, `lib.rs`). Task 0017 built a fresh
+//! provider per command; this is M3's shared/managed replacement.
 
-use std::path::Path;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
 
-use emu_android::provider::{AndroidProvider, TrackedEmulator};
+use emu_android::provider::TrackedEmulator;
 use emu_core::model::device::{DeviceProfile, FormFactor};
-use emu_core::model::emulator::{EmulatorId, Hardware, RunState};
+use emu_core::model::emulator::{EmulatorId, EmulatorSource, Graphics, Hardware, RunState};
 use emu_core::model::image::ImageCoord;
 use emu_core::model::job::{JobHandle, JobId, Progress};
 use emu_core::model::plan::CreateSpec;
-use emu_core::model::HostOs;
 use emu_core::provider::{LaunchOpts, Provider as _};
-use emu_core::registry::Registry;
+use emu_core::registry::EmulatorRow;
 use emu_core::CoreError;
 use futures_util::future::try_join_all;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager as _};
+use tauri::{AppHandle, State};
 use tauri_specta::Event as _;
 
 use crate::ipc_error::IpcError;
-use crate::ports::{NativeFs, NativeProcessRunner};
+use crate::provider_state::ManagedProvider;
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
-
-fn require_host_os() -> Result<HostOs, IpcError> {
-    HostOs::current().ok_or_else(|| {
-        IpcError::new(
-            "unsupported",
-            "this operating system isn't supported by the Android SDK",
-        )
-    })
-}
-
-fn app_data_dir(app: &AppHandle) -> Result<std::path::PathBuf, IpcError> {
-    app.path()
-        .app_data_dir()
-        .map_err(|e| IpcError::new("fs_error", format!("resolving the app data directory: {e}")))
-}
-
-/// Build an [`AndroidProvider`] over the real ports for this call.
-async fn provider(app: &AppHandle) -> Result<AndroidProvider, IpcError> {
-    let os = require_host_os()?;
-    let data_dir = app_data_dir(app)?;
-    let registry = Registry::open(&data_dir).await.map_err(IpcError::from)?;
-    Ok(AndroidProvider::new(
-        Arc::new(NativeProcessRunner),
-        Arc::new(NativeFs),
-        registry,
-        data_dir,
-        os,
-    ))
-}
 
 async fn fetch_bytes(url: &str) -> Result<Vec<u8>, IpcError> {
     let response = reqwest::get(url)
@@ -156,8 +125,8 @@ fn read_sdklib_jar(sdk_root: &Path) -> Result<Vec<u8>, IpcError> {
 /// Every Google device profile, parsed from the installed `sdklib` jar.
 #[tauri::command]
 #[specta::specta]
-pub async fn list_devices(app: AppHandle) -> Result<Vec<DeviceInfo>, IpcError> {
-    let provider = provider(&app).await?;
+pub async fn list_devices(mgr: State<'_, ManagedProvider>) -> Result<Vec<DeviceInfo>, IpcError> {
+    let provider = mgr.get().await?;
     let sdk_root = provider.sdk_root().await.map_err(IpcError::from)?;
     let jar = read_sdklib_jar(&sdk_root)?;
     let mut devices: Vec<DeviceInfo> = emu_android::devices::parse_from_jar(&jar)
@@ -202,8 +171,8 @@ pub struct ImageInfo {
 /// local install state.
 #[tauri::command]
 #[specta::specta]
-pub async fn list_images(app: AppHandle) -> Result<Vec<ImageInfo>, IpcError> {
-    let provider = provider(&app).await?;
+pub async fn list_images(mgr: State<'_, ManagedProvider>) -> Result<Vec<ImageInfo>, IpcError> {
+    let provider = mgr.get().await?;
 
     let manifests = try_join_all(
         emu_android::sysimg::MANIFEST_URLS
@@ -286,8 +255,21 @@ impl From<&TrackedEmulator> for EmulatorInfo {
 /// Every registry-tracked emulator with its live state — what the Dashboard polls.
 #[tauri::command]
 #[specta::specta]
-pub async fn list_emulators(app: AppHandle) -> Result<Vec<EmulatorInfo>, IpcError> {
-    let provider = provider(&app).await?;
+pub async fn list_emulators(
+    mgr: State<'_, ManagedProvider>,
+) -> Result<Vec<EmulatorInfo>, IpcError> {
+    let provider = mgr.get().await?;
+    let tracked = provider.tracked_states().await.map_err(IpcError::from)?;
+    Ok(tracked.iter().map(EmulatorInfo::from).collect())
+}
+
+/// Reconcile the registry against on-disk / adb reality, then return the refreshed list. The
+/// Dashboard's "Refresh" action and a manual recovery from drift.
+#[tauri::command]
+#[specta::specta]
+pub async fn reconcile_now(mgr: State<'_, ManagedProvider>) -> Result<Vec<EmulatorInfo>, IpcError> {
+    let provider = mgr.get().await?;
+    provider.reconcile().await.map_err(IpcError::from)?;
     let tracked = provider.tracked_states().await.map_err(IpcError::from)?;
     Ok(tracked.iter().map(EmulatorInfo::from).collect())
 }
@@ -396,6 +378,7 @@ pub struct CreateEmulatorRequest {
 #[specta::specta]
 pub async fn create_emulator(
     app: AppHandle,
+    mgr: State<'_, ManagedProvider>,
     request: CreateEmulatorRequest,
 ) -> Result<String, IpcError> {
     let display_name = request.name.trim().to_string();
@@ -405,7 +388,7 @@ pub async fn create_emulator(
     let coord: ImageCoord = request.image_coord.parse().map_err(IpcError::from)?;
     let avd_name = sanitize_avd_name(&display_name);
     let job_id = format!("create:{avd_name}");
-    let provider = provider(&app).await?;
+    let provider = mgr.get().await?;
     let job = job_handle(&app, &job_id);
 
     let outcome: Result<EmulatorId, CoreError> = async {
@@ -470,9 +453,13 @@ pub async fn create_emulator(
 /// `jobId` `launch:<id>`.
 #[tauri::command]
 #[specta::specta]
-pub async fn launch_emulator(app: AppHandle, id: String) -> Result<(), IpcError> {
+pub async fn launch_emulator(
+    app: AppHandle,
+    mgr: State<'_, ManagedProvider>,
+    id: String,
+) -> Result<(), IpcError> {
     let job_id = format!("launch:{id}");
-    let provider = provider(&app).await?;
+    let provider = mgr.get().await?;
     let job = job_handle(&app, &job_id);
 
     match provider
@@ -505,12 +492,257 @@ pub async fn launch_emulator(app: AppHandle, id: String) -> Result<(), IpcError>
     }
 }
 
-/// Stop a running emulator (`adb emu kill`).
+/// Stop a running emulator: graceful `adb emu kill`, then force-kill the held child if it doesn't
+/// exit (the shared provider means that held handle now actually persists — task 0020).
 #[tauri::command]
 #[specta::specta]
-pub async fn stop_emulator(app: AppHandle, id: String) -> Result<(), IpcError> {
-    let provider = provider(&app).await?;
+pub async fn stop_emulator(mgr: State<'_, ManagedProvider>, id: String) -> Result<(), IpcError> {
+    let provider = mgr.get().await?;
     provider.stop(EmulatorId(id)).await.map_err(IpcError::from)
+}
+
+// ---------------------------------------------------------------------------
+// rename / edit hardware / delete / wipe / detail  (task 0020)
+// ---------------------------------------------------------------------------
+
+fn graphics_label(graphics: Graphics) -> &'static str {
+    match graphics {
+        Graphics::Host => "host",
+        Graphics::SwiftshaderIndirect => "swiftshader",
+        _ => "auto",
+    }
+}
+
+fn source_label(source: &EmulatorSource) -> &'static str {
+    match source {
+        EmulatorSource::Manual { discovered: false } => "created here",
+        EmulatorSource::Manual { discovered: true } => "adopted",
+        EmulatorSource::FromProfile { .. } => "from profile",
+        EmulatorSource::Imported { .. } => "imported",
+        _ => "unknown",
+    }
+}
+
+/// The default AVD home — `$ANDROID_AVD_HOME`, else `~/.android/avd` (the `avdmanager` default).
+fn avd_home() -> Option<PathBuf> {
+    if let Ok(dir) = std::env::var("ANDROID_AVD_HOME") {
+        return Some(PathBuf::from(dir));
+    }
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .ok()?;
+    Some(PathBuf::from(home).join(".android").join("avd"))
+}
+
+/// Full config + live state for the detail panel.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct EmulatorDetail {
+    pub id: String,
+    pub avd_name: String,
+    pub display_name: String,
+    pub device_profile_id: String,
+    /// `sdkmanager` package path, when known.
+    pub image_coord: Option<String>,
+    /// Android API level from the image coord, when known.
+    pub api: Option<u32>,
+    pub has_play_store: bool,
+    pub ram_mb: u32,
+    pub storage_mb: u32,
+    /// `auto` / `host` / `swiftshader`.
+    pub graphics: String,
+    /// `created here` / `adopted` / `from profile` / `imported`.
+    pub source: String,
+    /// Live: `stopped` / `booting` / `running` / `error`.
+    pub state: String,
+    pub adb_serial: Option<String>,
+    /// RFC 3339.
+    pub created_at: String,
+    /// RFC 3339.
+    pub updated_at: String,
+    /// `<avd home>/<avd_name>.avd`, for the "Open folder" button. `None` if the home can't be resolved.
+    pub avd_path: Option<String>,
+}
+
+/// Rename a tracked emulator (display name only — the on-disk AVD name never changes).
+#[tauri::command]
+#[specta::specta]
+pub async fn rename_emulator(
+    mgr: State<'_, ManagedProvider>,
+    id: String,
+    display_name: String,
+) -> Result<(), IpcError> {
+    let name = display_name.trim();
+    if name.is_empty() {
+        return Err(IpcError::new("invalid", "the name can't be blank"));
+    }
+    let provider = mgr.get().await?;
+    provider
+        .rename(&EmulatorId(id), name)
+        .await
+        .map_err(IpcError::from)
+}
+
+/// Update an emulator's stored RAM / storage / graphics. Recorded now; applied when the AVD is next
+/// (re)created — see `AndroidProvider::set_hardware`.
+#[tauri::command]
+#[specta::specta]
+pub async fn edit_hardware(
+    mgr: State<'_, ManagedProvider>,
+    id: String,
+    ram_mb: u32,
+    storage_mb: u32,
+    graphics: String,
+) -> Result<(), IpcError> {
+    let provider = mgr.get().await?;
+    let current = provider
+        .detail(&EmulatorId(id.clone()))
+        .await
+        .map_err(IpcError::from)?;
+    let hardware = Hardware {
+        ram_mb: ram_mb.max(512),
+        storage_mb: storage_mb.max(1024),
+        graphics: match graphics.as_str() {
+            "host" => Graphics::Host,
+            "swiftshader" => Graphics::SwiftshaderIndirect,
+            _ => Graphics::Auto,
+        },
+        ..current.hardware
+    };
+    provider
+        .set_hardware(&EmulatorId(id), &hardware)
+        .await
+        .map_err(IpcError::from)
+}
+
+/// Delete a tracked emulator. `wipe` also removes the AVD from disk (`avdmanager delete avd`);
+/// `wipe = false` just untracks it.
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_emulator(
+    mgr: State<'_, ManagedProvider>,
+    id: String,
+    wipe: bool,
+) -> Result<(), IpcError> {
+    let provider = mgr.get().await?;
+    provider
+        .delete(EmulatorId(id), wipe)
+        .await
+        .map_err(IpcError::from)
+}
+
+/// Wipe an emulator's user data (deletes the AVD's writable images + snapshots; next launch
+/// rebuilds them). Refuses while running.
+#[tauri::command]
+#[specta::specta]
+pub async fn wipe_emulator_data(
+    mgr: State<'_, ManagedProvider>,
+    id: String,
+) -> Result<(), IpcError> {
+    let provider = mgr.get().await?;
+    let row = provider
+        .detail(&EmulatorId(id.clone()))
+        .await
+        .map_err(IpcError::from)?;
+    let avd_dir = avd_home()
+        .ok_or_else(|| IpcError::new("fs_error", "couldn't resolve the AVD home directory"))?
+        .join(format!("{}.avd", row.avd_name));
+    provider
+        .wipe_data(&EmulatorId(id), &avd_dir)
+        .await
+        .map_err(IpcError::from)
+}
+
+/// Full detail for one emulator — its stored config plus live run state.
+#[tauri::command]
+#[specta::specta]
+pub async fn emulator_detail(
+    mgr: State<'_, ManagedProvider>,
+    id: String,
+) -> Result<EmulatorDetail, IpcError> {
+    let provider = mgr.get().await?;
+    let row: EmulatorRow = provider
+        .detail(&EmulatorId(id.clone()))
+        .await
+        .map_err(IpcError::from)?;
+
+    // Live state from the same read-only probe the Dashboard uses.
+    let live = provider
+        .tracked_states()
+        .await
+        .map_err(IpcError::from)?
+        .into_iter()
+        .find(|t| t.id.as_str() == id);
+    let (state, adb_serial) = live.map_or((row.last_state, row.adb_serial.clone()), |t| {
+        (t.state, t.adb_serial)
+    });
+
+    let avd_path = avd_home().map(|home| {
+        home.join(format!("{}.avd", row.avd_name))
+            .display()
+            .to_string()
+    });
+
+    Ok(EmulatorDetail {
+        id: row.id.to_string(),
+        avd_name: row.avd_name,
+        display_name: row.display_name,
+        device_profile_id: row.device_profile_id,
+        image_coord: row.image_coord.map(|c| c.to_string()),
+        api: row.image_coord.map(|c| c.api),
+        has_play_store: row
+            .image_coord
+            .is_some_and(|c| c.image_type.has_play_store()),
+        ram_mb: row.hardware.ram_mb,
+        storage_mb: row.hardware.storage_mb,
+        graphics: graphics_label(row.hardware.graphics).to_string(),
+        source: source_label(&row.source).to_string(),
+        state: run_state_label(state).to_string(),
+        adb_serial,
+        created_at: row
+            .created_at
+            .format(&time::format_description::well_known::Rfc3339)
+            .unwrap_or_default(),
+        updated_at: row
+            .updated_at
+            .format(&time::format_description::well_known::Rfc3339)
+            .unwrap_or_default(),
+        avd_path,
+    })
+}
+
+/// Reveal a path in the OS file manager (Finder / Explorer / the default file browser).
+#[tauri::command]
+#[specta::specta]
+pub fn reveal_path(path: String) -> Result<(), IpcError> {
+    let p = Path::new(&path);
+    #[cfg(target_os = "macos")]
+    let mut cmd = {
+        let mut c = std::process::Command::new("open");
+        c.arg("-R").arg(p);
+        c
+    };
+    #[cfg(target_os = "windows")]
+    let mut cmd = {
+        let mut c = std::process::Command::new("explorer");
+        c.arg(format!("/select,{}", p.display()));
+        c
+    };
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut cmd = {
+        // No portable "reveal & select" on Linux — open the containing directory.
+        let target = if p.is_file() {
+            p.parent().unwrap_or(p)
+        } else {
+            p
+        };
+        let mut c = std::process::Command::new("xdg-open");
+        c.arg(target);
+        c
+    };
+    cmd.spawn()
+        .map(|_| ())
+        .map_err(|e| IpcError::new("process_failed", format!("opening the file manager: {e}")))
 }
 
 #[cfg(test)]

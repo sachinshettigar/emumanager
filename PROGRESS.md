@@ -5,19 +5,20 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
-- **Milestone:** M3 — Registry & reliable tracking, **in progress**. Scoped into four tasks
-  (`0018`–`0021`); `0018` + `0019` **done** (in review). M0, M1 and M2 all stay `in_progress` on
-  deliberately-deferred/blocked DoD lines, see below.
-- **Phase:** M3 storage + reconciliation landed (`0018`, `0019`). `0018`: full schema
-  (`migrations/0002_registry_m3.sql`) + typed `Registry` API (`EmulatorRow` in/out, compound
-  values as JSON columns). `0019`: `AndroidProvider::reconcile()` (parses `avdmanager list avd`,
-  adopts untracked loadable AVDs, flags missing/broken rows as `Error`, refreshes state from adb,
-  kill-safety resets a stale `Running` row to `Stopped`), `AndroidProvider::delete(id, wipe)`, and
-  the M3 DoD property test (48 random scenarios → registry converges to ground truth). Real
-  `avdmanager list avd` fixture captured from a real `cmdline-tools 16111833` install this task.
-  Next: task `0020` (shared managed provider as `tauri::State` — persists the spawned-child map for
-  real force-kill + app-exit reap — startup reconcile, and the rename/edit-hardware/delete/wipe/
-  `reconcile_now`/`emulator_detail` IPC commands).
+- **Milestone:** M3 — Registry & reliable tracking, **in progress**. Tasks `0018`–`0021`;
+  `0018` + `0019` + `0020` **done** (in review), `0021` (detail panel + log console) left. M0, M1
+  and M2 all stay `in_progress` on deliberately-deferred/blocked DoD lines, see below.
+- **Phase:** M3 storage + reconciliation + the shared provider are in. `0018`: full schema + typed
+  `Registry` API. `0019`: `reconcile()` + `delete()` + kill-safety + the DoD property test. `0020`:
+  the `AndroidProvider` is now one shared `tauri::State` (`src-tauri/src/provider_state.rs`,
+  `OnceCell`-built on first command) — so its spawned-child map persists (`stop_emulator` reaches
+  the force-kill fallback) and a `RunEvent::ExitRequested` handler reaps every child on quit
+  (**the M2 "app exit orphans an emulator" gap is closed**). `reconcile()` runs once at startup
+  (spawned from `setup`). New commands: `reconcile_now`, `rename_emulator`, `edit_hardware`,
+  `delete_emulator`, `wipe_emulator_data`, `emulator_detail`, `reveal_path` (16 commands total).
+  Dashboard got a "Refresh" button (`reconcile_now`); the detail-panel `ipc.ts` hooks are held for
+  `0021` (their commands + `EmulatorDetail` type are already in `bindings.ts`) so `knip` stays green.
+  Next: task `0021` — the `/emulator/:id` detail panel + per-emulator log console.
 - **M2 recap:** tasks `0014`–`0017` all **done**; M2 stays `in_progress` only on its one DoD line
   (a real `tauri-driver` E2E boot), deferred to M6's e2e-suite work.
 - **M2 task 0017 (IPC + Create wizard + Dashboard) done:** `src-tauri/src/commands/emulator.rs` —
@@ -109,12 +110,12 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0020` — build one `AndroidProvider` in `setup` as `tauri::State` (its
-  spawned-child map then persists → `stop` can force-kill, and `RunEvent::ExitRequested` can reap
-  every child so quitting never orphans an emulator), run `reconcile()` once on startup, and add
-  the `rename_emulator` / `edit_hardware` / `delete_emulator` / `wipe_emulator_data` /
-  `reconcile_now` / `emulator_detail` commands + their `ipc.ts` hooks. Then `0021` (detail panel +
-  log console). Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run, then
+- **Next action:** task `0021` — the `/emulator/:id` detail panel (config + live state + "Open
+  folder" via `reveal_path`, inline rename, RAM/storage/graphics form → `edit_hardware`, Wipe /
+  Delete buttons) and the per-emulator log console (tee `launch`'s output stream to
+  `<data_dir>/logs/<avd>.log`, an `emulator_log_tail` command, live lines via the existing
+  `job://emulator` `Log` event). Adds the thin `ipc.ts` hooks for the `0020` commands that don't
+  have one yet. Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run, then
   flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
@@ -128,14 +129,49 @@ Narrative companion to `.agent/state.json`. Update both together (see
       stays in_progress only on its one DoD line (a real `tauri-driver` E2E boot), deferred to
       M6's e2e-suite work — see `MILESTONES.md`
 - [~] M3 Registry & reliable tracking — **current milestone**, tasks `0018`–`0021`; `0018` (schema
-      + typed `Registry` API) and `0019` (`reconcile` + `delete` + kill-safety + DoD property test)
-      **done**, `0020`–`0021` todo
+      + typed `Registry` API), `0019` (`reconcile` + `delete` + kill-safety + DoD property test) and
+      `0020` (shared managed provider + lifecycle commands + exit reap) **done**, `0021` (detail
+      panel + log console) left
 - [ ] M4 Profiles: export / import / recreate
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-06 — session 9 (continued) (Claude Code) — task 0020 done (shared managed provider + lifecycle commands)
+
+The `AndroidProvider` is no longer rebuilt per command. `src-tauri/src/provider_state.rs` holds a
+`ManagedProvider` — a `tokio::sync::OnceCell<Arc<AndroidProvider>>` plus the fixed `(data_dir, os)`
+— built in `setup` and `app.manage()`d; the first command that calls `mgr.get().await` builds the
+provider (chose `OnceCell` over `block_on` in `setup` so `Registry::open`'s migrations never block
+the window; an unsupported host yields a clear `unsupported` error at call time, the app still
+launches). Every emulator command now takes `State<'_, ManagedProvider>`.
+
+**The M2 "app exit orphans an emulator" gap is closed.** The shared provider means
+`create_emulator`'s spawned-child map persists, so `stop_emulator` actually reaches
+`AndroidProvider::stop`'s force-kill fallback, and `run()` switched to
+`.build(ctx).run(|handle, event| …)` so a `RunEvent::ExitRequested` handler calls the new
+`AndroidProvider::shutdown()` (drains the `running` map, kill+wait each child, per-child 5 s
+timeout) inside an 8 s `block_on(timeout(…))`. `reconcile()` also runs once at startup, spawned
+from `setup` (non-blocking; best-effort — no logging surface in this crate, the 4 s Dashboard poll
+recovers a failure).
+
+New commands (all thin): `reconcile_now` (reconcile + refreshed `EmulatorInfo[]`), `rename_emulator`,
+`edit_hardware` (records the row's hardware; a live `config.ini` rewrite / AVD recreate is a
+documented follow-up), `delete_emulator(id, wipe)`, `wipe_emulator_data` (refuses while running,
+else deletes the AVD's `userdata-qemu.img` / `cache.img` / `snapshots/` etc. so the next launch
+rebuilds them — the real `-wipe-data` mechanism), `emulator_detail(id) -> EmulatorDetail`, and
+`reveal_path` (`open -R` / `explorer /select,` / `xdg-open`, no new dep). 16 commands total.
+New `AndroidProvider` methods: `detail`, `rename`, `set_hardware`, `wipe_data`, `shutdown`.
+
+Frontend: `useReconcileNow` + a Dashboard "Refresh" button + a Vitest (23 web tests). The
+detail-panel hooks (`emulator_detail` / rename / edit / delete / wipe / `revealPath`) are held for
+task `0021` — shipping them here with no consumer trips `knip`; their backend commands and the
+`EmulatorDetail` type are already generated into `bindings.ts`.
+
+128 rust tests, 23 web tests, `just validate` green (the `bindings.ts` diff is the usual
+pre-commit regen the lefthook stages).
 
 ### 2026-09-06 — session 9 (continued) (Claude Code) — task 0019 done (reconcile + delete + kill-safety)
 

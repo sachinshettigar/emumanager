@@ -18,7 +18,10 @@ Plus a per-emulator log console — history tail of the launch log file + a live
 
 - Milestones: `MILESTONES.md` M3 bullets 3 (detail panel) + 5 (log console)
 - Spec: `docs/spec.md` §5.3 (detail view)
-- Depends on task `0020` (`emulator_detail`, `rename_emulator`, …)
+- Depends on task `0020` — the backend commands (`emulator_detail`, `rename_emulator`,
+  `edit_hardware`, `delete_emulator`, `wipe_emulator_data`, `reveal_path`) and the `EmulatorDetail`
+  type are **already done and in `bindings.ts`**; this task adds the thin `ipc.ts` hooks for them
+  (deferred out of `0020` so `knip` wouldn't flag them as unused) alongside the panel that calls them.
 - `crates/emu-android/src/provider.rs::launch` already streams emulator output onto the `JobHandle`;
   this task also **tees it to a file** so there's history to tail after a reload.
 

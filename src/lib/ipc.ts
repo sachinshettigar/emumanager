@@ -284,6 +284,27 @@ export function useStopEmulator() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// M3 — reconcile (task 0020). The detail-panel hooks (rename / edit / delete /
+// wipe / emulator_detail / revealPath) land in task 0021 with the panel that
+// consumes them; their backend commands already exist in `bindings.ts`.
+// ---------------------------------------------------------------------------
+
+async function reconcileNow(): Promise<EmulatorInfo[]> {
+  return unwrap(await commands.reconcileNow());
+}
+
+/** Mutation hook for the Dashboard's "Refresh" action — reconcile then refetch the list. */
+export function useReconcileNow() {
+  const queryClient = useQueryClient();
+  return useMutation<EmulatorInfo[], IpcCallError>({
+    mutationFn: reconcileNow,
+    onSuccess: (list) => {
+      queryClient.setQueryData(EMULATORS_QUERY_KEY, list);
+    },
+  });
+}
+
 /** Live state of the current emulator create/launch job, built up from `job://emulator` events. */
 export interface EmulatorJobState {
   running: boolean;

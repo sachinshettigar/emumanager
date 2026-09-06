@@ -205,6 +205,103 @@ impl AndroidProvider {
         Ok(out)
     }
 
+    /// The full stored record for `id`. `NotFound` if untracked.
+    ///
+    /// # Errors
+    /// [`CoreError::NotFound`] for an unknown id; [`CoreError`] from the registry.
+    pub async fn detail(&self, id: &EmulatorId) -> Result<EmulatorRow> {
+        self.registry
+            .get_row(id.as_str())
+            .await?
+            .ok_or_else(|| CoreError::NotFound {
+                what: "emulator",
+                name: id.to_string(),
+            })
+    }
+
+    /// Change an emulator's display name. `NotFound` if untracked.
+    ///
+    /// # Errors
+    /// [`CoreError::NotFound`] for an unknown id; [`CoreError`] from the registry.
+    pub async fn rename(&self, id: &EmulatorId, display_name: &str) -> Result<()> {
+        self.detail(id).await?; // existence check
+        self.registry.rename(id.as_str(), display_name).await
+    }
+
+    /// Update an emulator's stored hardware config. Takes effect the next time the AVD is
+    /// (re)created — this does **not** rewrite the live `config.ini` or recreate the AVD (that is a
+    /// later task); it records the user's intent so the detail panel and a future profile export
+    /// are correct. `NotFound` if untracked.
+    ///
+    /// # Errors
+    /// [`CoreError::NotFound`] for an unknown id; [`CoreError`] from the registry.
+    pub async fn set_hardware(
+        &self,
+        id: &EmulatorId,
+        hardware: &emu_core::model::emulator::Hardware,
+    ) -> Result<()> {
+        self.detail(id).await?;
+        self.registry.set_hardware(id.as_str(), hardware).await
+    }
+
+    /// Wipe an emulator's user data by deleting the AVD's writable images and snapshots, so the
+    /// next launch rebuilds them from the system image (the same effect as `emulator -wipe-data`).
+    /// Refuses while the emulator is running. A file that isn't there is not an error.
+    ///
+    /// # Errors
+    /// [`CoreError::NotFound`] for an unknown id; [`CoreError::Invalid`] if it's running;
+    /// [`CoreError`] from the filesystem port.
+    pub async fn wipe_data(&self, id: &EmulatorId, avd_dir: &Path) -> Result<()> {
+        // The writable state an `-wipe-data` launch would otherwise recreate. Names are the ones
+        // the emulator writes into an AVD dir; a missing one just means it was never booted.
+        const WIPE: &[&str] = &[
+            "userdata-qemu.img",
+            "userdata-qemu.img.qcow2",
+            "userdata.img",
+            "userdata.img.qcow2",
+            "cache.img",
+            "cache.img.qcow2",
+            "snapshots",
+        ];
+
+        let row = self.detail(id).await?;
+        let sdk_root = self.sdk_root().await?;
+        let adb = self.adb_path(&sdk_root);
+        if self.serial_for_avd(&adb, &row.avd_name).await?.is_some() {
+            return Err(CoreError::invalid(
+                "emulator",
+                format!(
+                    "'{}' is running — stop it before wiping data",
+                    row.display_name
+                ),
+            ));
+        }
+        for name in WIPE {
+            let path = avd_dir.join(name);
+            if self.fs.exists(&path).await? {
+                self.fs.remove(&path).await?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Kill and reap every emulator child process this provider still holds. Call on app shutdown
+    /// so quitting never orphans an emulator we launched. Best-effort and time-boxed per child.
+    pub async fn shutdown(&self) {
+        let children: Vec<ChildHandle> = {
+            let mut map = self.running.lock().expect("running map poisoned");
+            map.drain().map(|(_, child)| child).collect()
+        };
+        for child in children {
+            let mut guard = child.lock().await;
+            let _ = timeout(Duration::from_secs(5), async {
+                let _ = guard.kill().await;
+                let _ = guard.wait().await;
+            })
+            .await;
+        }
+    }
+
     fn avdmanager_path(&self, sdk_root: &Path) -> PathBuf {
         let sdkmanager = toolchain::binary_path(sdk_root, ComponentId::CmdlineTools, self.os);
         let bin = if matches!(self.os, HostOs::Windows) {

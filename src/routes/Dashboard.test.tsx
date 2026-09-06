@@ -16,6 +16,7 @@ vi.mock("../lib/bindings", () => ({
     listEmulators: vi.fn(),
     launchEmulator: vi.fn(),
     stopEmulator: vi.fn(),
+    reconcileNow: vi.fn(),
   },
   events: {
     jobBootstrap: { listen: vi.fn().mockResolvedValue(() => {}) },
@@ -25,6 +26,7 @@ vi.mock("../lib/bindings", () => ({
 
 const listEmulatorsMock = vi.mocked(commands.listEmulators);
 const stopEmulatorMock = vi.mocked(commands.stopEmulator);
+const reconcileNowMock = vi.mocked(commands.reconcileNow);
 
 const RUNNING: EmulatorInfo = {
   id: "01J0RUNNING",
@@ -57,6 +59,7 @@ describe("Dashboard", () => {
   beforeEach(() => {
     listEmulatorsMock.mockReset();
     stopEmulatorMock.mockReset();
+    reconcileNowMock.mockReset();
   });
 
   it("shows the empty state when there are no emulators", async () => {
@@ -91,6 +94,22 @@ describe("Dashboard", () => {
 
     await waitFor(() => {
       expect(stopEmulatorMock).toHaveBeenCalledWith("01J0RUNNING");
+    });
+  });
+
+  it("reconciles and repopulates the list when Refresh is clicked", async () => {
+    listEmulatorsMock.mockResolvedValue({ status: "ok", data: [] });
+    reconcileNowMock.mockResolvedValue({ status: "ok", data: [STOPPED] });
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByText(/No emulators yet/)).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("reconcile-button"));
+
+    await waitFor(() => {
+      expect(reconcileNowMock).toHaveBeenCalled();
+      expect(screen.getByTestId("emulator-01J0STOPPED")).toHaveTextContent("Android TV");
     });
   });
 

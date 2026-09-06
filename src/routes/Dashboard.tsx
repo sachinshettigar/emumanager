@@ -2,7 +2,13 @@ import { Link } from "react-router-dom";
 
 import { Placeholder, Screen } from "../components/Screen";
 import type { EmulatorInfo } from "../lib/bindings";
-import { useEmulators, useLaunchEmulator, usePing, useStopEmulator } from "../lib/ipc";
+import {
+  useEmulators,
+  useLaunchEmulator,
+  usePing,
+  useReconcileNow,
+  useStopEmulator,
+} from "../lib/ipc";
 
 /** Backend liveness line: proves the typed IPC seam is wired end to end. */
 function BackendStatus(): React.JSX.Element {
@@ -88,6 +94,7 @@ function EmulatorRow({ emulator }: { emulator: EmulatorInfo }): React.JSX.Elemen
 
 export function Dashboard(): React.JSX.Element {
   const { data: emulators, error, isPending } = useEmulators();
+  const reconcile = useReconcileNow();
 
   let body: React.JSX.Element;
   if (isPending) {
@@ -115,13 +122,26 @@ export function Dashboard(): React.JSX.Element {
     <Screen
       title="My emulators"
       actions={
-        <Link
-          to="/create"
-          data-testid="create-link"
-          className="rounded-md bg-primary px-3.5 py-2 text-[13px] font-medium text-white"
-        >
-          New emulator
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-testid="reconcile-button"
+            disabled={reconcile.isPending}
+            onClick={() => {
+              reconcile.mutate();
+            }}
+            className="rounded-md border border-border-default px-3 py-2 text-[13px] disabled:opacity-50"
+          >
+            {reconcile.isPending ? "Refreshing…" : "Refresh"}
+          </button>
+          <Link
+            to="/create"
+            data-testid="create-link"
+            className="rounded-md bg-primary px-3.5 py-2 text-[13px] font-medium text-white"
+          >
+            New emulator
+          </Link>
+        </div>
       }
     >
       <div className="flex flex-wrap items-center gap-3.5 rounded-card border border-border-default bg-surface px-3.5 py-3 text-[12.5px] text-muted">
