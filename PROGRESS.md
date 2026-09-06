@@ -8,11 +8,12 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Milestone:** M4 — Profiles: export / import / recreate. Scoped into `0022`–`0024`; `0022`
   (profile engine) **done** (in review). M3 stays `in_progress` on the same M6 `tauri-driver` E2E
   line as M0/M1/M2.
-- **Phase:** M4 engine landed (`0022`). `emu_core::profile::resolve(profile, &InstalledState,
-  image_installed, image_size_bytes) -> Plan` — pure, effect-free; `EmuProfile::from_emulator` /
-  `from_create_spec` for export; a `jsonschema` dev-dep test locks the serde model to
-  `v1.schema.json`. Next: `0023` (IPC — `inspect_profile` / `apply_profile` / `export_profile` +
-  the saved-profiles registry), then `0024` (Profiles screen + export actions).
+- **Phase:** M4 engine + IPC landed (`0022`, `0023`). `0023`: `src-tauri/src/commands/profile.rs` —
+  `inspect_profile` (parse + validate + `resolve` → a preview diff, with specific rejection
+  messages), `apply_profile` (ensure image → create as `Imported` → optional launch, streaming on
+  `job://emulator`), `export_profile`, and `save_/list_/get_saved_/delete_profile` over a
+  `migrations/0003` `profiles` table with a `json` column. 24 commands. Frontend hooks + the
+  Profiles screen are task `0024`.
 - **Phase:** M3 done end to end. `0018`: full schema + typed `Registry` API. `0019`: `reconcile()`,
   `delete()`, kill-safety, and the DoD property test (real `avdmanager list avd` fixture captured
   from a real SDK). `0020`: the `AndroidProvider` is now one shared `tauri::State`
@@ -116,12 +117,10 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0023` — Profile IPC: `inspect_profile(bytes)` (parse → `EmuProfile::validate`
-  → `profile::resolve` against real `InstalledState` + a `sys-img2-3.xml` size lookup → a preview
-  DTO, with specific rejection messages for non-JSON / non-android / unknown-version), `apply_profile`
-  (ensure image → `create` with `source: Imported` → optional launch), `export_profile(id)`, and a
-  saved-profiles registry (`migrations/0003_*.sql` adds a JSON column to `profiles`). Then `0024`
-  (Profiles screen). Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
+- **Next action:** task `0024` — the Profiles screen (drop zone → `inspect_profile` preview with
+  the requirement table + total download, Apply; saved-profiles list with apply/delete), an
+  "Export profile" action on the emulator detail panel, and "Save as profile" in the Create
+  wizard's review step. Adds the `ipc.ts` hooks for the `0023` commands. Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
   then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
@@ -139,12 +138,36 @@ Narrative companion to `.agent/state.json`. Update both together (see
       shared managed provider + lifecycle commands + exit reap; detail panel + log console. Stays
       `in_progress` on the same M6 `tauri-driver` E2E line as M0/M1/M2.
 - [~] M4 Profiles: export / import / recreate — **current milestone**, tasks `0022`–`0024`; `0022`
-      (profile engine — `resolve` + export + schema-sync test) **done**, `0023`–`0024` todo
+      (profile engine) and `0023` (IPC — inspect / apply / export + saved-profiles) **done**,
+      `0024` (Profiles screen) todo
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-06 — session 9 (continued) (Claude Code) — task 0023 done (profile IPC — inspect / apply / export)
+
+`src-tauri/src/commands/profile.rs` (new) wires task `0022`'s engine to the app:
+
+- `inspect_profile(bytes) -> ProfileInspection` — `parse_profile` (serde + `EmuProfile::validate`,
+  with **specific** rejection messages: not-JSON, no `schemaVersion`, unsupported version, wrong
+  `platform`, bad field) → `emu_core::profile::resolve` against `provider.installed_state()` +
+  `image_size_bytes(coord)` (fetches the six `sys-img2-3.xml` manifests). Returns the requirement
+  table + total download + `ready`. (`bad-abi.json` — a schema-enum violation — is not caught here;
+  the domain `Abi` is wider than the schema, so that stays the frontend's `ajv` job.)
+- `apply_profile(bytes, launch) -> String` — `ensure_image` → `provider.create` →
+  `provider.set_source(id, Imported { profile_id: <name>, origin_label })` → optional launch,
+  streaming on `job://emulator` with `jobId` `apply:<avd>`. Reuses `emulator::{job_handle,
+  emit_job, EmulatorJobKind}` (promoted to `pub(crate)`).
+- `export_profile(id) -> String` — `EmuProfile::from_emulator(...).to_json_pretty()`.
+- Saved profiles: `save_profile` / `list_profiles` / `get_saved_profile` / `delete_profile` over a
+  `migrations/0003_profiles.sql` `profiles` table with new `json` + `description` columns. New
+  `Registry` methods (`save_profile`/`list_profiles`/`get_profile`/`delete_profile`/`set_source`)
+  and `AndroidProvider` accessors (`registry()`, `installed_state()`, `set_source`).
+
+24 commands. Frontend hooks + the Profiles screen are task `0024` (shipping unused hooks trips
+`knip`). 3 new tests. `just validate` green (the `bindings.ts` diff is the usual pre-commit regen).
 
 ### 2026-09-06 — session 9 (continued) (Claude Code) — M3 closed out; M4 scoped; task 0022 done (profile engine)
 

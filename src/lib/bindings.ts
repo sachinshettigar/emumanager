@@ -81,6 +81,23 @@ export const commands = {
 	emulatorLogTail: (id: string, maxLines: number) => typedError<string[], IpcError>(__TAURI_INVOKE("emulator_log_tail", { id, maxLines })),
 	/**  Reveal a path in the OS file manager (Finder / Explorer / the default file browser). */
 	revealPath: (path: string) => typedError<null, IpcError>(__TAURI_INVOKE("reveal_path", { path })),
+	/**  Parse + validate + resolve a dropped `.emuprofile` into a preview. */
+	inspectProfile: (bytes: number[]) => typedError<ProfileInspection, IpcError>(__TAURI_INVOKE("inspect_profile", { bytes })),
+	/**
+	 *  Import a `.emuprofile`: ensure its image, create the AVD as `Imported`, optionally launch.
+	 *  Streams on `job://emulator` with `jobId` `apply:<avdName>`. Returns the new tracked id.
+	 */
+	applyProfile: (bytes: number[], launch: boolean) => typedError<string, IpcError>(__TAURI_INVOKE("apply_profile", { bytes, launch })),
+	/**  The tracked emulator `id` as a pretty-printed `.emuprofile` JSON string. */
+	exportProfile: (id: string) => typedError<string, IpcError>(__TAURI_INVOKE("export_profile", { id })),
+	/**  Validate and save a `.emuprofile` to the local list (keyed by its `name`). */
+	saveProfile: (bytes: number[]) => typedError<null, IpcError>(__TAURI_INVOKE("save_profile", { bytes })),
+	/**  Every saved profile, newest first. */
+	listProfiles: () => typedError<ProfileSummary[], IpcError>(__TAURI_INVOKE("list_profiles")),
+	/**  The JSON body of a saved profile — for "Apply" of a saved entry (feed it back to `apply_profile`). */
+	getSavedProfile: (name: string) => typedError<string, IpcError>(__TAURI_INVOKE("get_saved_profile", { name })),
+	/**  Delete a saved profile. */
+	deleteProfile: (name: string) => typedError<null, IpcError>(__TAURI_INVOKE("delete_profile", { name })),
 };
 
 /** Events */
@@ -280,6 +297,37 @@ export type Pong = {
 	message: string,
 	/**  The running backend's crate version (`CARGO_PKG_VERSION`). */
 	version: string,
+};
+
+/**  The preview shown before "Apply". */
+export type ProfileInspection = {
+	name: string,
+	description: string,
+	deviceLabel: string,
+	imageLabel: string,
+	/**  `sdkmanager` package path of the system image the recipe needs. */
+	imageCoord: string,
+	requirements: ProfileRequirement[],
+	totalDownloadBytes: number,
+	/**  `true` when nothing needs downloading — Apply is a straight create. */
+	ready: boolean,
+};
+
+/**  One line of the import requirement table. */
+export type ProfileRequirement = {
+	label: string,
+	/**  `true` when already installed locally. */
+	present: boolean,
+	/**  Bytes to download when not present (0 when present or unknown), saturating `u32`. */
+	downloadBytes: number,
+};
+
+/**  One saved recipe in the list. */
+export type ProfileSummary = {
+	name: string,
+	description: string,
+	/**  RFC 3339. */
+	createdAt: string,
 };
 
 /* Tauri Specta runtime */

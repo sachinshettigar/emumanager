@@ -4,7 +4,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::SqlitePool;
 use time::OffsetDateTime;
 
-use crate::model::emulator::{Hardware, RunState};
+use crate::model::emulator::{EmulatorSource, Hardware, RunState};
 use crate::registry::row::{format_ts, run_state_str, EmulatorRow, HostSnapshotRow};
 use crate::{CoreError, Result};
 
@@ -180,6 +180,25 @@ impl Registry {
         Ok(())
     }
 
+    /// Replace an emulator's provenance (used when applying a profile → `Imported`). Bumps
+    /// `updated_at`.
+    ///
+    /// # Errors
+    /// [`CoreError::Db`] on SQL failure.
+    pub async fn set_source(&self, id: &str, source: &EmulatorSource) -> Result<()> {
+        let json = serde_json::to_string(source).map_err(|e| CoreError::Db {
+            detail: format!("serializing source: {e}"),
+        })?;
+        sqlx::query("UPDATE emulators SET source_json = ?2, updated_at = ?3 WHERE id = ?1")
+            .bind(id)
+            .bind(json)
+            .bind(format_ts(OffsetDateTime::now_utc()))
+            .execute(&self.pool)
+            .await
+            .map_err(|e| db_err(&e))?;
+        Ok(())
+    }
+
     /// Replace the stored hardware config and bump `updated_at`.
     ///
     /// # Errors
@@ -205,6 +224,66 @@ impl Registry {
     pub async fn delete_row(&self, id: &str) -> Result<bool> {
         let result = sqlx::query("DELETE FROM emulators WHERE id = ?1")
             .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| db_err(&e))?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    // ---- saved profiles -------------------------------------------------------------------
+
+    /// Insert or replace a saved `.emuprofile` recipe by name.
+    ///
+    /// # Errors
+    /// [`CoreError::Db`] on SQL failure.
+    pub async fn save_profile(&self, name: &str, description: &str, json: &str) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO profiles (name, description, json) VALUES (?1, ?2, ?3)
+             ON CONFLICT(name) DO UPDATE SET description = excluded.description, json = excluded.json",
+        )
+        .bind(name)
+        .bind(description)
+        .bind(json)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| db_err(&e))?;
+        Ok(())
+    }
+
+    /// Every saved profile as `(name, description, created_at)`, newest first.
+    ///
+    /// # Errors
+    /// [`CoreError::Db`] on SQL failure.
+    pub async fn list_profiles(&self) -> Result<Vec<(String, String, String)>> {
+        let rows = sqlx::query_as::<_, (String, String, String)>(
+            "SELECT name, description, created_at FROM profiles ORDER BY created_at DESC, name",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| db_err(&e))?;
+        Ok(rows)
+    }
+
+    /// A saved profile's JSON body by name, or `None`.
+    ///
+    /// # Errors
+    /// [`CoreError::Db`] on SQL failure.
+    pub async fn get_profile(&self, name: &str) -> Result<Option<String>> {
+        let row = sqlx::query_as::<_, (String,)>("SELECT json FROM profiles WHERE name = ?1")
+            .bind(name)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| db_err(&e))?;
+        Ok(row.map(|r| r.0))
+    }
+
+    /// Delete a saved profile. `true` if a row was removed.
+    ///
+    /// # Errors
+    /// [`CoreError::Db`] on SQL failure.
+    pub async fn delete_profile(&self, name: &str) -> Result<bool> {
+        let result = sqlx::query("DELETE FROM profiles WHERE name = ?1")
+            .bind(name)
             .execute(&self.pool)
             .await
             .map_err(|e| db_err(&e))?;
@@ -423,5 +502,60 @@ mod tests {
         let back = registry.latest_host_snapshot().await.unwrap().unwrap();
         assert_eq!(back.id, snap.id);
         assert_eq!(back.report_json, snap.report_json);
+    }
+
+    #[tokio::test]
+    async fn saved_profiles_crud_and_set_source() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let registry = Registry::open(dir.path()).await.expect("open");
+
+        assert!(registry.list_profiles().await.unwrap().is_empty());
+        registry
+            .save_profile(
+                "QA baseline",
+                "checkout regressions",
+                r#"{"schemaVersion":"1.0"}"#,
+            )
+            .await
+            .expect("save");
+        registry
+            .save_profile(
+                "QA baseline",
+                "updated",
+                r#"{"schemaVersion":"1.0","name":"x"}"#,
+            )
+            .await
+            .expect("upsert");
+
+        let list = registry.list_profiles().await.unwrap();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].0, "QA baseline");
+        assert_eq!(list[0].1, "updated");
+        assert!(registry
+            .get_profile("QA baseline")
+            .await
+            .unwrap()
+            .unwrap()
+            .contains("\"name\":\"x\""));
+        assert!(registry.delete_profile("QA baseline").await.unwrap());
+        assert!(!registry.delete_profile("QA baseline").await.unwrap());
+
+        // set_source
+        registry
+            .upsert_emulator(&sample_row("id-1", "avd_one"))
+            .await
+            .expect("insert emulator");
+        registry
+            .set_source(
+                "id-1",
+                &EmulatorSource::Imported {
+                    profile_id: "QA baseline".into(),
+                    origin_label: "imported .emuprofile".into(),
+                },
+            )
+            .await
+            .expect("set_source");
+        let row = registry.get_row("id-1").await.unwrap().unwrap();
+        assert!(matches!(row.source, EmulatorSource::Imported { .. }));
     }
 }

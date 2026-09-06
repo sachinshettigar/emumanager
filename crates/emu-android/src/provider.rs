@@ -139,13 +139,29 @@ impl AndroidProvider {
     /// [`CoreError`] from the filesystem scan.
     pub async fn sdk_root(&self) -> Result<PathBuf> {
         let app_sdk_dir = self.data_dir.join("sdk");
-        let state = toolchain::scan(self.fs.as_ref(), &app_sdk_dir, self.os, |k| {
-            std::env::var(k).ok()
-        })
-        .await?;
-        Ok(state
+        Ok(self
+            .installed_state()
+            .await?
             .location_of(ComponentId::CmdlineTools)
             .map_or(app_sdk_dir, |l| l.sdk_root.clone()))
+    }
+
+    /// Scan what SDK components are installed (app-managed dir + any system SDK). Feeds
+    /// `emu_core::profile::resolve` (task `0023`'s `inspect_profile`).
+    ///
+    /// # Errors
+    /// [`CoreError`] from the filesystem scan.
+    pub async fn installed_state(&self) -> Result<emu_core::toolchain::InstalledState> {
+        toolchain::scan(self.fs.as_ref(), &self.data_dir.join("sdk"), self.os, |k| {
+            std::env::var(k).ok()
+        })
+        .await
+    }
+
+    /// The registry handle — for the profile commands that read/write saved recipes.
+    #[must_use]
+    pub fn registry(&self) -> &Registry {
+        &self.registry
     }
 
     /// `true` when `coord`'s system image is installed under the resolved SDK root — the same
@@ -226,6 +242,15 @@ impl AndroidProvider {
     pub async fn rename(&self, id: &EmulatorId, display_name: &str) -> Result<()> {
         self.detail(id).await?; // existence check
         self.registry.rename(id.as_str(), display_name).await
+    }
+
+    /// Replace an emulator's provenance (profile apply → `Imported`). `NotFound` if untracked.
+    ///
+    /// # Errors
+    /// [`CoreError::NotFound`] for an unknown id; [`CoreError`] from the registry.
+    pub async fn set_source(&self, id: &EmulatorId, source: &EmulatorSource) -> Result<()> {
+        self.detail(id).await?;
+        self.registry.set_source(id.as_str(), source).await
     }
 
     /// Update an emulator's stored hardware config. Takes effect the next time the AVD is

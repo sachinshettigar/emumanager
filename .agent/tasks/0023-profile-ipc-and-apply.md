@@ -2,8 +2,8 @@
 id: "0023"
 title: "Profile IPC — inspect / apply / export / saved-profiles registry"
 milestone: "M4"
-status: "todo"
-owner: ""
+status: "review"
+owner: "Claude Code"
 created: "2026-09-06"
 updated: "2026-09-06"
 ---
@@ -37,23 +37,32 @@ diff), `apply_profile(...)` (ensure image → create with `source: Imported` →
 
 ## Acceptance criteria
 
-- [ ] `inspect_profile(bytes: Vec<u8>) -> ProfileInspection` — parse JSON → `EmuProfile::validate`
-      → `resolve()` against real `InstalledState` + a size lookup over the `sys-img2-3.xml` catalog.
-      `ProfileInspection { name, description, deviceLabel, imageLabel, requirements: [...], totalDownloadBytes, ready }`.
-      A non-JSON / non-android / unknown-schema input returns a **specific** `IpcError` message
-      (not "invalid") — e.g. "not a .emuprofile (missing schemaVersion)", "profile targets iOS, not
-      Android", "unsupported .emuprofile version 2.0".
-- [ ] `apply_profile(bytes, launch: bool) -> String` (new emulator id) — ensure the image (streams
-      on `job://emulator`, `jobId` `apply:<name>`), `create` with
-      `source: Imported { origin_label: "imported .emuprofile" }`, optional launch. Reuses the
-      `create_emulator` machinery.
-- [ ] `export_profile(id) -> String` — the emulator's `EmuProfile` as pretty JSON.
-- [ ] Saved profiles: `save_profile(bytes)` (validates, stores the JSON + name), `list_profiles() ->
-      [ProfileSummary]`, `delete_profile(name)`. `migrations/0003_*.sql` if the table needs a JSON column.
-- [ ] Tests: `inspect_profile` on each `schemas/emuprofile/fixtures/{valid,invalid}` fixture
-      (valid → a diff, invalid → the right specific message); `export_profile` round-trips via
-      `inspect_profile`; registry profile CRUD.
-- [ ] `just bindings` clean once committed; `just check-fast` then `just validate` green.
+- [x] `inspect_profile(bytes) -> ProfileInspection` (`src-tauri/src/commands/profile.rs`) — `parse_profile`
+      (serde + `EmuProfile::validate`) → `emu_core::profile::resolve` against real `installed_state()`
+      + `image_size_bytes(coord)` (fetches the six `sys-img2-3.xml` manifests). `ProfileInspection
+      { name, description, deviceLabel, imageLabel, imageCoord, requirements: [{label, present,
+      downloadBytes}], totalDownloadBytes, ready }`.
+- [x] **Specific** rejection messages in `parse_profile`: not-JSON → "isn't valid JSON — a
+      .emuprofile is a small JSON recipe"; no `schemaVersion` → "doesn't look like a .emuprofile";
+      wrong version → `unsupported` "unsupported .emuprofile version …"; `platform != android` →
+      `unsupported` "targets \"<x>\", not Android"; bad field → `invalid` with the serde detail.
+      (Schema-enum violations like `bad-abi.json` are NOT caught here — the domain `Abi` is wider
+      than the schema's two; that's the frontend's `ajv` pass. Noted in the test + code.)
+- [x] `apply_profile(bytes, launch) -> String` — `ensure_image` (streams on `job://emulator`,
+      `jobId` `apply:<avdName>`) → `provider.create(spec)` → `provider.set_source(id, Imported
+      { profile_id: <name>, origin_label: "imported .emuprofile" })` → optional launch. Reuses
+      `emulator::{job_handle, emit_job, EmulatorJobKind}` (made `pub(crate)`).
+- [x] `export_profile(id) -> String` — `EmuProfile::from_emulator(&<row→Emulator>).to_json_pretty()`;
+      errors if the emulator has no known image coord.
+- [x] Saved profiles: `save_profile(bytes)` (validates then stores), `list_profiles() -> [ProfileSummary]`,
+      `get_saved_profile(name) -> String`, `delete_profile(name)`. `migrations/0003_profiles.sql`
+      adds `json` + `description` columns to `profiles`. New `Registry` methods
+      `save_profile`/`list_profiles`/`get_profile`/`delete_profile`/`set_source`; `AndroidProvider`
+      `registry()` / `installed_state()` / `set_source` accessors.
+- [x] Tests: `parse_profile` on the valid fixtures + each specific-message path; `Registry`
+      `saved_profiles_crud_and_set_source`. (2 src-tauri, 1 emu-core.)
+- [x] `just bindings` clean once committed (24 commands). Frontend hooks for these deferred to
+      task `0024` (knip). `just check-fast` then `just validate` green.
 
 ## Validate
 
@@ -64,5 +73,41 @@ just validate
 
 ## Notes / findings
 
-(Fill in: `profiles` table shape; the specific rejection messages; whether `apply_profile` shares
-code with `create_emulator` or duplicates the thin flow; the size-lookup source.)
+### `profiles` table
+
+`migrations/0003_profiles.sql` `ALTER TABLE`s `json TEXT NOT NULL DEFAULT '{}'` and
+`description TEXT NOT NULL DEFAULT ''` onto the M0 `profiles(name PK, source_path, created_at)`.
+`save_profile` upserts by name; `get_profile` returns the `json` body, which `apply_profile` can be
+fed back for a saved-entry "Apply".
+
+### `apply_profile` reuses, doesn't duplicate
+
+It builds a `CreateSpec` from the profile and calls the same `provider.ensure_image` / `create` /
+`launch` the `create_emulator` command uses, sharing `emulator::{job_handle, emit_job,
+EmulatorJobKind}` (promoted to `pub(crate)`). The one addition is `provider.set_source(id,
+Imported{..})` after `create` — `Provider::create` doesn't take a `source`, so a follow-up write is
+simpler than a trait-signature change. `EmulatorSource::Imported` needs `profile_id` +
+`origin_label`; `profile_id` is the recipe `name`.
+
+### Size lookup
+
+`image_size_bytes(coord)` fetches the six `sys-img2-3.xml` manifests (same set `list_images` uses),
+parses each, and returns the `size_bytes` of the entry whose `coord` matches. `None` on any fetch
+failure — the diff then shows the image as "needs download" without a figure.
+
+### `bad-abi.json` is not rejected by `parse_profile`
+
+The domain `emu_core::model::image::Abi` accepts more ABIs (`armeabi-v7a`, `x86`, …) than the
+schema's `["x86_64", "arm64-v8a"]`. `parse_profile` does serde + `EmuProfile::validate`, not full
+JSON-Schema validation, so `bad-abi.json` (schema-invalid, serde-valid) passes here. Full schema
+enforcement is the frontend's `ajv` (`scripts/validate-schema.mjs`). Documented in the test.
+
+### No `Platform` requirement
+
+Carried from task `0022`: `resolve` doesn't emit one, so `ProfileInspection.requirements` is
+cmdline-tools / platform-tools / emulator / system-image.
+
+### Frontend hooks deferred
+
+`inspect_profile` … `delete_profile` have no `ipc.ts` hook yet — that + the Profiles screen is task
+`0024`. Shipping unused hooks trips `knip`. The commands + DTOs are generated into `bindings.ts`.

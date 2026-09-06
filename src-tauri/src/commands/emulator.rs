@@ -305,7 +305,7 @@ pub struct EmulatorJob {
     pub payload: EmulatorJobKind,
 }
 
-fn emit_job(app: &AppHandle, job_id: &str, payload: EmulatorJobKind) {
+pub(crate) fn emit_job(app: &AppHandle, job_id: &str, payload: EmulatorJobKind) {
     let _ = EmulatorJob {
         job_id: job_id.to_string(),
         payload,
@@ -313,7 +313,7 @@ fn emit_job(app: &AppHandle, job_id: &str, payload: EmulatorJobKind) {
     .emit(app);
 }
 
-fn job_handle(app: &AppHandle, job_id: &str) -> JobHandle {
+pub(crate) fn job_handle(app: &AppHandle, job_id: &str) -> JobHandle {
     let sink_app = app.clone();
     let sink_job_id = job_id.to_string();
     JobHandle::new(

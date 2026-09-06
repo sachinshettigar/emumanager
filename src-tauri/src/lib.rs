@@ -48,6 +48,13 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::emulator::emulator_detail,
             commands::emulator::emulator_log_tail,
             commands::emulator::reveal_path,
+            commands::profile::inspect_profile,
+            commands::profile::apply_profile,
+            commands::profile::export_profile,
+            commands::profile::save_profile,
+            commands::profile::list_profiles,
+            commands::profile::get_saved_profile,
+            commands::profile::delete_profile,
         ])
         .events(collect_events![
             commands::toolchain::BootstrapProgress,
