@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod avd_list;
 pub mod catalog;
 pub mod devices;
 pub mod provider;

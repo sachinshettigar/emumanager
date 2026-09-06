@@ -11,7 +11,7 @@
 //! `crates/emu-core/src/toolchain/bootstrap.rs` made for `platform-tools`/`emulator`. No
 //! `Downloader`/zip-extraction code lives here at all.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
@@ -19,6 +19,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::time::{sleep, timeout, Instant};
+
+use crate::avd_list::{parse_avdmanager_list_avd, AvdEntry};
 
 use emu_core::error::{CoreError, Result};
 use emu_core::model::component::{ComponentId, HostOs};
@@ -561,17 +563,222 @@ impl Provider for AndroidProvider {
         Ok(())
     }
 
-    async fn delete(&self, _id: EmulatorId, _wipe: bool) -> Result<()> {
-        Err(CoreError::NotImplemented(
-            "AndroidProvider::delete (M3 — full registry reconciliation)",
-        ))
+    /// Delete a tracked emulator. `wipe` also removes the AVD from disk
+    /// (`avdmanager delete avd -n <name>` — which removes the whole `.avd` dir, userdata included);
+    /// `wipe = false` just untracks it (the registry row goes, the AVD stays and `reconcile()`
+    /// would re-adopt it as `discovered`). Refuses while the emulator is running.
+    async fn delete(&self, id: EmulatorId, wipe: bool) -> Result<()> {
+        let row = self
+            .registry
+            .get_row(id.as_str())
+            .await?
+            .ok_or_else(|| CoreError::NotFound {
+                what: "emulator",
+                name: id.to_string(),
+            })?;
+
+        let sdk_root = self.sdk_root().await?;
+        let adb = self.adb_path(&sdk_root);
+        if self.serial_for_avd(&adb, &row.avd_name).await?.is_some() {
+            return Err(CoreError::invalid(
+                "emulator",
+                format!(
+                    "'{}' is running — stop it before deleting",
+                    row.display_name
+                ),
+            ));
+        }
+
+        if wipe {
+            let avdmanager = self.avdmanager_path(&sdk_root);
+            let cmd = Command::new(avdmanager.display().to_string())
+                .args(["delete", "avd"])
+                .args(["-n", &row.avd_name]);
+            let out = self.process.run(cmd).await?;
+            // "There is no Android Virtual Device named '<name>'." — already gone out-of-band; the
+            // end state (no AVD) is what we wanted, so treat it as success.
+            if !out.success() && !out.stderr.contains("no Android Virtual Device named") {
+                return Err(CoreError::Process {
+                    program: "avdmanager delete avd".to_string(),
+                    code: out.status,
+                    stderr: out.stderr,
+                });
+            }
+        }
+
+        self.registry.delete_row(id.as_str()).await?;
+        Ok(())
     }
 
+    /// Make the registry match on-disk / running reality and return the refreshed live state of
+    /// every tracked emulator.
+    ///
+    /// - **Adopt**: a loadable AVD from `avdmanager list avd` with no registry row is inserted as
+    ///   [`EmulatorSource::Manual`]`{ discovered: true }`, enriched from its `config.ini`.
+    /// - **Flag, don't drop**: a registry row whose AVD is missing from `avdmanager list avd`, or
+    ///   present but un-loadable (missing system image), is set to [`RunState::Error`]. Hard
+    ///   deletion stays explicit — that is [`Provider::delete`].
+    /// - **Refresh**: every surviving row's `last_state` / `adb_serial` / `grpc_port` / `pid` are
+    ///   re-derived from `adb`.
+    /// - **Kill-safety**: a row left `Booting`/`Running` with a `pid` from a previous app run whose
+    ///   emulator is no longer in `adb devices` is reset to `Stopped` and its `pid` cleared. (A
+    ///   [`ProcessRunner`] can't test an arbitrary pid for liveness, so "not in `adb devices`" is
+    ///   the liveness signal — which is also the ground truth the UI cares about.)
     async fn reconcile(&self) -> Result<Vec<LiveState>> {
-        Err(CoreError::NotImplemented(
-            "AndroidProvider::reconcile (M3 — full registry reconciliation)",
-        ))
+        let sdk_root = self.sdk_root().await?;
+        let avdmanager = self.avdmanager_path(&sdk_root);
+        let adb = self.adb_path(&sdk_root);
+
+        // Ground truth #1: on-disk AVDs.
+        let list_out = self
+            .process
+            .run(Command::new(avdmanager.display().to_string()).args(["list", "avd"]))
+            .await?;
+        let avds = parse_avdmanager_list_avd(&list_out.stdout);
+        let on_disk: HashMap<&str, &AvdEntry> = avds.iter().map(|a| (a.name.as_str(), a)).collect();
+
+        // Ground truth #2: which AVDs are live, and on which serial.
+        let mut serial_by_avd: HashMap<String, String> = HashMap::new();
+        for serial in self.emulator_serials(&adb).await.unwrap_or_default() {
+            let cmd = Command::new(adb.display().to_string())
+                .args(["-s", &serial])
+                .args(["emu", "avd", "name"]);
+            if let Ok(out) = self.process.run(cmd).await {
+                if let Some(name) = out.stdout.lines().next() {
+                    serial_by_avd.insert(name.trim().to_string(), serial);
+                }
+            }
+        }
+
+        // Adopt on-disk AVDs the registry doesn't know yet.
+        let known: HashSet<String> = self
+            .registry
+            .list_rows()
+            .await?
+            .into_iter()
+            .map(|r| r.avd_name)
+            .collect();
+        for avd in avds
+            .iter()
+            .filter(|a| a.loadable && !known.contains(&a.name))
+        {
+            let row = self.adopt_row(avd).await;
+            self.registry.upsert_emulator(&row).await?;
+        }
+
+        // Refresh every row (adopted ones included) against ground truth.
+        let mut live = Vec::new();
+        for row in self.registry.list_rows().await? {
+            let entry = on_disk.get(row.avd_name.as_str());
+            let (state, serial) = match entry {
+                None => (RunState::Error, None), // AVD deleted out-of-band.
+                Some(e) if !e.loadable => (RunState::Error, None), // present but broken.
+                Some(_) => match serial_by_avd.get(&row.avd_name) {
+                    Some(serial) if self.boot_completed(&adb, serial).await => {
+                        (RunState::Running, Some(serial.clone()))
+                    }
+                    Some(serial) => (RunState::Booting, Some(serial.clone())),
+                    None => (RunState::Stopped, None), // not live — kill-safety resets a stale pid.
+                },
+            };
+
+            let running = matches!(state, RunState::Running | RunState::Booting);
+            let pid = if running { row.pid } else { None };
+            let grpc_port = if running { row.grpc_port } else { None };
+            let launched_at = if running { row.launched_at } else { None };
+
+            let changed = row.last_state != state
+                || row.adb_serial != serial
+                || (!running && (row.pid.is_some() || row.grpc_port.is_some()));
+            if changed {
+                self.registry
+                    .set_run_fields(
+                        row.id.as_str(),
+                        state,
+                        serial.as_deref(),
+                        grpc_port,
+                        pid,
+                        launched_at,
+                    )
+                    .await?;
+            }
+
+            live.push(LiveState {
+                id: row.id.clone(),
+                state,
+                adb_serial: serial,
+                grpc_port,
+                pid,
+                uptime_secs: None,
+            });
+        }
+        Ok(live)
     }
+}
+
+impl AndroidProvider {
+    /// Build a registry row for an on-disk AVD `reconcile()` just discovered. Best-effort enrichment
+    /// from the AVD's `config.ini` (`image.sysdir.1` → [`ImageCoord`], `hw.device.name` → device
+    /// profile, `avd.ini.displayname` → display name, `hw.ramSize` → RAM); anything unreadable just
+    /// falls back to a sane default, the row is still adopted.
+    async fn adopt_row(&self, avd: &AvdEntry) -> EmulatorRow {
+        let now = OffsetDateTime::now_utc();
+        let mut row = EmulatorRow {
+            id: EmulatorId::generate(),
+            avd_name: avd.name.clone(),
+            display_name: avd.name.clone(),
+            device_profile_id: String::new(),
+            image_coord: None,
+            hardware: emu_core::model::emulator::Hardware::default(),
+            source: EmulatorSource::Manual { discovered: true },
+            tags: Vec::new(),
+            notes: String::new(),
+            last_state: RunState::Stopped,
+            adb_serial: None,
+            grpc_port: None,
+            pid: None,
+            created_at: now,
+            updated_at: now,
+            launched_at: None,
+        };
+
+        if let Some(dir) = &avd.path {
+            if let Ok(bytes) = self.fs.read(&dir.join("config.ini")).await {
+                if let Ok(text) = std::str::from_utf8(&bytes) {
+                    let kv = parse_ini(text);
+                    if let Some(v) = kv.get("avd.ini.displayname") {
+                        row.display_name = (*v).to_string();
+                    }
+                    if let Some(v) = kv.get("hw.device.name") {
+                        row.device_profile_id = (*v).to_string();
+                    }
+                    if let Some(v) = kv.get("image.sysdir.1") {
+                        // `system-images/android-24/default/x86_64/` → `system-images;android-24;default;x86_64`
+                        row.image_coord = v.trim_end_matches('/').replace('/', ";").parse().ok();
+                    }
+                    if let Some(mb) = kv.get("hw.ramSize").and_then(|v| v.trim().parse().ok()) {
+                        row.hardware.ram_mb = mb;
+                    }
+                }
+            }
+        }
+        row
+    }
+}
+
+/// Parse an AVD `config.ini` / `.ini` file into its `key=value` pairs. Blank lines, `#` comments
+/// and `[section]` headers are skipped; keys and values are trimmed.
+fn parse_ini(text: &str) -> HashMap<&str, &str> {
+    text.lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') || line.starts_with('[') {
+                return None;
+            }
+            let (k, v) = line.split_once('=')?;
+            Some((k.trim(), v.trim()))
+        })
+        .collect()
 }
 
 impl AndroidProvider {
@@ -1104,5 +1311,341 @@ mod tests {
 
         let err = provider.stop(EmulatorId::generate()).await.unwrap_err();
         assert_eq!(err.code(), "not_found");
+    }
+
+    // ---- reconcile / delete (task 0019) --------------------------------------------------
+
+    /// Seed a full registry row with a chosen name / last-state / pid.
+    async fn seed_row(
+        provider: &AndroidProvider,
+        name: &str,
+        state: RunState,
+        pid: Option<u32>,
+    ) -> EmulatorId {
+        let id = EmulatorId::generate();
+        let now = OffsetDateTime::now_utc();
+        let row = EmulatorRow {
+            id: id.clone(),
+            avd_name: name.to_string(),
+            display_name: name.to_string(),
+            device_profile_id: "pixel_6".into(),
+            image_coord: Some(coord()),
+            hardware: emu_core::model::emulator::Hardware::default(),
+            source: EmulatorSource::Manual { discovered: false },
+            tags: Vec::new(),
+            notes: String::new(),
+            last_state: state,
+            adb_serial: pid.map(|_| "emulator-5554".to_string()),
+            grpc_port: None,
+            pid,
+            created_at: now,
+            updated_at: now,
+            launched_at: None,
+        };
+        provider
+            .registry
+            .upsert_emulator(&row)
+            .await
+            .expect("seed row");
+        id
+    }
+
+    /// Synthesize `avdmanager list avd` output for the given loadable + broken AVD names.
+    fn list_avd(loadable: &[&str], broken: &[&str]) -> String {
+        use std::fmt::Write as _;
+        let mut s = String::from("Available Android Virtual Devices:\n");
+        for (i, name) in loadable.iter().enumerate() {
+            if i > 0 {
+                s.push_str("---------\n");
+            }
+            let _ = write!(
+                s,
+                "    Name: {name}\n  Device: pixel_6 (Google)\n    Path: /data/avd/{name}.avd\n  \
+                 Target:\n          Based on: Android 7.0 (\"Nougat\") Tag/ABI: default/x86_64\n  \
+                 Sdcard: 512 MB\n"
+            );
+        }
+        if !broken.is_empty() {
+            s.push_str("\nThe following Android Virtual Devices could not be loaded:\n");
+            for name in broken {
+                let _ = write!(
+                    s,
+                    "    Name: {name}\n    Path: /data/avd/{name}.avd\n   Error: Missing system \
+                     image android-99/default/x86_64.\n"
+                );
+            }
+        }
+        s
+    }
+
+    /// Synthesize `adb devices` output; serial `emulator-(5554 + 2i)` for `running[i]`.
+    fn devices(running: &[&str]) -> String {
+        use std::fmt::Write as _;
+        let mut s = String::from("List of devices attached\n");
+        for i in 0..running.len() {
+            let _ = writeln!(s, "emulator-{}\tdevice", 5554 + i * 2);
+        }
+        s
+    }
+
+    #[tokio::test]
+    async fn reconcile_adopts_unknown_avds_and_flags_missing_or_broken_ones() {
+        let fs = InMemoryFs::new();
+        // config.ini for the AVD we expect to adopt, so enrichment is exercised too.
+        fs.write_atomic(
+            Path::new("/data/avd/adopt_me.avd/config.ini"),
+            b"avd.ini.displayname=Adopted Pixel\nhw.device.name=pixel_6\n\
+              image.sysdir.1=system-images/android-30/google_apis/x86_64/\nhw.ramSize=3072\n",
+        )
+        .await
+        .unwrap();
+        let process = FakeProcessRunner::new()
+            .on_run(
+                "list avd",
+                ok(list_avd(&["known_ok", "adopt_me"], &["known_broken"])),
+            )
+            .on_run("adb devices", ok("List of devices attached\n"));
+        let (provider, _dir) = provider_with(process, fs).await;
+
+        let ok_id = seed_row(&provider, "known_ok", RunState::Stopped, None).await;
+        let gone_id = seed_row(&provider, "known_gone", RunState::Running, Some(123)).await;
+        let broken_id = seed_row(&provider, "known_broken", RunState::Stopped, None).await;
+
+        let live = provider.reconcile().await.expect("reconcile");
+
+        let state_of = |id: &EmulatorId| live.iter().find(|l| &l.id == id).unwrap().state;
+        assert_eq!(state_of(&ok_id), RunState::Stopped);
+        assert_eq!(
+            state_of(&gone_id),
+            RunState::Error,
+            "AVD vanished from disk"
+        );
+        assert_eq!(
+            state_of(&broken_id),
+            RunState::Error,
+            "present but un-loadable"
+        );
+
+        // The unknown loadable AVD was adopted, enriched from its config.ini.
+        let rows = provider.registry.list_rows().await.unwrap();
+        let adopted = rows
+            .iter()
+            .find(|r| r.avd_name == "adopt_me")
+            .expect("adopted");
+        assert_eq!(adopted.display_name, "Adopted Pixel");
+        assert_eq!(adopted.device_profile_id, "pixel_6");
+        assert_eq!(adopted.hardware.ram_mb, 3072);
+        assert_eq!(
+            adopted.image_coord.map(|c| c.to_string()).as_deref(),
+            Some("system-images;android-30;google_apis;x86_64")
+        );
+        assert!(matches!(
+            adopted.source,
+            EmulatorSource::Manual { discovered: true }
+        ));
+        // The broken AVD is NOT adopted as a new row.
+        assert_eq!(
+            rows.iter().filter(|r| r.avd_name == "known_broken").count(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn reconcile_kill_safety_resets_a_stale_running_row() {
+        let fs = InMemoryFs::new();
+        // Row thinks it's Running with a pid from a previous app run; adb shows it is NOT up.
+        let process = FakeProcessRunner::new()
+            .on_run("list avd", ok(list_avd(&["crashed", "other"], &[])))
+            .on_run("adb devices", ok(devices(&["other"])))
+            .on_run("emu avd name", ok("other\nOK\n"))
+            .on_run("getprop sys.boot_completed", ok("1\n"));
+        let (provider, _dir) = provider_with(process, fs).await;
+
+        let crashed = seed_row(&provider, "crashed", RunState::Running, Some(4242)).await;
+        let other = seed_row(&provider, "other", RunState::Stopped, None).await;
+
+        provider.reconcile().await.expect("reconcile");
+
+        let crashed_row = provider
+            .registry
+            .get_row(crashed.as_str())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(crashed_row.last_state, RunState::Stopped);
+        assert_eq!(crashed_row.pid, None, "stale pid cleared");
+        assert_eq!(crashed_row.adb_serial, None);
+
+        let other_row = provider
+            .registry
+            .get_row(other.as_str())
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(other_row.last_state, RunState::Running);
+        assert_eq!(other_row.adb_serial.as_deref(), Some("emulator-5554"));
+    }
+
+    #[tokio::test]
+    async fn reconcile_reports_booting_when_not_yet_boot_completed() {
+        let fs = InMemoryFs::new();
+        let process = FakeProcessRunner::new()
+            .on_run("list avd", ok(list_avd(&["warming"], &[])))
+            .on_run("adb devices", ok(devices(&["warming"])))
+            .on_run("emu avd name", ok("warming\nOK\n"))
+            .on_run("getprop sys.boot_completed", ok("0\n"));
+        let (provider, _dir) = provider_with(process, fs).await;
+        let id = seed_row(&provider, "warming", RunState::Stopped, None).await;
+
+        let live = provider.reconcile().await.expect("reconcile");
+        assert_eq!(
+            live.iter().find(|l| l.id == id).unwrap().state,
+            RunState::Booting
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_with_wipe_runs_avdmanager_and_drops_the_row() {
+        let fs = InMemoryFs::new();
+        let process = FakeProcessRunner::new()
+            .on_run("adb devices", ok("List of devices attached\n")) // not running
+            .on_run("delete avd -n gonezo", ok("\nAVD 'gonezo' deleted.\n"));
+        let (provider, _dir) = provider_with(process, fs).await;
+        let id = seed_row(&provider, "gonezo", RunState::Stopped, None).await;
+
+        provider.delete(id.clone(), true).await.expect("delete");
+        assert!(provider
+            .registry
+            .get_row(id.as_str())
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn delete_without_wipe_only_untracks() {
+        let fs = InMemoryFs::new();
+        let process =
+            FakeProcessRunner::new().on_run("adb devices", ok("List of devices attached\n"));
+        let (provider, _dir) = provider_with(process, fs).await;
+        let id = seed_row(&provider, "keepavd", RunState::Stopped, None).await;
+
+        // Only `adb devices` is scripted. If delete(wipe=false) shelled out to
+        // `avdmanager delete avd`, the fake would return an unmatched-command error and this
+        // `expect` would panic — so a clean success proves the untrack path skips it.
+        provider.delete(id.clone(), false).await.expect("untrack");
+        assert!(provider
+            .registry
+            .get_row(id.as_str())
+            .await
+            .unwrap()
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn delete_is_refused_while_running() {
+        let fs = InMemoryFs::new();
+        let process = FakeProcessRunner::new()
+            .on_run(
+                "adb devices",
+                ok("List of devices attached\nemulator-5554\tdevice\n"),
+            )
+            .on_run("emu avd name", ok("busy\nOK\n"));
+        let (provider, _dir) = provider_with(process, fs).await;
+        let id = seed_row(&provider, "busy", RunState::Running, Some(9)).await;
+
+        let err = provider.delete(id, true).await.unwrap_err();
+        assert_eq!(err.code(), "invalid");
+        assert!(err.to_string().contains("stop it before deleting"));
+    }
+
+    #[tokio::test]
+    async fn delete_of_an_unknown_id_is_not_found() {
+        let fs = InMemoryFs::new();
+        let (provider, _dir) = provider_with(FakeProcessRunner::new(), fs).await;
+        let err = provider
+            .delete(EmulatorId::generate(), true)
+            .await
+            .unwrap_err();
+        assert_eq!(err.code(), "not_found");
+    }
+
+    /// The M3 definition-of-done check: over many pseudo-random arrangements of on-disk / broken /
+    /// running AVDs, the registry's `last_state` for every row converges to ground truth after a
+    /// single `reconcile()`, and every loadable on-disk AVD ends up tracked.
+    #[tokio::test]
+    async fn reconcile_converges_to_ground_truth_over_random_scenarios() {
+        const POOL: [&str; 6] = ["avd0", "avd1", "avd2", "avd3", "avd4", "avd5"];
+        // xorshift64 — deterministic, no dependency.
+        let mut rng: u64 = 0x2545_F491_4F6C_DD1D;
+        let mut next = || {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            rng
+        };
+
+        for iter in 0..48 {
+            let mut loadable: Vec<&str> = Vec::new();
+            let mut broken: Vec<&str> = Vec::new();
+            let mut running: Vec<&str> = Vec::new();
+            for name in POOL {
+                match next() % 3 {
+                    0 => {
+                        loadable.push(name);
+                        if next() & 1 == 0 {
+                            running.push(name);
+                        }
+                    }
+                    1 => broken.push(name),
+                    _ => {} // absent from disk
+                }
+            }
+
+            let mut process = FakeProcessRunner::new()
+                .on_run("list avd", ok(list_avd(&loadable, &broken)))
+                .on_run("adb devices", ok(devices(&running)));
+            for name in &running {
+                process = process.on_run("emu avd name", ok(format!("{name}\nOK\n")));
+            }
+            for _ in &running {
+                process = process.on_run("getprop sys.boot_completed", ok("1\n"));
+            }
+            let (provider, _dir) = provider_with(process, InMemoryFs::new()).await;
+
+            // Pre-seed rows for the first four of the pool (Stopped).
+            for name in &POOL[..4] {
+                seed_row(&provider, name, RunState::Stopped, None).await;
+            }
+
+            provider.reconcile().await.expect("reconcile");
+
+            let expected = |name: &str| -> RunState {
+                if running.contains(&name) {
+                    RunState::Running
+                } else if loadable.contains(&name) {
+                    RunState::Stopped
+                } else {
+                    RunState::Error // broken or absent
+                }
+            };
+
+            let rows = provider.registry.list_rows().await.unwrap();
+            for row in &rows {
+                assert_eq!(
+                    row.last_state,
+                    expected(&row.avd_name),
+                    "iter {iter}: {} — loadable={loadable:?} broken={broken:?} running={running:?}",
+                    row.avd_name
+                );
+            }
+            // Every loadable AVD is tracked (pre-seeded or adopted).
+            for name in &loadable {
+                assert!(
+                    rows.iter().any(|r| &r.avd_name == name),
+                    "iter {iter}: loadable {name} was not adopted"
+                );
+            }
+        }
     }
 }

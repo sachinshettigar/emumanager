@@ -1,0 +1,19 @@
+Available Android Virtual Devices:
+    Name: Pixel6_API24
+  Device: pixel_6 (Google)
+    Path: /home/user/.android/avd/Pixel6_API24.avd
+  Target:
+          Based on: Android 7.0 ("Nougat") Tag/ABI: default/x86_64
+  Sdcard: 512 MB
+---------
+    Name: Wear_Small_API24
+  Device: wearos_small_round (Google)
+    Path: /home/user/.android/avd/Wear_Small_API24.avd
+  Target:
+          Based on: Android 7.0 ("Nougat") Tag/ABI: default/x86_64
+  Sdcard: 512 MB
+
+The following Android Virtual Devices could not be loaded:
+    Name: Broken_API99
+    Path: /home/user/.android/avd/Broken_API99.avd
+   Error: Missing system image android-99/default/x86_64.

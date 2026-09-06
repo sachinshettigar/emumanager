@@ -93,7 +93,11 @@ trait Provider {
   truth from `avdmanager`/`adb` and updates `last_state` so the DB never drifts. The typed
   `Registry` API (`EmulatorRow` in/out) lives in `crates/emu-core/src/registry/`. Queries are
   runtime-checked (`sqlx::query` + `SqliteRow::try_get`); a committed `.sqlx/` offline cache +
-  `query!` macros are deferred to M4 (task `0018` Notes).
+  `query!` macros are deferred to M4 (task `0018` Notes). `reconcile()` (task `0019`,
+  `emu-android::AndroidProvider`) parses `avdmanager list avd` (`emu-android::avd_list`), **adopts**
+  loadable AVDs it doesn't yet track (`Manual { discovered: true }`), **flags** rows whose AVD is
+  gone or un-loadable as `Error` (never hard-deletes — that's `Provider::delete`), and applies
+  **kill-safety**: a `Booting`/`Running` row absent from `adb devices` is reset to `Stopped`.
 - **Toolchain manager:** a static descriptor of required components + their Google repo coords;
   resolves the repository XML for versions; downloads via `Downloader` with SHA verification;
   writes license-hash files to accept licenses; exposes `InstalledState` for the Dependencies

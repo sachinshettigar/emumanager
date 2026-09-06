@@ -108,14 +108,26 @@ pieces are covered by fake-driven Rust tests + Vitest; a real booted-emulator ru
       `host_snapshots`; behind a typed `Registry` API (`EmulatorRow` in/out) in
       `crates/emu-core/src/registry/`. Task `0018`. Compound values (`Hardware`, `EmulatorSource`,
       tags) are JSON columns, not one column per field — see the task Notes.
-- [ ] `reconcile()` on startup and on demand: adopt out-of-band AVDs, drop vanished ones, refresh state
+- [x] `reconcile()` **on demand** — `AndroidProvider::reconcile` (task `0019`): parses
+      `avdmanager list avd`, adopts loadable AVDs with no row (`Manual { discovered: true }`,
+      enriched from `config.ini`), flags rows whose AVD is missing or un-loadable as `Error`
+      (never hard-deletes), refreshes `last_state` / serial / port / pid from adb. **On startup**
+      (running it once when the app launches) is task `0020`'s shared-provider work.
 - [ ] Detail panel: image coord, RAM/storage, adb serial, gRPC port, snapshot, source; open folder
-- [ ] Wipe data, delete (with/without AVD removal), rename, edit hardware (recreate if needed)
+- [~] Wipe data, delete (with/without AVD removal), rename, edit hardware (recreate if needed) —
+      **delete done** (`Provider::delete(id, wipe)`, task `0019`: `wipe` = `avdmanager delete avd`
+      + untrack, `!wipe` = untrack only; refuses while running). Wipe-data / rename / edit-hardware
+      are task `0020`'s commands.
 - [ ] Per-emulator log console with history tail + live stream; copy / open log file
-- [ ] Kill-safety: SIGKILL the app mid-boot → next start reconciles to a correct state (tested)
+- [x] Kill-safety: a `Booting`/`Running` registry row whose emulator is no longer in `adb devices`
+      (app SIGKILLed mid-boot) is reset to `Stopped` with `pid` cleared by `reconcile()` (task
+      `0019`) — tested (`reconcile_kill_safety_resets_a_stale_running_row`).
 
 DoD: property/integration test that randomly creates/launches/kills and asserts the registry
-always converges to ground truth after `reconcile()`.
+always converges to ground truth after `reconcile()`. **Met** (task `0019`) —
+`reconcile_converges_to_ground_truth_over_random_scenarios`: 48 pseudo-random loadable/broken/
+running arrangements, each asserts every row's `last_state` == ground truth and every loadable AVD
+is tracked. Fake-driven, in `just validate`.
 
 ---
 

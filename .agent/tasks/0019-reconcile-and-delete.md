@@ -2,10 +2,10 @@
 id: "0019"
 title: "AndroidProvider::reconcile + delete + kill-safety"
 milestone: "M3"
-status: "todo"
-owner: ""
+status: "review"
+owner: "Claude Code"
 created: "2026-09-05"
-updated: "2026-09-05"
+updated: "2026-09-06"
 ---
 
 ## Goal
@@ -35,27 +35,32 @@ with a now-dead `pid` back to `Stopped`. `AndroidProvider::delete()` gets its re
 
 ## Acceptance criteria
 
-- [ ] `parse_avdmanager_list_avd(&str) -> Vec<AvdEntry { name, device, path, target }>` against a
-      **real captured** `avdmanager list avd` fixture (cite the capture in a module comment; if no
-      Android SDK is installed on this machine, capture it during the task the same way `0014`/`0015`
-      captured theirs, or fall back to the documented output shape and say so).
-- [ ] `reconcile()` returns `Vec<LiveState>` and, as a side effect, makes the registry match reality:
-  - [ ] an AVD on disk with no registry row → inserted as `EmulatorSource::Manual { discovered: true }`
-  - [ ] a registry row whose `avd_name` is not in `avdmanager list avd` → `last_state = Error` and a
-        marker (do **not** hard-delete — the user may want to see it; real delete is explicit)
-  - [ ] for every surviving row: `last_state` / `adb_serial` / `grpc_port` refreshed from adb
-  - [ ] kill-safety: a row with `last_state` `Booting`/`Running` and a `pid` that is not alive
-        (`ProcessRunner` can't check liveness directly → treat "not in `adb devices` and pid set" as
-        dead) → reset to `Stopped`, clear `adb_serial` / `pid`
-- [ ] `delete(id, wipe)`: `avdmanager delete avd -n <avd_name>` (cite flag), then `delete_row(id)`;
-      `wipe` additionally removes the AVD data dir via `Fs`. `NotFound` for an unknown id; deleting a
-      running emulator errors with a clear "stop it first" message.
-- [ ] Property/integration test (the M3 DoD): a fake-driven loop that randomly
-      creates / launches / kills (drops the child) / adopts / removes AVDs, calls `reconcile()`, and
-      asserts the registry's `last_state` for every row equals the fake's ground truth. Fake-driven,
-      no real binaries, in `just validate`.
-- [ ] Tests for each bullet above; `just check-fast` then `just validate` green
-- [ ] Docs updated (`MILESTONES.md` M3 boxes, architecture reconcile note)
+- [x] `parse_avdmanager_list_avd(&str) -> Vec<AvdEntry>` (`crates/emu-android/src/avd_list.rs`)
+      against a **real captured** fixture — `tests/fixtures/avdmanager-list-avd.txt`, produced this
+      task from a real `cmdline-tools 16111833` install (downloaded `commandlinetools-mac_arm64`,
+      `sdkmanager` for `system-images;android-24;default;x86_64` + `emulator` + `platform-tools`,
+      two real `avdmanager create avd` runs + one hand-seeded broken AVD, then `avdmanager list avd`).
+      `AvdEntry { name, device, path, tag_abi, based_on, loadable, error }`.
+- [x] `reconcile()` returns `Vec<LiveState>` and makes the registry match reality:
+  - [x] a **loadable** AVD on disk with no registry row → adopted as
+        `EmulatorSource::Manual { discovered: true }`, enriched from its `config.ini`
+        (`image.sysdir.1` → `ImageCoord`, `hw.device.name`, `avd.ini.displayname`, `hw.ramSize`)
+  - [x] a registry row whose `avd_name` is missing from `avdmanager list avd`, **or present but
+        un-loadable** (missing system image) → `last_state = Error`; never hard-deleted
+  - [x] every surviving row: `last_state` / `adb_serial` / `grpc_port` / `pid` refreshed from adb
+  - [x] kill-safety: a `Booting`/`Running` row whose AVD is not in `adb devices` → `Stopped`,
+        `pid` / `adb_serial` / `grpc_port` cleared (see Notes on the pid-liveness approximation)
+- [x] `delete(id, wipe)`: `wipe = true` → `avdmanager delete avd -n <name>` (removes the whole
+      `.avd` dir, userdata included) then `delete_row`; `wipe = false` → `delete_row` only (untrack).
+      `NotFound` for an unknown id; running → `Invalid` ("stop it before deleting"). A
+      "no Android Virtual Device named" stderr on the wipe path is treated as success (already gone).
+- [x] M3 DoD test: `reconcile_converges_to_ground_truth_over_random_scenarios` — 48 xorshift64
+      pseudo-random arrangements of loadable / broken / running AVDs over a 6-name pool, each with a
+      fresh provider + registry; after one `reconcile()` every row's `last_state` equals ground
+      truth and every loadable AVD is tracked. Fake-driven, no real binaries, in `just validate`.
+- [x] 11 new tests (3 `avd_list`, 8 `provider`); `just check-fast` then `just validate` green
+      (128 rust tests, 22 web).
+- [x] Docs updated (`MILESTONES.md` M3 bullets 2 / 4-delete / 6 / DoD, architecture reconcile note)
 
 ## Validate
 
@@ -66,6 +71,54 @@ just validate
 
 ## Notes / findings
 
-(Fill in: real `avdmanager list avd` capture or the fallback; how "pid alive" is approximated
-without a new port; anything the property test flushed out.)
+### Real `avdmanager list avd` capture
+
+No Android SDK was installed on this machine (only a Homebrew `adb`). Captured a real one the way
+`0014`/`0015` did: downloaded `commandlinetools-mac_arm64-16111833_latest.zip` into the scratchpad,
+unpacked to `cmdline-tools/latest/`, `sdkmanager` for `system-images;android-24;default;x86_64`
+(399 MiB — the smallest modern `default` x86_64 image), `emulator`, `platform-tools`, then two real
+`avdmanager create avd` runs (`-d pixel_6`, `-d wearos_small_round`) plus one hand-seeded `.ini` +
+`config.ini` pointing at an absent image. `avdmanager list avd` then printed all three.
+
+Real quirks the capture surfaced, all encoded in `avd_list.rs`'s parser + module doc:
+- Loadable entry = a block of `Name:` / `Device:` / `Path:` / `Target:` / `Based on: … Tag/ABI:` /
+  `Sdcard:`, blocks separated by a line of exactly nine dashes.
+- `Target:` prints **empty** even with `platforms;android-24` installed (verified — installed it and
+  re-ran); the android-version text is on the indented `Based on:` continuation line.
+- Broken AVDs come after `The following Android Virtual Devices could not be loaded:` and carry only
+  `Name:` / `Path:` / `Error:`. `avdmanager list avd -c` (compact) **omits them entirely**, which is
+  why `reconcile` parses the verbose form.
+- `avdmanager delete avd`: success is exit 0 + `\nAVD '<name>' deleted.`; unknown name is exit 1 +
+  `Error: There is no Android Virtual Device named '<name>'.\nnull`. It removes the whole `.avd`
+  directory (both the `.ini` and the dir), so there is no "keep the AVD, wipe only userdata" here —
+  that is task `0020`'s `wipe_emulator_data` (launch with `-wipe-data`).
+- `avdmanager create avd` needs the `emulator` package installed or it fails with
+  `Error: "emulator" package must be installed!` before touching the AVD.
+
+Fixture normalizations (documented in the parser module doc, neither touching parsed fields): the
+machine-specific `Path:` prefix rewritten to `/home/user/.android/avd`, and the trailing space on
+the empty `Target:` line dropped.
+
+### "pid alive" without a new port
+
+A `ProcessRunner` can't test an arbitrary pid for liveness (no `kill -0`, no `/proc` access in the
+port surface). `reconcile` uses **"the AVD is not in `adb devices`"** as the liveness signal
+instead — which is also exactly the ground truth the dashboard cares about. So a `Booting`/`Running`
+row whose emulator has vanished from adb (app SIGKILLed mid-boot, emulator later died or was killed)
+is reset to `Stopped` with `pid` cleared. If the emulator is genuinely still orphaned and running,
+adb still sees it and `reconcile` keeps it `Running`/`Booting` — also correct.
+
+### Property test
+
+`reconcile_converges_to_ground_truth_over_random_scenarios`: xorshift64 (no `proptest` dep — the
+project has none and "keep it simple" stands), 48 iterations, fresh provider + tempdir registry per
+iteration so the `FakeProcessRunner`'s consume-on-match rule queue only has to answer one
+`reconcile()`. `emu avd name` rules are registered in running-serial order (reconcile calls them in
+`adb devices` order); the `getprop` rules are all identical (`"1\n"`) so their call order doesn't
+matter. Nothing surfaced — it passed first run and every run since.
+
+### No testing-fake changes
+
+`FakeProcessRunner` / `InMemoryFs` were enough as-is. `adopt_row` reads `config.ini` through the
+`Fs` port, so `InMemoryFs::write_atomic` seeds it in the enrichment test.
 </content>

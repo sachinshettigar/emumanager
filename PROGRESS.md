@@ -6,14 +6,18 @@ Narrative companion to `.agent/state.json`. Update both together (see
 ## Current state
 
 - **Milestone:** M3 — Registry & reliable tracking, **in progress**. Scoped into four tasks
-  (`0018`–`0021`); `0018` is **done** (in review). M0, M1 and M2 all stay `in_progress` on
+  (`0018`–`0021`); `0018` + `0019` **done** (in review). M0, M1 and M2 all stay `in_progress` on
   deliberately-deferred/blocked DoD lines, see below.
-- **Phase:** M3 storage layer landed (task `0018`). `migrations/0002_registry_m3.sql` grows the
-  M0-minimal `emulators` table into the full tracked record (image coord, device profile, hardware,
-  source, tags, notes, live-run columns, timestamps) and adds `host_snapshots`; the `Registry` API
-  is now typed (`EmulatorRow` in/out, `registry/row.rs`) instead of column tuples, with compound
-  values stored as JSON text columns so struct changes don't force a migration. Next: task `0019`
-  (`AndroidProvider::reconcile` + `delete` + kill-safety + the M3 DoD property test).
+- **Phase:** M3 storage + reconciliation landed (`0018`, `0019`). `0018`: full schema
+  (`migrations/0002_registry_m3.sql`) + typed `Registry` API (`EmulatorRow` in/out, compound
+  values as JSON columns). `0019`: `AndroidProvider::reconcile()` (parses `avdmanager list avd`,
+  adopts untracked loadable AVDs, flags missing/broken rows as `Error`, refreshes state from adb,
+  kill-safety resets a stale `Running` row to `Stopped`), `AndroidProvider::delete(id, wipe)`, and
+  the M3 DoD property test (48 random scenarios → registry converges to ground truth). Real
+  `avdmanager list avd` fixture captured from a real `cmdline-tools 16111833` install this task.
+  Next: task `0020` (shared managed provider as `tauri::State` — persists the spawned-child map for
+  real force-kill + app-exit reap — startup reconcile, and the rename/edit-hardware/delete/wipe/
+  `reconcile_now`/`emulator_detail` IPC commands).
 - **M2 recap:** tasks `0014`–`0017` all **done**; M2 stays `in_progress` only on its one DoD line
   (a real `tauri-driver` E2E boot), deferred to M6's e2e-suite work.
 - **M2 task 0017 (IPC + Create wizard + Dashboard) done:** `src-tauri/src/commands/emulator.rs` —
@@ -105,13 +109,13 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0019` — `AndroidProvider::reconcile()` (adopt on-disk AVDs with no row,
-  flag rows whose AVD vanished, refresh `last_state`/serial/port from adb, reset a `Booting`/
-  `Running` row with a dead `pid` back to `Stopped`), `AndroidProvider::delete(id, wipe)`
-  (`avdmanager delete avd`), and the M3 DoD property test (random create/launch/kill/adopt →
-  `reconcile()` → registry matches ground truth). Then `0020` (shared managed provider + lifecycle
-  commands) and `0021` (detail panel + log console). Separately: once GitHub billing is fixed,
-  re-watch the next `ci.yml` push run, then flip `0009`/`M0` to `done`.
+- **Next action:** task `0020` — build one `AndroidProvider` in `setup` as `tauri::State` (its
+  spawned-child map then persists → `stop` can force-kill, and `RunEvent::ExitRequested` can reap
+  every child so quitting never orphans an emulator), run `reconcile()` once on startup, and add
+  the `rename_emulator` / `edit_hardware` / `delete_emulator` / `wipe_emulator_data` /
+  `reconcile_now` / `emulator_detail` commands + their `ipc.ts` hooks. Then `0021` (detail panel +
+  log console). Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run, then
+  flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
 
@@ -123,14 +127,55 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [~] M2 Create & launch one emulator end-to-end — tasks `0014`–`0017` **all done**; milestone
       stays in_progress only on its one DoD line (a real `tauri-driver` E2E boot), deferred to
       M6's e2e-suite work — see `MILESTONES.md`
-- [~] M3 Registry & reliable tracking — **current milestone**, scoped into tasks `0018`–`0021`;
-      `0018` (full schema + typed `Registry` API) **done**, `0019`–`0021` todo
+- [~] M3 Registry & reliable tracking — **current milestone**, tasks `0018`–`0021`; `0018` (schema
+      + typed `Registry` API) and `0019` (`reconcile` + `delete` + kill-safety + DoD property test)
+      **done**, `0020`–`0021` todo
 - [ ] M4 Profiles: export / import / recreate
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-06 — session 9 (continued) (Claude Code) — task 0019 done (reconcile + delete + kill-safety)
+
+`AndroidProvider::reconcile()` and `delete()` — the registry now converges to ground truth.
+
+**Real `avdmanager list avd` capture.** No Android SDK on this machine, so captured one the way
+`0014`/`0015` captured theirs: downloaded `commandlinetools-mac_arm64-16111833`, `sdkmanager` for
+`system-images;android-24;default;x86_64` (399 MiB — smallest modern `default` x86_64), `emulator`,
+`platform-tools`; two real `avdmanager create avd` runs + one hand-seeded broken AVD;
+`avdmanager list avd` → `tests/fixtures/avdmanager-list-avd.txt`. Quirks encoded in the new
+`emu-android::avd_list` parser: `Target:` prints empty even with the platform installed (the
+android-version is on the `Based on:` continuation line); blocks separated by nine dashes; broken
+AVDs come after a `could not be loaded:` header with only `Name:`/`Path:`/`Error:`, and `-c`
+(compact) drops them — so `reconcile` parses the verbose form. Also captured: `avdmanager delete
+avd` success/not-found text, and that it removes the whole `.avd` dir (no "keep AVD, wipe userdata"
+— that's `0020`'s `wipe_emulator_data`).
+
+**`reconcile()`** parses that output, then: adopts every loadable AVD with no registry row
+(`Manual { discovered: true }`, enriched from its `config.ini` — `image.sysdir.1` → `ImageCoord`,
+`hw.device.name`, `avd.ini.displayname`, `hw.ramSize`); sets a row whose AVD is missing from the
+list, or present-but-un-loadable, to `Error` (never hard-deletes); refreshes every surviving row's
+`last_state` / `adb_serial` / `grpc_port` / `pid` from adb. **Kill-safety**: a `ProcessRunner`
+can't probe an arbitrary pid, so "not in `adb devices`" is the liveness signal — a `Booting`/
+`Running` row whose emulator has vanished from adb (app SIGKILLed mid-boot) is reset to `Stopped`
+with `pid` cleared.
+
+**`delete(id, wipe)`**: `wipe = true` → `avdmanager delete avd -n <name>` (removes the whole
+`.avd`, userdata included) then `delete_row`; `wipe = false` → `delete_row` only (untrack; a later
+`reconcile` re-adopts it as `discovered`). Refuses while running (`Invalid`, "stop it before
+deleting"); `NotFound` for an unknown id; a "no Android Virtual Device named" stderr on the wipe
+path counts as success (already gone).
+
+**M3 DoD met** — `reconcile_converges_to_ground_truth_over_random_scenarios`: 48 xorshift64
+(no `proptest` dep) pseudo-random loadable/broken/running arrangements over a 6-name pool, fresh
+provider + registry per iteration; after one `reconcile()` every row's `last_state` equals ground
+truth and every loadable AVD is tracked. Fake-driven, in `just validate`.
+
+11 new tests (3 `avd_list`, 8 `provider`), 128 rust tests total, 22 web; `just validate` green.
+No IPC surface touched (`bindings.ts` no-op regen — that changes in `0020`). `emu-android` gained
+no new deps; the testing fakes needed no changes.
 
 ### 2026-09-05 — session 9 (Claude Code) — M3 scoped (0018–0021); task 0018 done (registry schema)
 
