@@ -8,12 +8,14 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Milestone:** M5 — Host readiness & elevated helper. Scoped into `0025`–`0027`; `0025`
   (`emu-host` detection) **done** (in review). M4 stays `in_progress` on the export→wipe→import E2E
   deferred to M6.
-- **Phase:** `emu-host` now implements `HostProbe`. `crates/emu-host/src/{signals,report,probe}.rs`:
-  a pure `build_report(&HostSignals) -> HostReport` (verdict + fixes, 8 unit tests incl. the M5 DoD
-  "CI runner, no virtualization → `CannotRun`") + a `NativeHostProbe` that gathers signals per OS
-  (`sysinfo` for RAM/disk; `sysctl` / `/dev/kvm` / `powershell` for virtualization + accelerator).
-  Real probe on this Mac: `Hvf/Ok`, `CanAccelerate`. Next: `0026` (`emu-helper` real subcommands +
-  `probe_host` / `run_helper` IPC), then `0027` (host panel + launch-gating).
+- **Phase:** `emu-host` (`0025`) + the helper/IPC (`0026`) are in. `0026`: `emu-helper`'s
+  subcommands do real per-OS work and print `{command,status,message,needsReboot}` (schema-tested
+  as a subprocess — the M5 DoD's second half); `probe_host()` runs `NativeHostProbe` and snapshots
+  the report; `run_helper(fixId)` invokes `emu-helper` **with an OS elevation prompt**
+  (`osascript` / `pkexec` / `Start-Process -Verb RunAs`) via a pure, unit-tested `elevated_argv`
+  wrapper, and returns a `cancelled` error if the prompt is dismissed. `emu-host` is now a real
+  `src-tauri` dependency (its `cargo-machete` ignore entry is gone). Next: `0027` — the
+  Dependencies host panel + launch-gating.
 - **Phase:** M4 done end to end. `0024`: `src/routes/Profiles.tsx` rewritten — a `FileReader`
   drop zone → `inspect_profile` → a requirement table + Apply / Apply & launch (streams
   `useEmulatorJob`) + Save-to-library; a saved-profiles list with Load / Delete. Emulator detail
@@ -123,12 +125,10 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0026` — `emu-helper` real subcommands (`check` / `enable-whpx` /
-  `enable-aehd` / `add-kvm-group` → structured JSON, per-OS `#[cfg]` bodies, `not_applicable` off
-  their platform) + a subprocess output-schema test (the M5 DoD's second half); `probe_host()`
-  (runs `NativeHostProbe`, writes a `host_snapshots` row) and `run_helper(fixId)` (invokes
-  `emu-helper` with OS elevation — `osascript … with administrator privileges` / `pkexec` / UAC).
-  Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
+- **Next action:** task `0027` — the Dependencies-screen host panel: a verdict banner + four tiles
+  (virtualization / accelerator / disk / RAM) from `probe_host`, a "Fix it" button per scriptable
+  fix (→ `run_helper`), and launch-gating (Dashboard + detail "Launch" disabled with the reason
+  when `verdict.kind === 'cannotRun'`). Adds `useHostReport` / `useRunHelper`. Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
   then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
@@ -148,12 +148,36 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [~] M4 Profiles: export / import / recreate — tasks `0022`–`0024` all `done` (engine, IPC,
       Profiles screen). Stays `in_progress` on the export→wipe→import E2E deferred to M6.
 - [~] M5 Host readiness & elevated helper — **current milestone**, tasks `0025`–`0027`; `0025`
-      (`emu-host` detection) **done**, `0026`–`0027` todo
+      (`emu-host` detection) and `0026` (`emu-helper` + `probe_host`/`run_helper` IPC) **done**,
+      `0027` (host panel + launch-gating) todo
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-06 — session 9 (continued) (Claude Code) — task 0026 done (emu-helper + probe_host / run_helper)
+
+`crates/emu-helper/src/actions.rs` — real per-OS subcommand bodies behind `#[cfg(target_os)]`.
+macOS: `check` runs `sysctl kern.hv_support`, the rest are `notApplicable`. Linux: `check` opens
+`/dev/kvm`, `add-kvm-group` runs `usermod -aG kvm <user>` where `<user>` is `$SUDO_USER` (or
+resolved from `$PKEXEC_UID` — never `root`). Windows: best-effort `dism` /
+`Get-WindowsOptionalFeature`, **untested on this Mac** — flagged for a Windows CI runner (M6). The
+output is one line of camelCase JSON `{command,status,message,needsReboot}`, `status` ∈
+`ok`/`failed`/`notApplicable`/`needsReboot`, exit `0` for all but `failed`. `crates/emu-helper/tests/schema.rs`
+runs each subcommand as a subprocess and asserts the shape + exit code — the M5 DoD's second half.
+
+`src-tauri/src/commands/host.rs`: `probe_host() -> HostReportDto` (runs `NativeHostProbe::inspect`,
+maps the enums to strings and the `u64` RAM/disk to `u32` MB, and writes a best-effort
+`host_snapshots` row); `run_helper(fixId) -> HelperOutcomeDto` — rejects non-scriptable ids,
+resolves `emu-helper` next to the app binary, and wraps it with an OS elevation prompt via a
+**pure, unit-tested** `elevated_argv(helper, sub, os)` (`osascript … with administrator
+privileges` / `pkexec` / `powershell Start-Process -Verb RunAs`). A dismissed prompt →
+`IpcError` `cancelled`; Windows can't forward the child's stdout so it returns a synthetic
+"re-probe" outcome. `emu-host` is now a real `src-tauri` dependency, so its `cargo-machete` ignore
+entry is gone (the whole block — every workspace crate is now consumed by `src-tauri`).
+
+26 commands. 154 rust tests, `just validate` green. Frontend hooks are task `0027`.
 
 ### 2026-09-06 — session 9 (continued) (Claude Code) — M5 scoped; task 0025 done (emu-host detection)
 

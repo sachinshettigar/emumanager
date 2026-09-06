@@ -14,6 +14,7 @@
 // re-export moves the visible name but not those siblings. `lib.rs` refers to
 // `commands::toolchain::{list_components, bootstrap_toolchain}` directly instead.
 pub(crate) mod emulator;
+pub(crate) mod host;
 pub(crate) mod profile;
 pub(crate) mod toolchain;
 

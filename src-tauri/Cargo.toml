@@ -47,8 +47,6 @@ tempfile = "3"
 [lints]
 workspace = true
 
-[package.metadata.cargo-machete]
-# `emu-host` (host readiness probe) has no consumer until M5 — not imported by any `src-tauri`
-# source yet, so cargo-machete flags it; that's correct today, not a mistake to fix. `emu-android`
-# was on this list too until task 0013 wired its real catalog parser into `commands::toolchain`.
-ignored = ["emu-host"]
+# `emu-host` was ignored here until task 0026 wired `NativeHostProbe` into `commands::host`;
+# `emu-android` similarly until task 0013. Every workspace crate now has a real `src-tauri`
+# consumer, so there is no `[package.metadata.cargo-machete]` block.

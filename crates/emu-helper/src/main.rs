@@ -1,11 +1,16 @@
 //! `emu-helper` — a tiny standalone binary the app invokes **with OS elevation** to perform the
 //! scriptable parts of accelerator setup. It shares no state with the app beyond argv and a
-//! single JSON object on stdout.
+//! single JSON object on stdout: `{ "command", "status", "message", "needsReboot" }`.
 //!
-//! Every subcommand currently reports `not_implemented`; the real logic lands in milestone M5
-//! (`docs/architecture.md` §5, `docs/playbooks/debug-emulator-boot.md`).
+//! `status` is one of `ok` / `failed` / `notApplicable` / `needsReboot`. Exit code is `0` for
+//! everything except `failed` (which exits `1`), so a caller can branch on either.
+//!
+//! It runs as root/Administrator, so anything that needs the *invoking* user reads `$SUDO_USER`
+//! (Linux) rather than `$USER`.
 
 #![forbid(unsafe_code)]
+
+mod actions;
 
 use clap::{Parser, Subcommand};
 use serde::Serialize;
@@ -22,14 +27,14 @@ struct Cli {
 }
 
 #[derive(Subcommand, Clone, Copy)]
-enum Command {
-    /// Report what the host has and what this helper could change.
+pub enum Command {
+    /// Report what the host has and what this helper could change (no mutation).
     Check,
     /// Enable the Windows Hypervisor Platform feature.
     EnableWhpx,
     /// Install and enable AEHD (the HAXM successor) on Windows.
     EnableAehd,
-    /// Add the current user to the `kvm` group on Linux.
+    /// Add the invoking user to the `kvm` group on Linux.
     AddKvmGroup,
 }
 
@@ -44,25 +49,40 @@ impl Command {
     }
 }
 
+/// The single JSON object printed to stdout.
 #[derive(Serialize)]
-struct Outcome {
-    command: &'static str,
-    status: &'static str,
-    message: &'static str,
-    needs_reboot: bool,
+#[serde(rename_all = "camelCase")]
+pub struct Outcome {
+    pub command: &'static str,
+    /// `ok` | `failed` | `notApplicable` | `needsReboot`.
+    pub status: &'static str,
+    pub message: String,
+    pub needs_reboot: bool,
+}
+
+impl Outcome {
+    pub fn new(command: Command, status: &'static str, message: impl Into<String>) -> Self {
+        Self {
+            command: command.slug(),
+            status,
+            message: message.into(),
+            needs_reboot: status == "needsReboot",
+        }
+    }
 }
 
 fn main() {
     let cli = Cli::parse();
-    let outcome = Outcome {
-        command: cli.command.slug(),
-        status: "not_implemented",
-        message: "emu-helper is scaffolded; accelerator setup lands in milestone M5.",
-        needs_reboot: false,
+    let outcome = match cli.command {
+        Command::Check => actions::check(cli.command),
+        Command::EnableWhpx => actions::enable_whpx(cli.command),
+        Command::EnableAehd => actions::enable_aehd(cli.command),
+        Command::AddKvmGroup => actions::add_kvm_group(cli.command),
     };
-    // Structured, single-line output — the app parses this from stdout.
+
     println!(
         "{}",
         serde_json::to_string(&outcome).expect("Outcome serializes to JSON")
     );
+    std::process::exit(i32::from(outcome.status == "failed"));
 }

@@ -55,6 +55,8 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::profile::list_profiles,
             commands::profile::get_saved_profile,
             commands::profile::delete_profile,
+            commands::host::probe_host,
+            commands::host::run_helper,
         ])
         .events(collect_events![
             commands::toolchain::BootstrapProgress,

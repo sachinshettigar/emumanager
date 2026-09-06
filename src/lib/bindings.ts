@@ -98,6 +98,10 @@ export const commands = {
 	getSavedProfile: (name: string) => typedError<string, IpcError>(__TAURI_INVOKE("get_saved_profile", { name })),
 	/**  Delete a saved profile. */
 	deleteProfile: (name: string) => typedError<null, IpcError>(__TAURI_INVOKE("delete_profile", { name })),
+	/**  Probe the machine for emulator readiness. Also records a `host_snapshots` row (best-effort). */
+	probeHost: () => typedError<HostReportDto, IpcError>(__TAURI_INVOKE("probe_host")),
+	/**  Run a scriptable host fix with OS elevation and return `emu-helper`'s structured outcome. */
+	runHelper: (fixId: string) => typedError<HelperOutcomeDto, IpcError>(__TAURI_INVOKE("run_helper", { fixId })),
 };
 
 /** Events */
@@ -248,6 +252,46 @@ export type EmulatorJobKind =
 { type: "log"; line: string } | 
 /**  The run reached a terminal state. */
 { type: "done"; ok: boolean; error: IpcError | null };
+
+/**  The parsed result of one elevated `emu-helper` run. */
+export type HelperOutcomeDto = {
+	command: string,
+	/**  `ok` / `failed` / `notApplicable` / `needsReboot`. */
+	status: string,
+	message: string,
+	needsReboot: boolean,
+};
+
+/**  One remediation from the host report. */
+export type HostFixDto = {
+	id: string,
+	title: string,
+	/**  `true` when `run_helper(id)` can perform it (with elevation). */
+	scriptable: boolean,
+	needsReboot: boolean,
+	description: string,
+};
+
+/**  The host-readiness picture for the Dependencies screen. */
+export type HostReportDto = {
+	os: string,
+	arch: string,
+	/**  `enabled` / `disabledInFirmware` / `unknown`. */
+	virtualization: string,
+	/**  `kvm` / `whpx` / `aehd` / `hvf` / `none`. */
+	acceleratorKind: string,
+	/**  `ok` / `missing` / `noPermission` / `disabled` / `unknown`. */
+	acceleratorStatus: string,
+	/**  Free space on the data volume, in MB (`u32` — specta won't export a bigint-risking `u64`). */
+	diskFreeMb: number,
+	/**  Total RAM in MB. */
+	ramMb: number,
+	/**  `canAccelerate` / `degraded` / `cannotRun`. */
+	verdict: string,
+	/**  The `degraded` / `cannotRun` reason; empty for `canAccelerate`. */
+	verdictReason: string,
+	fixes: HostFixDto[],
+};
 
 /**  A system image for the Create wizard's image step. */
 export type ImageInfo = {
