@@ -7,6 +7,7 @@ import {
   useDevices,
   useEmulatorJob,
   useImages,
+  useSaveProfile,
   type EmulatorJobState,
 } from "../lib/ipc";
 
@@ -191,6 +192,7 @@ export function Create(): React.JSX.Element {
   const devicesQuery = useDevices();
   const imagesQuery = useImages();
   const create = useCreateEmulator();
+  const saveProfile = useSaveProfile();
   const { state: run, reset } = useEmulatorJob();
 
   const [step, setStep] = useState(0);
@@ -220,6 +222,28 @@ export function Create(): React.JSX.Element {
       storageMb,
       launch,
     });
+  };
+
+  const saveAsProfile = (): void => {
+    if (!deviceId || !imageCoord || !effectiveName) {
+      return;
+    }
+    // imageCoord is `system-images;android-NN;<type>;<abi>`.
+    const parts = imageCoord.split(";");
+    const rawType = parts[2] ?? "default";
+    const profile = {
+      schemaVersion: "1.0",
+      name: effectiveName,
+      platform: "android",
+      device: { profile: deviceId },
+      image: {
+        api: Number((parts[1] ?? "android-0").replace("android-", "")),
+        type: rawType === "android-automotive-playstore" ? "android-automotive_playstore" : rawType,
+        abi: parts[3] ?? "x86_64",
+      },
+      hardware: { ramMb, storageGb: Math.max(2, Math.ceil(storageMb / 1024)) },
+    };
+    saveProfile.mutate(Array.from(new TextEncoder().encode(JSON.stringify(profile))));
   };
 
   const canAdvance =
@@ -329,6 +353,15 @@ export function Create(): React.JSX.Element {
           className="rounded-md border border-border-default px-3.5 py-2 text-[13px]"
         >
           Back
+        </button>
+        <button
+          type="button"
+          data-testid="save-as-profile"
+          disabled={saveProfile.isPending}
+          onClick={saveAsProfile}
+          className="rounded-md border border-border-default px-3.5 py-2 text-[13px] disabled:opacity-50"
+        >
+          {saveProfile.isSuccess ? "Saved" : "Save as profile"}
         </button>
         <button
           type="button"

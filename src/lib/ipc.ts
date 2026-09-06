@@ -23,6 +23,8 @@ import {
   type ImageInfo,
   type IpcError,
   type Pong,
+  type ProfileInspection,
+  type ProfileSummary,
 } from "./bindings";
 
 /** A failed IPC call. `ipc.code` is the stable machine string from the backend. */
@@ -495,4 +497,94 @@ export function useEmulatorJob(): UseEmulatorJobResult {
       setState(INITIAL_EMULATOR_JOB_STATE);
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// M4 — profiles (task 0024)
+// ---------------------------------------------------------------------------
+
+const PROFILES_QUERY_KEY = ["profiles"];
+
+async function inspectProfile(bytes: number[]): Promise<ProfileInspection> {
+  return unwrap(await commands.inspectProfile(bytes));
+}
+
+/** Mutation hook for a dropped `.emuprofile` — parse + validate + resolve into a preview. */
+export function useInspectProfile() {
+  return useMutation<ProfileInspection, IpcCallError, number[]>({
+    mutationFn: inspectProfile,
+  });
+}
+
+async function applyProfile(vars: { bytes: number[]; launch: boolean }): Promise<string> {
+  return unwrap(await commands.applyProfile(vars.bytes, vars.launch));
+}
+
+/** Mutation hook for "Apply" / "Apply & launch" — creates the emulator from the recipe. */
+export function useApplyProfile() {
+  const queryClient = useQueryClient();
+  return useMutation<string, IpcCallError, { bytes: number[]; launch: boolean }>({
+    mutationFn: applyProfile,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: EMULATORS_QUERY_KEY });
+    },
+  });
+}
+
+async function exportProfile(id: string): Promise<string> {
+  return unwrap(await commands.exportProfile(id));
+}
+
+/** Mutation hook for the detail panel's "Export profile" — returns the `.emuprofile` JSON. */
+export function useExportProfile() {
+  return useMutation<string, IpcCallError, string>({ mutationFn: exportProfile });
+}
+
+async function listProfiles(): Promise<ProfileSummary[]> {
+  return unwrap(await commands.listProfiles());
+}
+
+/** TanStack Query hook for the saved-profiles list. */
+export function useProfiles(): UseQueryResult<ProfileSummary[], IpcCallError> {
+  return useQuery<ProfileSummary[], IpcCallError>({
+    queryKey: PROFILES_QUERY_KEY,
+    queryFn: listProfiles,
+  });
+}
+
+async function saveProfile(bytes: number[]): Promise<undefined> {
+  unwrap(await commands.saveProfile(bytes));
+  return undefined;
+}
+
+/** Mutation hook for "Save as profile" (Create wizard) and "Save to library" (Profiles import). */
+export function useSaveProfile() {
+  const queryClient = useQueryClient();
+  return useMutation<undefined, IpcCallError, number[]>({
+    mutationFn: saveProfile,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: PROFILES_QUERY_KEY });
+    },
+  });
+}
+
+async function deleteProfile(name: string): Promise<undefined> {
+  unwrap(await commands.deleteProfile(name));
+  return undefined;
+}
+
+/** Mutation hook for a saved-profiles row's "Delete". */
+export function useDeleteProfile() {
+  const queryClient = useQueryClient();
+  return useMutation<undefined, IpcCallError, string>({
+    mutationFn: deleteProfile,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: PROFILES_QUERY_KEY });
+    },
+  });
+}
+
+/** The JSON body of a saved profile — feed it (as bytes) to {@link useApplyProfile}. */
+export async function getSavedProfile(name: string): Promise<string> {
+  return unwrap(await commands.getSavedProfile(name));
 }

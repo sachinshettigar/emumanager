@@ -4,11 +4,12 @@ import { Link, useParams } from "react-router-dom";
 import { Placeholder, Screen } from "../components/Screen";
 import {
   revealPath,
+  useDeleteEmulator,
+  useEditHardware,
   useEmulatorDetail,
   useEmulatorJob,
   useEmulatorLogTail,
-  useDeleteEmulator,
-  useEditHardware,
+  useExportProfile,
   useLaunchEmulator,
   useRenameEmulator,
   useStopEmulator,
@@ -39,6 +40,7 @@ export function EmulatorDetail(): React.JSX.Element {
   const wipe = useWipeEmulatorData();
   const launch = useLaunchEmulator();
   const stop = useStopEmulator();
+  const exportProfile = useExportProfile();
 
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [hw, setHw] = useState<{ ramMb: number; storageMb: number; graphics: string } | null>(null);
@@ -321,11 +323,45 @@ export function EmulatorDetail(): React.JSX.Element {
             .
           </span>
         ) : null}
+        <button
+          type="button"
+          data-testid="export-profile"
+          disabled={exportProfile.isPending}
+          onClick={() => {
+            exportProfile.mutate(id, {
+              onSuccess: (json) => {
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                void navigator.clipboard?.writeText(json);
+              },
+            });
+          }}
+          className="rounded-md border border-border-default px-3.5 py-2 text-[13px] disabled:opacity-50"
+        >
+          Export profile
+        </button>
       </section>
 
-      {(rename.error ?? editHardware.error ?? wipe.error ?? del.error) ? (
+      {exportProfile.data ? (
+        <section className="flex flex-col gap-1">
+          <span className="text-[12px] text-muted">
+            Copied to the clipboard. Save it as <code>{d.avdName}.emuprofile</code>:
+          </span>
+          <textarea
+            data-testid="exported-profile"
+            readOnly
+            value={exportProfile.data}
+            rows={12}
+            className="w-full rounded-md border border-border-default bg-panel p-2 font-mono text-[11px] text-muted"
+          />
+        </section>
+      ) : null}
+
+      {(rename.error ?? editHardware.error ?? wipe.error ?? del.error ?? exportProfile.error) ? (
         <p data-testid="action-error" className="text-[12.5px] text-danger">
-          {(rename.error ?? editHardware.error ?? wipe.error ?? del.error)?.ipc.message}
+          {
+            (rename.error ?? editHardware.error ?? wipe.error ?? del.error ?? exportProfile.error)
+              ?.ipc.message
+          }
         </p>
       ) : null}
 

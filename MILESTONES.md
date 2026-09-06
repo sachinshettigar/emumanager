@@ -148,19 +148,28 @@ of the harness. `currentMilestone` has moved to M4.
 
 - [x] `EmuProfile` structs ↔ `schemas/emuprofile/v1.schema.json`, kept in sync by a test —
       `model_round_trip_stays_schema_valid` (`jsonschema` dev-dep), task `0022`.
-- [~] Export from an emulator and from the create wizard ("Save as profile") — the engine half is
-      done (`EmuProfile::from_emulator` / `from_create_spec`, task `0022`); the UI actions are task `0024`.
-- [~] `inspect_profile(bytes)` → parse + JSON-Schema validate → `resolve()` → diff — `resolve()`
-      done (`emu_core::profile::resolve` → `Plan`, task `0022`); the `inspect_profile` command is task `0023`.
-- [ ] `apply_profile(plan)` → downloads → `create` → tracked instance with `source: Imported` — task `0023`.
-- [ ] Profiles screen: drop zone, import preview with requirement diff + sizes, saved list, actions — task `0024`.
-- [~] Reject non-android / unknown-schema profiles with a specific message — `EmuProfile::validate`
-      + `resolve` reject them (task `0022`); the specific user-facing messages are task `0023`.
-- [ ] Round-trip test: export → wipe → import → equivalent emulator — the pure half
-      (`export_from_an_emulator_round_trips_the_recipe_fields`, task `0022`); the full flow is task `0024`.
+- [x] Export from an emulator and from the Create wizard — `export_profile` command + a "Export
+      profile" button on the detail panel (task `0024`); "Save as profile" in the wizard's review
+      step (builds the `EmuProfile` client-side); `EmuProfile::from_emulator` / `from_create_spec`
+      (task `0022`).
+- [x] `inspect_profile(bytes)` → parse + validate → `resolve()` → diff — `emu_core::profile::resolve`
+      (task `0022`) behind the `inspect_profile` command (task `0023`), rendered as the drop-zone
+      preview (task `0024`).
+- [x] `apply_profile` → ensure image → `create` → tracked instance with `source: Imported`
+      (task `0023`), wired to the Profiles screen's Apply / Apply & launch (task `0024`).
+- [x] Profiles screen: drop zone + file input, import preview with the requirement table + total
+      download, saved-profiles list with Load/Delete, "Save to library" (task `0024`).
+- [x] Reject non-android / unknown-schema profiles with a specific message — `parse_profile`
+      (task `0023`): not-JSON / no `schemaVersion` / unsupported version / wrong platform / bad
+      field, each its own message, surfaced on the Profiles screen.
+- [~] Round-trip test — the pure half is done
+      (`export_from_an_emulator_round_trips_the_recipe_fields`, task `0022`). The full
+      export → wipe → import → boots-again flow is the DoD E2E, deferred to M6's e2e-suite line
+      (same as M2/M3).
 
 DoD: E2E — export a profile, delete the emulator and its image, import the profile, emulator boots
-again. Bonus CI job: export on Linux, import on Windows.
+again. **Deferred to M6** ("E2E suite runs in CI") along with M2's and M3's E2E lines — everything
+else in M4 is done and covered by Rust unit + Vitest tests.
 
 ---
 

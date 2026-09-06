@@ -5,15 +5,16 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
-- **Milestone:** M4 — Profiles: export / import / recreate. Scoped into `0022`–`0024`; `0022`
-  (profile engine) **done** (in review). M3 stays `in_progress` on the same M6 `tauri-driver` E2E
-  line as M0/M1/M2.
-- **Phase:** M4 engine + IPC landed (`0022`, `0023`). `0023`: `src-tauri/src/commands/profile.rs` —
-  `inspect_profile` (parse + validate + `resolve` → a preview diff, with specific rejection
-  messages), `apply_profile` (ensure image → create as `Imported` → optional launch, streaming on
-  `job://emulator`), `export_profile`, and `save_/list_/get_saved_/delete_profile` over a
-  `migrations/0003` `profiles` table with a `json` column. 24 commands. Frontend hooks + the
-  Profiles screen are task `0024`.
+- **Milestone:** M5 — Host readiness & elevated helper (`currentMilestone` advanced). M4 is
+  **functionally complete** — tasks `0022`–`0024` all `done` (engine, IPC, Profiles screen) — and
+  stays `in_progress` on the export→wipe→import E2E deferred to M6, same as M2/M3. No M5 task files
+  yet.
+- **Phase:** M4 done end to end. `0024`: `src/routes/Profiles.tsx` rewritten — a `FileReader`
+  drop zone → `inspect_profile` → a requirement table + Apply / Apply & launch (streams
+  `useEmulatorJob`) + Save-to-library; a saved-profiles list with Load / Delete. Emulator detail
+  gets "Export profile" (clipboard + a read-only `<textarea>`); the Create wizard's review step
+  gets "Save as profile" (builds the `EmuProfile` JSON client-side). `ipc.ts` got the seven
+  profile hooks. Next: scope M5 — Host readiness & elevated helper.
 - **Phase:** M3 done end to end. `0018`: full schema + typed `Registry` API. `0019`: `reconcile()`,
   `delete()`, kill-safety, and the DoD property test (real `avdmanager list avd` fixture captured
   from a real SDK). `0020`: the `AndroidProvider` is now one shared `tauri::State`
@@ -117,10 +118,11 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** task `0024` — the Profiles screen (drop zone → `inspect_profile` preview with
-  the requirement table + total download, Apply; saved-profiles list with apply/delete), an
-  "Export profile" action on the emulator detail panel, and "Save as profile" in the Create
-  wizard's review step. Adds the `ipc.ts` hooks for the `0023` commands. Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
+- **Next action:** scope **M5 — Host readiness & elevated helper** into task files. From
+  `MILESTONES.md` M5: `emu-host` per-OS detection (virtualization, accelerator kind + status, disk,
+  RAM) → `HostReport` + `verdict` + `fixes[]`; the `emu-helper` binary subcommands with structured
+  JSON; `run_helper(fix)` with OS elevation; the Dependencies-screen host panel; graceful
+  degradation when there's no accelerator. Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
   then flip `0009`/`M0` to `done`.
 
 ## Milestone checklist
@@ -137,14 +139,39 @@ Narrative companion to `.agent/state.json`. Update both together (see
       schema + typed `Registry` API; `reconcile` + `delete` + kill-safety + the DoD property test;
       shared managed provider + lifecycle commands + exit reap; detail panel + log console. Stays
       `in_progress` on the same M6 `tauri-driver` E2E line as M0/M1/M2.
-- [~] M4 Profiles: export / import / recreate — **current milestone**, tasks `0022`–`0024`; `0022`
-      (profile engine) and `0023` (IPC — inspect / apply / export + saved-profiles) **done**,
-      `0024` (Profiles screen) todo
+- [~] M4 Profiles: export / import / recreate — tasks `0022`–`0024` all `done` (engine, IPC,
+      Profiles screen). Stays `in_progress` on the export→wipe→import E2E deferred to M6.
+- [~] M5 Host readiness & elevated helper — **current milestone**, no task files yet
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-06 — session 9 (continued) (Claude Code) — task 0024 done (Profiles screen); M4 functionally complete
+
+`src/routes/Profiles.tsx` rewritten from its static placeholder: a `<label>` drop zone wrapping a
+hidden file input (drag-over styling), `FileReader` → `number[]` → `inspect_profile` → a preview
+with name / device / image, a **requirement table** (`installed` / `download N MB` per row), the
+total-download figure or a "ready" note, and **Apply / Apply & launch** (streams `useEmulatorJob`
+just like the Create wizard, links to the Dashboard on success) + **Save to library**. Below it, a
+saved-profiles list from `list_profiles` with **Load** (fetches the JSON and re-inspects it) and
+**Delete**. A rejected file shows the backend's specific `message` verbatim.
+
+Emulator detail gets an **Export profile** button (`export_profile` → clipboard + a read-only
+`<textarea>` — no dialog plugin). The Create wizard's review step gets **Save as profile**, which
+assembles the `EmuProfile` JSON client-side from the wizard selection (parsing `imageCoord`) and
+calls `save_profile`.
+
+`src/lib/ipc.ts` got the seven profile hooks (`useInspectProfile` / `useApplyProfile` /
+`useExportProfile` / `useProfiles` / `useSaveProfile` / `useDeleteProfile` / `getSavedProfile`) —
+all now consumed, so `knip` is green. `Profiles.test.tsx` (4 tests). Gotcha: jsdom's `File` has no
+`arrayBuffer()`, so `readBytes` uses a `FileReader` promise.
+
+131 rust tests, 31 web tests, `just validate` green. **M4 is functionally complete** — engine
+(`0022`), IPC (`0023`), UI (`0024`) all done. It stays `in_progress` only on the DoD E2E
+(export → wipe → import → boots again), deferred to M6's e2e-suite line alongside M2's and M3's.
+`currentMilestone` → M5.
 
 ### 2026-09-06 — session 9 (continued) (Claude Code) — task 0023 done (profile IPC — inspect / apply / export)
 

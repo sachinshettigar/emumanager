@@ -2,8 +2,8 @@
 id: "0024"
 title: "Profiles screen + export actions + Save-as-profile in the wizard"
 milestone: "M4"
-status: "todo"
-owner: ""
+status: "done"
+owner: "Claude Code"
 created: "2026-09-06"
 updated: "2026-09-06"
 ---
@@ -33,24 +33,26 @@ and "Save as profile" in the Create wizard's review step.
 
 ## Acceptance criteria
 
-- [ ] Profiles screen: a real drop zone (`<input type="file" accept=".emuprofile,.json">` +
-      drag-over styling) → reads the file → `inspect_profile` → renders the preview: name,
-      description, device, image, and a **requirement table** (each row `Present` / `needs N MB`),
-      a total-download figure, and an "Apply" button (disabled while a job runs). A rejected file
-      shows the specific backend message.
-- [ ] Saved-profiles list from `list_profiles`: name + summary, "Apply" and "Delete" per row;
-      empty state.
-- [ ] The apply flow streams the same job-log panel the Create wizard uses (`useEmulatorJob`), and
-      on success links to the new emulator on the Dashboard.
-- [ ] Emulator detail: an "Export profile" button → `export_profile(id)` → offer the JSON (write to
-      a file the user picks, or — simplest, note the choice — copy to clipboard + show it).
-- [ ] Create wizard review step: a "Save as profile" button → `save_profile` of the wizard's
-      current selection as an `EmuProfile`.
-- [ ] Vitest: Profiles screen renders a preview from a mocked `inspect_profile`, shows a rejection
-      message, applies a profile; saved list renders + delete calls the command.
-- [ ] `just bindings` clean; `just check-fast` then `just validate` green. **M4 functionally
-      complete** — mark the `MILESTONES.md` M4 boxes; the true export→wipe→import E2E is deferred to
-      M6's e2e-suite line (same as M2/M3).
+- [x] `src/lib/ipc.ts`: `useInspectProfile` / `useApplyProfile` / `useExportProfile` / `useProfiles`
+      / `useSaveProfile` / `useDeleteProfile` / `getSavedProfile`.
+- [x] `src/routes/Profiles.tsx` (rewritten): a `<label>` drop zone wrapping a hidden
+      `<input type="file" accept=".emuprofile,.json">`, drag-over styling, `FileReader` →
+      `number[]` → `inspect_profile`. Preview: name, description, Device / Image, a **requirement
+      table** (`installed` / `download N MB` per row), `ready` note or total-download figure,
+      Apply / Apply & launch (streams `useEmulatorJob`; on success links to the Dashboard) +
+      "Save to library". A rejected file shows the specific backend `message` verbatim.
+- [x] Saved-profiles list from `list_profiles`: name + description, "Load" (fetches the JSON →
+      re-inspects it into the preview) + "Delete" per row; empty state.
+- [x] Emulator detail: an "Export profile" button → `export_profile(id)` → copies the JSON to the
+      clipboard and shows it in a read-only `<textarea>` (chose clipboard + inline over a save
+      dialog — no `tauri-plugin-dialog` dependency).
+- [x] Create wizard review step: a "Save as profile" button — builds the `EmuProfile` JSON
+      **client-side** from the wizard selection (parses `imageCoord`) and calls `save_profile`.
+- [x] Vitest (`Profiles.test.tsx`, 4 tests): preview from a mocked `inspect_profile`, specific
+      rejection message, Apply calls the command, saved list renders + Delete calls the command.
+- [x] `just bindings` clean; `just check-fast` then `just validate` green (131 rust tests, 31 web).
+      **M4 functionally complete** — `MILESTONES.md` M4 boxes marked; the export→wipe→import E2E is
+      deferred to M6's e2e-suite line (same as M2/M3).
 
 ## Validate
 
@@ -61,6 +63,36 @@ just validate
 
 ## Notes / findings
 
-(Fill in: how "export" delivers the file without a Tauri save-dialog plugin — clipboard + a
-`reveal_path` of a written file, or add the dialog plugin; the drop-zone file-read approach under
-jsdom for the test.)
+### File read: `FileReader`, not `File.arrayBuffer()`
+
+jsdom's `File` in this vitest/jsdom version has no `arrayBuffer()` method (the test threw
+`file.arrayBuffer is not a function`). `readBytes` uses a `FileReader` +
+`readAsArrayBuffer` promise instead — works in jsdom and the Tauri webview. The bytes go over IPC
+as `number[]` (`Array.from(new Uint8Array(buf))`) — that's how `bindings.ts` types the `bytes` arg.
+
+### Export delivery: clipboard + inline, no dialog plugin
+
+`export_profile` returns the JSON string; the detail panel copies it to the clipboard
+(`navigator.clipboard?.writeText`, guarded) and renders it in a read-only `<textarea>` for the user
+to save manually. Adding `tauri-plugin-dialog` for a real "Save as…" is a follow-up — not worth a
+plugin + capability entry for M4.
+
+### "Save as profile" builds the recipe client-side
+
+The Create wizard has `deviceId` / `imageCoord` / `name` / `ramMb` / `storageMb` but no assembled
+`EmuProfile`. `saveAsProfile` parses `imageCoord` (`system-images;android-NN;<type>;<abi>`) into
+`{api, type, abi}`, maps the one known tag-vs-schema drift
+(`android-automotive-playstore` → `android-automotive_playstore`), builds the JSON, and calls
+`save_profile` (which validates server-side via `parse_profile`). A non-phone image whose tag has
+other drift would be rejected by `parse_profile` with a message — acceptable edge for M4.
+
+### `applySaved` re-inspects
+
+"Load" on a saved row calls `getSavedProfile(name)` → encodes the JSON to bytes → runs it back
+through `inspect_profile` so the same preview + Apply path is reused (rather than a separate
+"apply by name" flow).
+
+### knip
+
+All the `0023` + `0024` profile hooks now have a consumer (Profiles screen, detail panel, Create
+wizard), so `knip` is green — this is why the hooks were held out of `0023`.

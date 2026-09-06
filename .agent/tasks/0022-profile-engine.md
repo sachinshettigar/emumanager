@@ -2,7 +2,7 @@
 id: "0022"
 title: "Profile engine — resolve() + RequirementDiff + export + schema-sync test"
 milestone: "M4"
-status: "review"
+status: "done"
 owner: "Claude Code"
 created: "2026-09-06"
 updated: "2026-09-06"
