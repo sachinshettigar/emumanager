@@ -148,6 +148,22 @@ function RunProgress({
         <span className="font-semibold text-ink">{heading}</span>
         {run.pct !== null ? <span className="text-muted">{run.pct}%</span> : null}
       </div>
+      {run.running ? (
+        <div
+          data-testid="bootstrap-bar"
+          data-indeterminate={run.pct === null}
+          className="mb-2 h-1.5 overflow-hidden rounded-full bg-panel"
+        >
+          {run.pct !== null ? (
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-300"
+              style={{ width: `${String(run.pct)}%` }}
+            />
+          ) : (
+            <div className="h-full w-full animate-pulse rounded-full bg-primary/60" />
+          )}
+        </div>
+      ) : null}
       {errorMessage ? <p className="mb-2 text-danger">{errorMessage}</p> : null}
       <div
         data-testid="bootstrap-log"

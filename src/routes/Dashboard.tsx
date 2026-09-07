@@ -137,9 +137,12 @@ function EmulatorRow({ emulator }: { emulator: EmulatorInfo }): React.JSX.Elemen
       <div className="flex items-center gap-3">
         <span
           data-testid={`emulator-state-${emulator.id}`}
-          className={`text-[12px] ${STATE_STYLES[emulator.state] ?? "text-muted"}`}
+          className={`flex items-center gap-1.5 text-[12px] ${STATE_STYLES[emulator.state] ?? "text-muted"}`}
         >
-          {emulator.state}
+          {emulator.state === "booting" ? (
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-attention" aria-hidden />
+          ) : null}
+          {emulator.state === "booting" ? "booting…" : emulator.state}
         </span>
         {isRunningOrBooting ? (
           <button

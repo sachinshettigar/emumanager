@@ -119,9 +119,12 @@ export function EmulatorDetail(): React.JSX.Element {
         </button>
         <span
           data-testid="detail-state"
-          className={`ml-auto text-[12px] ${d.state === "running" ? "text-running" : d.state === "booting" ? "text-attention" : d.state === "error" ? "text-danger" : "text-muted"}`}
+          className={`ml-auto flex items-center gap-1.5 text-[12px] ${d.state === "running" ? "text-running" : d.state === "booting" ? "text-attention" : d.state === "error" ? "text-danger" : "text-muted"}`}
         >
-          {d.state}
+          {d.state === "booting" ? (
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-attention" aria-hidden />
+          ) : null}
+          {d.state === "booting" ? "booting…" : d.state}
           {d.adbSerial ? ` · ${d.adbSerial}` : ""}
         </span>
       </section>

@@ -26,7 +26,7 @@ use sha1::{Digest, Sha1};
 use crate::error::{CoreError, Result};
 use crate::model::component::{Component, ComponentId, HostOs};
 use crate::model::job::{JobHandle, Progress};
-use crate::ports::{Command, Downloader, Fs, ProcessRunner};
+use crate::ports::{Command, Downloader, Fs, Output, ProcessRunner};
 
 use super::installed_state::{self, InstalledState};
 
@@ -100,14 +100,10 @@ pub async fn bootstrap(
 
     // A license must be accepted before `sdkmanager` installs anything — needed whether we just
     // unpacked a brand-new `cmdline-tools` or are reusing one `state` already found.
-    accept_licenses(&sdkmanager, ports.process).await?;
+    accept_licenses(&sdkmanager, ports.process, job).await?;
 
     if !remaining_pkgs.is_empty() {
-        job.report(Progress::log(format!(
-            "installing {}",
-            remaining_pkgs.join(", ")
-        )));
-        install_packages(&sdkmanager, &remaining_pkgs, ports.process).await?;
+        install_packages(&sdkmanager, &remaining_pkgs, ports.process, job).await?;
     }
 
     Ok(())
@@ -349,6 +345,33 @@ async fn make_bin_executable(dest_root: &Path, process: &dyn ProcessRunner) -> R
     }
 }
 
+/// Run `cmd` to completion, forwarding every output line to `job` as it arrives (rather than
+/// dumping them all at the end once the process exits). `sdkmanager`'s big downloads —
+/// `emulator` is ~900 MB — otherwise look frozen for minutes. No assumption is made about the
+/// *shape* of a line: it's `sdkmanager`'s own text, passed straight through as a log line.
+async fn run_streamed(
+    cmd: Command,
+    process: &dyn ProcessRunner,
+    job: &JobHandle,
+) -> Result<Output> {
+    let mut child = process.spawn(cmd).await?;
+    while let Some(line) = child.next_line().await? {
+        let trimmed = line.trim_end();
+        if !trimmed.is_empty() {
+            job.report(Progress::log(trimmed.to_string()));
+        }
+    }
+    child.wait().await
+}
+
+fn process_err(sdkmanager: &Path, output: &Output) -> CoreError {
+    CoreError::Process {
+        program: sdkmanager.display().to_string(),
+        code: output.status,
+        stderr: output.stderr.clone(),
+    }
+}
+
 /// `sdkmanager --licenses`, answering every prompt `y`. Real, captured behavior of `sdkmanager`
 /// 19.0 (`cmdline-tools` resolved by task 0010's catalog, run live on 2026-09-05): it prints
 /// `"N of N SDK package licenses not accepted."`, then for each one in turn the license text
@@ -357,41 +380,47 @@ async fn make_bin_executable(dest_root: &Path, process: &dyn ProcessRunner) -> R
 /// [`LICENSE_ACCEPT_COUNT`] `y` answers up front and closing stdin (the real capture needed 7)
 /// accepts them all in one non-interactive call — the documented `yes | sdkmanager --licenses`
 /// pattern, bounded instead of infinite.
-async fn accept_licenses(sdkmanager: &Path, process: &dyn ProcessRunner) -> Result<()> {
+async fn accept_licenses(
+    sdkmanager: &Path,
+    process: &dyn ProcessRunner,
+    job: &JobHandle,
+) -> Result<()> {
+    job.report(Progress {
+        phase: Some("Accepting SDK licenses".to_string()),
+        ..Progress::empty()
+    });
     let stdin = "y\n".repeat(LICENSE_ACCEPT_COUNT).into_bytes();
     let cmd = Command {
         stdin: Some(stdin),
         ..Command::new(sdkmanager.display().to_string()).arg("--licenses")
     };
-    let output = process.run(cmd).await?;
+    let output = run_streamed(cmd, process, job).await?;
     if output.success() {
         Ok(())
     } else {
-        Err(CoreError::Process {
-            program: sdkmanager.display().to_string(),
-            code: output.status,
-            stderr: output.stderr,
-        })
+        Err(process_err(sdkmanager, &output))
     }
 }
 
 /// `sdkmanager <packages...>` — one call installing everything still missing besides
 /// `cmdline-tools` itself. `sdkmanager` accepts any number of package paths in one invocation.
+/// Output is streamed to `job` line by line as `sdkmanager` downloads and unpacks.
 async fn install_packages(
     sdkmanager: &Path,
     packages: &[&str],
     process: &dyn ProcessRunner,
+    job: &JobHandle,
 ) -> Result<()> {
+    job.report(Progress {
+        phase: Some(format!("Downloading & installing {}", packages.join(", "))),
+        ..Progress::empty()
+    });
     let cmd = Command::new(sdkmanager.display().to_string()).args(packages.iter().copied());
-    let output = process.run(cmd).await?;
+    let output = run_streamed(cmd, process, job).await?;
     if output.success() {
         Ok(())
     } else {
-        Err(CoreError::Process {
-            program: sdkmanager.display().to_string(),
-            code: output.status,
-            stderr: output.stderr,
-        })
+        Err(process_err(sdkmanager, &output))
     }
 }
 
@@ -500,17 +529,28 @@ mod tests {
         let process = FakeProcessRunner::new()
             .on_run("java -version", jdk_ok())
             .on_run("chmod -R +x", ok(""))
-            .on_run(
+            .on_spawn(
                 "sdkmanager --licenses",
-                ok("All SDK package licenses accepted"),
+                [
+                    "7 of 7 SDK package licenses not accepted",
+                    "All SDK package licenses accepted",
+                ],
+                ok(""),
             )
-            .on_run("sdkmanager platform-tools", ok(""));
+            .on_spawn(
+                "sdkmanager platform-tools",
+                [
+                    "Preparing \"Install Android SDK Platform-Tools\"",
+                    "\"Install Android SDK Platform-Tools\" (revision: 36.0.0): 100%",
+                ],
+                ok(""),
+            );
         let ports = BootstrapPorts {
             fs: &fs,
             downloader: &downloader,
             process: &process,
         };
-        let (job, _log) = JobHandle::collector(JobId("j".into()));
+        let (job, log) = JobHandle::collector(JobId("j".into()));
 
         bootstrap(
             Path::new("/data"),
@@ -522,6 +562,26 @@ mod tests {
         )
         .await
         .expect("bootstrap succeeds");
+
+        // `sdkmanager`'s own output lines are forwarded to the job as they arrive, not buffered.
+        let (saw_install_line, saw_license_phase) = {
+            let reported = log.lock().unwrap();
+            (
+                reported.iter().any(|p| {
+                    p.log_line
+                        .as_deref()
+                        .is_some_and(|l| l.contains("Install Android SDK Platform-Tools"))
+                }),
+                reported
+                    .iter()
+                    .any(|p| p.phase.as_deref() == Some("Accepting SDK licenses")),
+            )
+        };
+        assert!(
+            saw_install_line,
+            "sdkmanager output lines are forwarded live"
+        );
+        assert!(saw_license_phase, "the license phase is reported");
 
         assert!(fs
             .exists(Path::new("/data/sdk/cmdline-tools/latest/bin/sdkmanager"))

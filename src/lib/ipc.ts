@@ -176,13 +176,18 @@ function applyBootstrapEvent(
   kind: BootstrapProgressKind,
 ): BootstrapRunState {
   switch (kind.type) {
-    case "progress":
+    case "progress": {
+      // A new phase that carries no percentage (e.g. the `sdkmanager` download step, whose
+      // output format we deliberately don't parse) means "percentage unknown from here" — drop
+      // the stale one so the UI shows an indeterminate bar rather than a frozen number.
+      const phaseChanged = kind.phase !== null && kind.phase !== prev.phase;
       return {
         ...prev,
         running: true,
         phase: kind.phase ?? prev.phase,
-        pct: kind.pct ?? prev.pct,
+        pct: kind.pct ?? (phaseChanged ? null : prev.pct),
       };
+    }
     case "log":
       return { ...prev, running: true, log: [...prev.log, kind.line] };
     case "done":
@@ -489,13 +494,16 @@ const INITIAL_EMULATOR_JOB_STATE: EmulatorJobState = {
 
 function applyEmulatorJobEvent(prev: EmulatorJobState, kind: EmulatorJobKind): EmulatorJobState {
   switch (kind.type) {
-    case "progress":
+    case "progress": {
+      // Same rule as the bootstrap reducer: a new phase without a percentage clears the old one.
+      const phaseChanged = kind.phase !== null && kind.phase !== prev.phase;
       return {
         ...prev,
         running: true,
         phase: kind.phase ?? prev.phase,
-        pct: kind.pct ?? prev.pct,
+        pct: kind.pct ?? (phaseChanged ? null : prev.pct),
       };
+    }
     case "log":
       return { ...prev, running: true, log: [...prev.log, kind.line] };
     case "done":

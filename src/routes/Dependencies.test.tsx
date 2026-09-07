@@ -266,6 +266,21 @@ describe("Dependencies screen", () => {
     expect(screen.getByText("42%")).toBeInTheDocument();
     expect(screen.getByTestId("install-button")).toHaveTextContent("Installing…");
 
+    const bar = screen.getByTestId("bootstrap-bar");
+    expect(bar).toHaveAttribute("data-indeterminate", "false");
+    expect(bar.firstElementChild).toHaveStyle({ width: "42%" });
+
+    // A phase with no percentage (the sdkmanager download step) → indeterminate bar.
+    act(() => {
+      emit({
+        jobId: "toolchain-bootstrap",
+        payload: { type: "progress", phase: "Downloading & installing emulator", pct: null },
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("bootstrap-bar")).toHaveAttribute("data-indeterminate", "true");
+    });
+
     act(() => {
       emit({ jobId: "toolchain-bootstrap", payload: { type: "done", ok: true, error: null } });
     });

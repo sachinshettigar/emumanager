@@ -8,8 +8,13 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Phase (8-item feature batch, session 10):** user asked for seven things at once — live device
   telemetry (storage/network/logs), a logcat-style live+filterable viewer, real download/run
   progress %, proper device skins, export-profile parity, a rename, and grouped/customizable
-  device lists. Scoped into `0032`–`0038`. **`0033` (uninstall) done:** the Dependencies screen's
-  per-row Install now has a mirror — an "Uninstall" button (→ "Confirm remove" / "Cancel") on any
+  device lists. Scoped into `0032`–`0038`. **`0034` (progress) done:** `bootstrap` now streams
+  `sdkmanager`'s own output line by line (`ProcessRunner::spawn`) instead of dumping it at the
+  end — the ~900 MB `emulator` download no longer looks frozen. No output-format parsing (no
+  fixture; AGENTS §6.2): the `sdkmanager` phase shows an indeterminate pulse bar, while the
+  `cmdline-tools` archive download — which `NativeDownloader` already measures — shows a real
+  percentage. `RunProgress` gained that bar; Dashboard/Detail show a pulsing "booting…" dot.
+  **`0033` (uninstall) done:** the Dependencies screen's per-row Install now has a mirror — an "Uninstall" button (→ "Confirm remove" / "Cancel") on any
   installed, app-managed component that isn't the command-line tools. New
   `emu_core::toolchain::uninstall` module runs `sdkmanager --uninstall <pkg> --sdk_root=…`;
   it refuses to touch a component that came from a system SDK (Android Studio, `ANDROID_HOME`) —
