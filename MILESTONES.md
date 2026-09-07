@@ -228,6 +228,13 @@ unblocked it's one flip.
 ## M7 — Feature-complete v1.0  (coverage gate: 75%)
 
 - [ ] Full device catalog incl. Wear / TV / Automotive; custom hardware profile editor
+      *(partially done early in the M6 8-item batch: the device step is grouped by form factor
+      with per-group counts — task 0037. The reusable custom **hardware/device profile editor**
+      is still open.)*
+- [ ] Live device inspector — logcat + storage/battery/network
+      *(done early — task 0038: an `adb logcat -v threadtime` stream with level / tag / text
+      filters + pause/clear, and a facts strip (model, Android version, battery, `/data` usage)
+      on the emulator detail panel. Network detail beyond that is still open.)*
 - [ ] Snapshot management (create/boot-from/delete) within a single machine
 - [ ] Headless launch mode + Wayland window handling resolved (spec open question)
 - [ ] APK install into a running emulator (drag-drop)

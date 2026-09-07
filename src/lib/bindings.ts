@@ -123,10 +123,20 @@ export const commands = {
 	probeHost: () => typedError<HostReportDto, IpcError>(__TAURI_INVOKE("probe_host")),
 	/**  Run a scriptable host fix with OS elevation and return `emu-helper`'s structured outcome. */
 	runHelper: (fixId: string) => typedError<HelperOutcomeDto, IpcError>(__TAURI_INVOKE("run_helper", { fixId })),
+	/**
+	 *  Start streaming `adb logcat` for a running emulator. Lines arrive on `device://log`; the
+	 *  stream stops on [`stop_logcat`], on app exit, or when the device goes away.
+	 */
+	startLogcat: (id: string) => typedError<null, IpcError>(__TAURI_INVOKE("start_logcat", { id })),
+	/**  Stop the `adb logcat` stream for `id`. Idempotent — a no-op if none is running. */
+	stopLogcat: (id: string) => typedError<null, IpcError>(__TAURI_INVOKE("stop_logcat", { id })),
+	/**  Model / Android version / battery / `/data` usage for a running emulator. */
+	deviceFacts: (id: string) => typedError<DeviceFactsDto, IpcError>(__TAURI_INVOKE("device_facts", { id })),
 };
 
 /** Events */
 export const events = {
+	deviceLog: makeEvent<DeviceLogLine>("device://log"),
 	jobBootstrap: makeEvent<BootstrapProgress>("job://bootstrap"),
 	jobEmulator: makeEvent<EmulatorJob>("job://emulator"),
 };
@@ -214,6 +224,18 @@ export type CreateEmulatorRequest = {
 	launch: boolean,
 };
 
+/**  A quick snapshot of a running emulator for the inspector's facts strip. */
+export type DeviceFactsDto = {
+	model: string | null,
+	androidRelease: string | null,
+	sdkInt: number | null,
+	batteryPct: number | null,
+	/**  Free space on `/data`, MB. */
+	dataFreeMb: number | null,
+	/**  Total size of `/data`, MB. */
+	dataTotalMb: number | null,
+};
+
 /**  A hardware profile for the Create wizard's device step. */
 export type DeviceInfo = {
 	/**  `avdmanager -d` id, e.g. `pixel_6`. */
@@ -237,6 +259,17 @@ export type DeviceInfo = {
 	 *  emulator can draw around the screen. `None` = no dedicated frame for this device.
 	 */
 	skin: string | null,
+};
+
+/**
+ *  One line of a running emulator's `adb logcat`, emitted as `device://log`. The frontend filters
+ *  by `id` and parses the `-v threadtime` line itself (level / tag / message).
+ */
+export type DeviceLogLine = {
+	/**  The tracked emulator id this line belongs to. */
+	id: string,
+	/**  The raw logcat line, or a synthetic `— … —` marker when the stream ends. */
+	line: string,
 };
 
 /**  Full config + live state for the detail panel. */

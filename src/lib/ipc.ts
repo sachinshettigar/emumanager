@@ -17,6 +17,7 @@ import {
   type BootstrapProgressKind,
   type ComponentInfo,
   type CreateEmulatorRequest,
+  type DeviceFactsDto,
   type DeviceInfo,
   type EmulatorDetail,
   type EmulatorInfo,
@@ -698,5 +699,135 @@ export function useRunHelper() {
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: HOST_REPORT_QUERY_KEY });
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Device inspector (task 0038)
+// ---------------------------------------------------------------------------
+
+/** One parsed `adb logcat -v threadtime` line. `level` is `?` and `tag` empty when the line
+ * doesn't match the threadtime format (a synthetic marker, or a multi-line payload). */
+export interface LogcatLine {
+  raw: string;
+  level: string;
+  tag: string;
+  message: string;
+}
+
+/** `MM-DD HH:MM:SS.mmm  PID  TID L TAG: message` — the documented `threadtime` format
+ * (https://developer.android.com/tools/logcat#outputFormat). */
+const THREADTIME = /^\d\d-\d\d \d\d:\d\d:\d\d\.\d+\s+\d+\s+\d+\s+([VDIWEF])\s+(.+?):\s?(.*)$/;
+
+/** Ordering used by the "minimum level" filter, mirroring Android Studio's Logcat. */
+export const LOGCAT_LEVELS = ["V", "D", "I", "W", "E"] as const;
+const LEVEL_RANK: Record<string, number> = { V: 0, D: 1, I: 2, W: 3, E: 4, F: 5 };
+
+function parseLogcatLine(raw: string): LogcatLine {
+  const m = THREADTIME.exec(raw);
+  if (!m) {
+    return { raw, level: "?", tag: "", message: raw };
+  }
+  return { raw, level: m[1] ?? "?", tag: (m[2] ?? "").trim(), message: m[3] ?? "" };
+}
+
+/** Filter parsed lines by a minimum level, a tag substring and a free-text substring — the
+ * same three knobs Android Studio's Logcat exposes. An unparsed line (`level === "?"`) always
+ * passes the level gate so nothing is silently dropped. */
+export function filterLogcat(
+  lines: LogcatLine[],
+  opts: { minLevel: string; tag: string; text: string },
+): LogcatLine[] {
+  const min = LEVEL_RANK[opts.minLevel] ?? 0;
+  const tag = opts.tag.trim().toLowerCase();
+  const text = opts.text.trim().toLowerCase();
+  return lines.filter((l) => {
+    if (l.level !== "?" && (LEVEL_RANK[l.level] ?? 0) < min) {
+      return false;
+    }
+    if (tag && !l.tag.toLowerCase().includes(tag)) {
+      return false;
+    }
+    if (text && !l.raw.toLowerCase().includes(text)) {
+      return false;
+    }
+    return true;
+  });
+}
+
+async function startLogcat(id: string): Promise<undefined> {
+  unwrap(await commands.startLogcat(id));
+  return undefined;
+}
+
+async function stopLogcat(id: string): Promise<undefined> {
+  unwrap(await commands.stopLogcat(id));
+  return undefined;
+}
+
+/** Start / stop the backend `adb logcat` stream for an emulator. */
+export function useStartLogcat() {
+  return useMutation<undefined, IpcCallError, string>({ mutationFn: startLogcat });
+}
+export function useStopLogcat() {
+  return useMutation<undefined, IpcCallError, string>({ mutationFn: stopLogcat });
+}
+
+/** Accumulate `device://log` lines for one emulator (capped), with a `clear`. Subscribing does
+ * not start the stream — call {@link useStartLogcat} for that. */
+export function useLogcatStream(id: string): { lines: LogcatLine[]; clear: () => void } {
+  const [lines, setLines] = useState<LogcatLine[]>([]);
+
+  useEffect(() => {
+    setLines([]);
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+
+    void events.deviceLog
+      .listen((event) => {
+        if (event.payload.id !== id) {
+          return;
+        }
+        setLines((prev) => {
+          const next = [...prev, parseLogcatLine(event.payload.line)];
+          return next.length > 5000 ? next.slice(next.length - 5000) : next;
+        });
+      })
+      .then((fn) => {
+        if (cancelled) {
+          fn();
+        } else {
+          unlisten = fn;
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [id]);
+
+  return {
+    lines,
+    clear: () => {
+      setLines([]);
+    },
+  };
+}
+
+async function deviceFacts(id: string): Promise<DeviceFactsDto> {
+  return unwrap(await commands.deviceFacts(id));
+}
+
+/** Poll a running emulator's model / Android version / battery / storage every 5 s. */
+export function useDeviceFacts(
+  id: string,
+  enabled: boolean,
+): UseQueryResult<DeviceFactsDto, IpcCallError> {
+  return useQuery<DeviceFactsDto, IpcCallError>({
+    queryKey: ["device-facts", id],
+    queryFn: () => deviceFacts(id),
+    enabled,
+    refetchInterval: 5000,
   });
 }

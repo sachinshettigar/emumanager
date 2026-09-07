@@ -8,7 +8,14 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Phase (8-item feature batch, session 10):** user asked for seven things at once — live device
   telemetry (storage/network/logs), a logcat-style live+filterable viewer, real download/run
   progress %, proper device skins, export-profile parity, a rename, and grouped/customizable
-  device lists. Scoped into `0032`–`0038`. **`0037` (device grouping) done:** the Create wizard's
+  device lists. Scoped into `0032`–`0038`. **`0038` (device inspector) done — the batch is
+  complete.** The emulator detail panel gained a "Device" section: a facts strip (model, Android
+  version + API, battery %, `/data` free/total — from defensively-parsed `adb shell` one-shots,
+  polled every 5 s) and a live `adb logcat -v threadtime` viewer with Android-Studio-style
+  filters — minimum level (V/D/I/W/E), tag, free text — plus pause (freezes a snapshot), clear,
+  and a shown/total line counter. Backend: `AndroidProvider::{logcat_start,logcat_stop,
+  device_facts}` + a `logcats` child map reaped on shutdown; a `device://log` event streamed by a
+  background drain task. **`0037` (device grouping) done:** the Create wizard's
   device step was one flat list; it's now grouped into collapsible sections by form factor
   (Phones / Tablets / Foldables / Wear OS / Android TV / Automotive / Desktop) with per-group
   counts, collapsed by default and auto-opening on search or selection. Each row shows OEM /

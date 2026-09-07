@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { EmulatorDetail } from "./EmulatorDetail";
-import { commands } from "../lib/bindings";
+import { commands, events } from "../lib/bindings";
 import type { EmulatorDetail as EmulatorDetailDto } from "../lib/bindings";
 
 vi.mock("../lib/bindings", () => ({
@@ -36,9 +36,13 @@ vi.mock("../lib/bindings", () => ({
       },
     }),
     runHelper: vi.fn(),
+    startLogcat: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    stopLogcat: vi.fn().mockResolvedValue({ status: "ok", data: null }),
+    deviceFacts: vi.fn(),
   },
   events: {
     jobEmulator: { listen: vi.fn().mockResolvedValue(() => {}) },
+    deviceLog: { listen: vi.fn().mockResolvedValue(() => {}) },
   },
 }));
 
@@ -139,6 +143,64 @@ describe("EmulatorDetail", () => {
     await waitFor(() => {
       expect(screen.getByText(/emulator not found/)).toBeInTheDocument();
     });
+  });
+
+  it("streams logcat and filters it by level and text", async () => {
+    detailMock.mockResolvedValue({ status: "ok", data: { ...DETAIL, state: "running" } });
+    vi.mocked(commands.deviceFacts).mockResolvedValue({
+      status: "ok",
+      data: {
+        model: "sdk_gphone64_arm64",
+        androidRelease: "14",
+        sdkInt: 34,
+        batteryPct: 100,
+        dataFreeMb: 5000,
+        dataTotalMb: 6000,
+      },
+    });
+    let emitLog: (payload: { id: string; line: string }) => void = () => {
+      throw new Error("deviceLog.listen not resolved");
+    };
+    vi.mocked(events.deviceLog.listen).mockImplementation((cb) => {
+      emitLog = (payload) => {
+        cb({ payload } as Parameters<typeof cb>[0]);
+      };
+      return Promise.resolve(() => {});
+    });
+
+    renderDetail();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("device-facts")).toHaveTextContent("sdk_gphone64_arm64");
+    });
+    fireEvent.click(screen.getByTestId("logcat-toggle"));
+    await waitFor(() => {
+      expect(vi.mocked(commands.startLogcat)).toHaveBeenCalledWith("01J0ABC");
+    });
+
+    act(() => {
+      emitLog({
+        id: "01J0ABC",
+        line: "01-02 03:04:05.678  1234  1234 I ActivityManager: hello world",
+      });
+      emitLog({
+        id: "01J0ABC",
+        line: "01-02 03:04:06.100  1234  1300 E AndroidRuntime: FATAL EXCEPTION",
+      });
+      emitLog({ id: "other-emulator", line: "01-02 03:04:07.000 1 1 I X: not mine" });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("logcat-console")).toHaveTextContent("hello world");
+    });
+    expect(screen.getByTestId("logcat-console")).not.toHaveTextContent("not mine");
+
+    // Raise the minimum level to E — the Info line drops out.
+    fireEvent.change(screen.getByTestId("logcat-level"), { target: { value: "E" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("logcat-console")).not.toHaveTextContent("hello world");
+    });
+    expect(screen.getByTestId("logcat-console")).toHaveTextContent("FATAL EXCEPTION");
   });
 
   it("saves the profile to a file and shows the path", async () => {

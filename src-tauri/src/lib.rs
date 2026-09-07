@@ -61,10 +61,14 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::profile::delete_profile,
             commands::host::probe_host,
             commands::host::run_helper,
+            commands::device::start_logcat,
+            commands::device::stop_logcat,
+            commands::device::device_facts,
         ])
         .events(collect_events![
             commands::toolchain::BootstrapProgress,
             commands::emulator::EmulatorJob,
+            commands::device::DeviceLogLine,
         ])
 }
 

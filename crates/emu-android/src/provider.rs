@@ -55,7 +55,25 @@ const LOG_DRAIN_SLICE: Duration = Duration::from_millis(250);
 
 /// A live child process the provider is responsible for — shared so a background drain can keep
 /// reading its output while `stop` can still `wait`/`kill` it.
-type ChildHandle = Arc<AsyncMutex<Box<dyn ChildProcess>>>;
+pub type ChildHandle = Arc<AsyncMutex<Box<dyn ChildProcess>>>;
+
+/// A quick read of a running device: what the inspector's facts strip shows. Every field is
+/// `Option` — a value only appears when its `adb` one-shot ran and parsed cleanly.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DeviceFacts {
+    /// `ro.product.model`.
+    pub model: Option<String>,
+    /// `ro.build.version.release` (e.g. `"14"`).
+    pub android_release: Option<String>,
+    /// `ro.build.version.sdk` (API level).
+    pub sdk_int: Option<u32>,
+    /// Battery charge percent from `dumpsys battery` (`level:`).
+    pub battery_pct: Option<u8>,
+    /// Free space on `/data`, MB, from `df /data`.
+    pub data_free_mb: Option<u64>,
+    /// Total size of `/data`, MB, from `df /data`.
+    pub data_total_mb: Option<u64>,
+}
 
 /// One registry-tracked emulator plus its live run state — [`AndroidProvider::tracked_states`]'s
 /// element type, what the Dashboard renders.
@@ -89,6 +107,9 @@ pub struct AndroidProvider {
     /// process — "never orphans the process" in the task's acceptance criteria — and keeps its
     /// stdout pipe drained so a chatty emulator never blocks on a full buffer.
     running: StdMutex<HashMap<EmulatorId, ChildHandle>>,
+    /// Long-lived `adb logcat` streams the device inspector started, keyed by our id. One per
+    /// emulator; starting a new one replaces (and kills) any previous. Reaped on `shutdown`.
+    logcats: StdMutex<HashMap<EmulatorId, ChildHandle>>,
 }
 
 impl AndroidProvider {
@@ -110,6 +131,7 @@ impl AndroidProvider {
             boot_timeout: DEFAULT_BOOT_TIMEOUT,
             stop_timeout: DEFAULT_STOP_TIMEOUT,
             running: StdMutex::new(HashMap::new()),
+            logcats: StdMutex::new(HashMap::new()),
         }
     }
 
@@ -349,8 +371,13 @@ impl AndroidProvider {
     /// so quitting never orphans an emulator we launched. Best-effort and time-boxed per child.
     pub async fn shutdown(&self) {
         let children: Vec<ChildHandle> = {
-            let mut map = self.running.lock().expect("running map poisoned");
-            map.drain().map(|(_, child)| child).collect()
+            let mut running = self.running.lock().expect("running map poisoned");
+            let mut logcats = self.logcats.lock().expect("logcats map poisoned");
+            running
+                .drain()
+                .chain(logcats.drain())
+                .map(|(_, child)| child)
+                .collect()
         };
         for child in children {
             let mut guard = child.lock().await;
@@ -360,6 +387,134 @@ impl AndroidProvider {
             })
             .await;
         }
+    }
+
+    /// Resolve the `emulator-NNNN` serial for a tracked emulator that is currently running, or a
+    /// clear error if it isn't.
+    async fn running_serial(&self, id: &EmulatorId) -> Result<String> {
+        let avd_name = self
+            .registry
+            .get_row(id.as_str())
+            .await?
+            .ok_or_else(|| CoreError::NotFound {
+                what: "emulator",
+                name: id.to_string(),
+            })?
+            .avd_name;
+        let sdk_root = self.sdk_root().await?;
+        let adb = self.adb_path(&sdk_root);
+        self.serial_for_avd(&adb, &avd_name)
+            .await?
+            .ok_or_else(|| CoreError::Invalid {
+                what: "device inspector",
+                detail: format!("emulator '{avd_name}' isn't running"),
+            })
+    }
+
+    /// Start streaming `adb -s <serial> logcat -v threadtime` for a running emulator and hand back
+    /// the child handle — the caller drains its lines and emits them. Any existing stream for the
+    /// same id is killed first. `-v threadtime` is the documented parseable format
+    /// (<https://developer.android.com/tools/logcat#outputFormat>).
+    ///
+    /// # Errors
+    /// [`CoreError::NotFound`] for an unknown id, [`CoreError::Invalid`] when it isn't running.
+    pub async fn logcat_start(&self, id: &EmulatorId) -> Result<ChildHandle> {
+        let serial = self.running_serial(id).await?;
+        self.logcat_stop(id).await;
+
+        let sdk_root = self.sdk_root().await?;
+        let adb = self.adb_path(&sdk_root);
+        let cmd = Command::new(adb.display().to_string())
+            .args(["-s", &serial])
+            .args(["logcat", "-v", "threadtime"]);
+        let child = self.process.spawn(cmd).await?;
+        let handle: ChildHandle = Arc::new(AsyncMutex::new(child));
+        self.logcats
+            .lock()
+            .expect("logcats map poisoned")
+            .insert(id.clone(), Arc::clone(&handle));
+        Ok(handle)
+    }
+
+    /// Kill and forget the `adb logcat` stream for `id`, if any. Idempotent.
+    pub async fn logcat_stop(&self, id: &EmulatorId) {
+        let handle = self
+            .logcats
+            .lock()
+            .expect("logcats map poisoned")
+            .remove(id);
+        if let Some(handle) = handle {
+            let mut guard = handle.lock().await;
+            let _ = guard.kill().await;
+            let _ = guard.wait().await;
+        }
+    }
+
+    /// A quick snapshot of a running emulator: model, Android version, battery, `/data` usage —
+    /// each from a small `adb shell` one-shot, parsed defensively (a value that doesn't parse is
+    /// simply left `None`).
+    ///
+    /// `getprop` keys and `df` / `dumpsys battery` output shapes are standard and stable; the
+    /// parsers here only take the first plausible token and never guess.
+    pub async fn device_facts(&self, id: &EmulatorId) -> Result<DeviceFacts> {
+        let serial = self.running_serial(id).await?;
+        let sdk_root = self.sdk_root().await?;
+        let adb = self.adb_path(&sdk_root);
+
+        let getprop = |key: &str| {
+            let adb = adb.display().to_string();
+            let serial = serial.clone();
+            let key = key.to_string();
+            async move {
+                self.process
+                    .run(
+                        Command::new(adb)
+                            .args(["-s", &serial])
+                            .args(["shell", "getprop", &key]),
+                    )
+                    .await
+                    .ok()
+                    .map(|o| o.stdout.trim().to_string())
+                    .filter(|s| !s.is_empty())
+            }
+        };
+
+        let model = getprop("ro.product.model").await;
+        let android_release = getprop("ro.build.version.release").await;
+        let sdk_int = getprop("ro.build.version.sdk")
+            .await
+            .and_then(|s| s.parse().ok());
+
+        let battery_pct = self
+            .process
+            .run(
+                Command::new(adb.display().to_string())
+                    .args(["-s", &serial])
+                    .args(["shell", "dumpsys", "battery"]),
+            )
+            .await
+            .ok()
+            .and_then(|o| parse_battery_level(&o.stdout));
+
+        let (data_free_mb, data_total_mb) = self
+            .process
+            .run(
+                Command::new(adb.display().to_string())
+                    .args(["-s", &serial])
+                    .args(["shell", "df", "/data"]),
+            )
+            .await
+            .ok()
+            .map_or((None, None), |o| parse_df_data(&o.stdout));
+
+        Ok(DeviceFacts {
+            model,
+            android_release,
+            sdk_int,
+            battery_pct,
+            data_free_mb,
+            data_total_mb,
+        })
     }
 
     fn avdmanager_path(&self, sdk_root: &Path) -> PathBuf {
@@ -474,6 +629,37 @@ fn gpu_mode(graphics: Graphics) -> &'static str {
         // `Graphics::Auto` and any future non_exhaustive variant → the emulator's own default.
         _ => "auto",
     }
+}
+
+/// The `level: NN` line of `adb shell dumpsys battery` → percent. `dumpsys battery` prints a
+/// block of `  key: value` lines; `level` is the charge percent (0-100). Anything unparseable →
+/// `None`.
+fn parse_battery_level(dumpsys: &str) -> Option<u8> {
+    dumpsys.lines().find_map(|line| {
+        let rest = line.trim().strip_prefix("level:")?;
+        rest.trim().parse().ok()
+    })
+}
+
+/// `adb shell df /data` → (free MB, total MB). `df` prints a header row then one data row whose
+/// columns are `Filesystem 1K-blocks Used Available Use% Mounted-on` (POSIX). Values are in
+/// 1 KiB blocks. A row that doesn't have enough numeric columns → `(None, None)`.
+fn parse_df_data(df: &str) -> (Option<u64>, Option<u64>) {
+    let Some(row) = df.lines().nth(1) else {
+        return (None, None);
+    };
+    let cols: Vec<&str> = row.split_whitespace().collect();
+    // total = 1K-blocks (col 1), free = Available (col 3).
+    let kib_to_mb = |kib: u64| kib / 1024;
+    let total = cols
+        .get(1)
+        .and_then(|c| c.parse::<u64>().ok())
+        .map(kib_to_mb);
+    let free = cols
+        .get(3)
+        .and_then(|c| c.parse::<u64>().ok())
+        .map(kib_to_mb);
+    (free, total)
 }
 
 #[async_trait]
@@ -1281,6 +1467,62 @@ mod tests {
             gpu_mode(Graphics::SwiftshaderIndirect),
             "swiftshader_indirect"
         );
+    }
+
+    #[test]
+    fn parse_battery_level_reads_the_dumpsys_line() {
+        let dumpsys = "Current Battery Service state:\n  AC powered: false\n  level: 87\n  scale: 100\n  temperature: 250\n";
+        assert_eq!(parse_battery_level(dumpsys), Some(87));
+        assert_eq!(parse_battery_level("no battery block here"), None);
+    }
+
+    #[test]
+    fn parse_df_data_reads_available_and_total_in_mb() {
+        // `df /data` on a real emulator, 1 KiB blocks.
+        let df = "Filesystem     1K-blocks   Used Available Use% Mounted on\n/dev/block/dm-5  6154240 812340   5341900  14% /data\n";
+        let (free, total) = parse_df_data(df);
+        assert_eq!(free, Some(5_341_900 / 1024));
+        assert_eq!(total, Some(6_154_240 / 1024));
+        assert_eq!(parse_df_data("header only\n"), (None, None));
+    }
+
+    #[tokio::test]
+    async fn logcat_start_streams_lines_until_stopped() {
+        let fs = InMemoryFs::new();
+        let process = FakeProcessRunner::new()
+            .on_run(
+                "adb devices",
+                ok("List of devices attached\nemulator-5554\tdevice\n"),
+            )
+            .on_run("emu avd name", ok("pixel6_api34\nOK\n"))
+            .on_spawn_lingering(
+                "logcat -v threadtime",
+                [
+                    "01-02 03:04:05.678  1234  1234 I ActivityManager: Start proc",
+                    "01-02 03:04:06.001  1234  1300 W Choreographer: skipped frames",
+                ],
+                ok(""),
+            );
+        let (provider, _dir) = provider_with(process, fs).await;
+        let id = seed_emulator(&provider).await;
+
+        let handle = provider.logcat_start(&id).await.expect("logcat starts");
+        let mut got = Vec::new();
+        {
+            let mut child = handle.lock().await;
+            while let Ok(Some(line)) = child.next_line().await {
+                got.push(line);
+                if got.len() == 2 {
+                    break;
+                }
+            }
+        }
+        assert!(got[0].contains("ActivityManager"));
+        assert!(got[1].contains("Choreographer"));
+
+        provider.logcat_stop(&id).await;
+        // A second stop is a no-op, not a panic.
+        provider.logcat_stop(&id).await;
     }
 
     // ---- launch / stop (task 0016) --------------------------------------------------------

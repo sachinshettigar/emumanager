@@ -3,8 +3,11 @@ import { Link, useParams } from "react-router-dom";
 
 import { Placeholder, Screen } from "../components/Screen";
 import {
+  filterLogcat,
+  LOGCAT_LEVELS,
   revealPath,
   useDeleteEmulator,
+  useDeviceFacts,
   useEditHardware,
   useEmulatorDetail,
   useEmulatorJob,
@@ -13,9 +16,13 @@ import {
   useExportProfileToFile,
   useHostReport,
   useLaunchEmulator,
+  useLogcatStream,
   useRenameEmulator,
+  useStartLogcat,
   useStopEmulator,
+  useStopLogcat,
   useWipeEmulatorData,
+  type LogcatLine,
 } from "../lib/ipc";
 
 const GRAPHICS_OPTIONS = ["auto", "host", "swiftshader"] as const;
@@ -477,7 +484,177 @@ export function EmulatorDetail(): React.JSX.Element {
           )}
         </div>
       </section>
+
+      <DeviceInspector id={id} running={d.state === "running"} />
     </Screen>
+  );
+}
+
+/** Live device telemetry for a running emulator: a facts strip + an Android-Studio-style
+ * `adb logcat` viewer with level / tag / text filters, pause and clear. */
+function DeviceInspector({ id, running }: { id: string; running: boolean }): React.JSX.Element {
+  const facts = useDeviceFacts(id, running);
+  const startLogcat = useStartLogcat();
+  const stopLogcat = useStopLogcat();
+  const { lines, clear } = useLogcatStream(id);
+
+  const [streaming, setStreaming] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [frozen, setFrozen] = useState<LogcatLine[]>([]);
+  const [minLevel, setMinLevel] = useState("V");
+  const [tag, setTag] = useState("");
+  const [text, setText] = useState("");
+
+  const source = paused ? frozen : lines;
+  const shown = useMemo(
+    () => filterLogcat(source, { minLevel, tag, text }),
+    [source, minLevel, tag, text],
+  );
+
+  const toggleStream = (): void => {
+    if (streaming) {
+      stopLogcat.mutate(id);
+      setStreaming(false);
+    } else {
+      clear();
+      startLogcat.mutate(id);
+      setStreaming(true);
+    }
+  };
+
+  const LEVEL_TONE: Record<string, string> = {
+    E: "text-danger",
+    W: "text-attention",
+    I: "text-ink",
+    D: "text-muted",
+    V: "text-faint",
+  };
+
+  return (
+    <section className="flex flex-col gap-2" data-testid="device-inspector">
+      <h2 className="text-[13px] font-semibold text-ink">Device</h2>
+
+      <div
+        data-testid="device-facts"
+        className="flex flex-wrap gap-x-4 gap-y-1 rounded-card border border-border-default bg-surface px-3.5 py-2.5 text-[12px] text-muted"
+      >
+        {!running ? (
+          <span>Start the emulator to read its live state.</span>
+        ) : facts.data ? (
+          <>
+            <span>{facts.data.model ?? "unknown model"}</span>
+            <span>
+              Android {facts.data.androidRelease ?? "?"}
+              {facts.data.sdkInt === null ? "" : ` · API ${String(facts.data.sdkInt)}`}
+            </span>
+            <span>
+              Battery {facts.data.batteryPct === null ? "?" : `${String(facts.data.batteryPct)}%`}
+            </span>
+            <span>
+              /data{" "}
+              {facts.data.dataFreeMb === null
+                ? "?"
+                : `${String(facts.data.dataFreeMb)} MB free${
+                    facts.data.dataTotalMb === null
+                      ? ""
+                      : ` of ${String(facts.data.dataTotalMb)} MB`
+                  }`}
+            </span>
+          </>
+        ) : (
+          <span>{facts.error ? facts.error.ipc.message : "reading…"}</span>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 text-[12px]">
+        <button
+          type="button"
+          data-testid="logcat-toggle"
+          disabled={!running || startLogcat.isPending || stopLogcat.isPending}
+          onClick={toggleStream}
+          className="rounded-md border border-border-default px-3 py-1.5 disabled:opacity-50"
+        >
+          {streaming ? "Stop logcat" : "Start logcat"}
+        </button>
+        <select
+          data-testid="logcat-level"
+          value={minLevel}
+          onChange={(e) => {
+            setMinLevel(e.target.value);
+          }}
+          className="rounded-md border border-border-default bg-surface px-2 py-1.5"
+        >
+          {LOGCAT_LEVELS.map((lv) => (
+            <option key={lv} value={lv}>
+              {lv}+
+            </option>
+          ))}
+        </select>
+        <input
+          type="text"
+          data-testid="logcat-tag"
+          value={tag}
+          onChange={(e) => {
+            setTag(e.target.value);
+          }}
+          placeholder="tag"
+          className="w-28 rounded-md border border-border-default bg-surface px-2 py-1.5"
+        />
+        <input
+          type="text"
+          data-testid="logcat-text"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+          }}
+          placeholder="filter text"
+          className="w-40 rounded-md border border-border-default bg-surface px-2 py-1.5"
+        />
+        <label className="flex items-center gap-1.5 text-muted">
+          <input
+            type="checkbox"
+            data-testid="logcat-pause"
+            checked={paused}
+            onChange={(e) => {
+              setPaused(e.target.checked);
+              setFrozen(e.target.checked ? lines : []);
+            }}
+          />
+          Pause
+        </label>
+        <button
+          type="button"
+          data-testid="logcat-clear"
+          onClick={() => {
+            clear();
+            setFrozen([]);
+          }}
+          className="text-primary underline"
+        >
+          Clear
+        </button>
+        <span className="text-faint">
+          {shown.length} / {source.length} lines
+        </span>
+      </div>
+
+      <div
+        data-testid="logcat-console"
+        className="max-h-72 overflow-y-auto rounded-md bg-panel p-2 font-mono text-[11px] leading-snug"
+      >
+        {shown.length === 0 ? (
+          <p className="text-muted">
+            {streaming ? "Waiting for matching log lines…" : "Logcat is not running."}
+          </p>
+        ) : (
+          shown.map((l, i) => (
+            <p key={`${String(i)}-${l.raw}`} className={LEVEL_TONE[l.level] ?? "text-muted"}>
+              {l.raw}
+            </p>
+          ))
+        )}
+      </div>
+    </section>
   );
 }
 
