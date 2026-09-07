@@ -605,6 +605,18 @@ export function useExportProfile() {
   return useMutation<string, IpcCallError, string>({ mutationFn: exportProfile });
 }
 
+async function exportProfileToFile(id: string): Promise<string> {
+  return unwrap(await commands.exportProfileToFile(id));
+}
+
+/**
+ * Mutation hook that writes an emulator's `.emuprofile` to a file under the app data dir and
+ * resolves to its path — the mirror of the Profiles screen's drag-in import.
+ */
+export function useExportProfileToFile() {
+  return useMutation<string, IpcCallError, string>({ mutationFn: exportProfileToFile });
+}
+
 async function listProfiles(): Promise<ProfileSummary[]> {
   return unwrap(await commands.listProfiles());
 }

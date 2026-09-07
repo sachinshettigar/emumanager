@@ -19,6 +19,7 @@ vi.mock("../lib/bindings", () => ({
     stopEmulator: vi.fn(),
     revealPath: vi.fn(),
     exportProfile: vi.fn(),
+    exportProfileToFile: vi.fn(),
     probeHost: vi.fn().mockResolvedValue({
       status: "ok",
       data: {
@@ -137,6 +138,25 @@ describe("EmulatorDetail", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/emulator not found/)).toBeInTheDocument();
+    });
+  });
+
+  it("saves the profile to a file and shows the path", async () => {
+    detailMock.mockResolvedValue({ status: "ok", data: DETAIL });
+    vi.mocked(commands.exportProfileToFile).mockResolvedValue({
+      status: "ok",
+      data: "/home/u/.local/share/emulator-studio/exports/pixel6_api34.emuprofile",
+    });
+    renderDetail();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("export-profile-file")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("export-profile-file"));
+
+    await waitFor(() => {
+      expect(vi.mocked(commands.exportProfileToFile)).toHaveBeenCalledWith("01J0ABC");
+      expect(screen.getByTestId("exported-path")).toHaveTextContent("pixel6_api34.emuprofile");
     });
   });
 });

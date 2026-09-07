@@ -6,6 +6,7 @@ import {
   useComponents,
   useEmulators,
   useHostReport,
+  useExportProfileToFile,
   useLaunchEmulator,
   usePing,
   useReconcileNow,
@@ -112,6 +113,7 @@ function EmulatorRow({ emulator }: { emulator: EmulatorInfo }): React.JSX.Elemen
   const launch = useLaunchEmulator();
   const stop = useStopEmulator();
   const host = useHostReport();
+  const exportFile = useExportProfileToFile();
   const isRunningOrBooting = emulator.state === "running" || emulator.state === "booting";
   const blocked = host.data?.verdict === "cannotRun";
   const busy = launch.isPending || stop.isPending;
@@ -144,6 +146,22 @@ function EmulatorRow({ emulator }: { emulator: EmulatorInfo }): React.JSX.Elemen
           ) : null}
           {emulator.state === "booting" ? "booting…" : emulator.state}
         </span>
+        <button
+          type="button"
+          data-testid={`export-${emulator.id}`}
+          disabled={exportFile.isPending}
+          title={
+            exportFile.data
+              ? `Saved to ${exportFile.data}`
+              : "Save this emulator as a portable .emuprofile file"
+          }
+          onClick={() => {
+            exportFile.mutate(emulator.id);
+          }}
+          className="rounded-md border border-border-default px-3 py-1.5 text-[12px] text-muted disabled:opacity-50"
+        >
+          {exportFile.isPending ? "Exporting…" : exportFile.data ? "Exported ✓" : "Export"}
+        </button>
         {isRunningOrBooting ? (
           <button
             type="button"

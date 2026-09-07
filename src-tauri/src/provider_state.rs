@@ -67,4 +67,10 @@ impl ManagedProvider {
     pub fn peek(&self) -> Option<Arc<AndroidProvider>> {
         self.cell.get().cloned()
     }
+
+    /// The app data directory recorded at startup, if the host was supported.
+    #[must_use]
+    pub fn data_dir(&self) -> Option<&std::path::Path> {
+        self.init.as_ref().map(|(p, _)| p.as_path())
+    }
 }

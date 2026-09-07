@@ -54,6 +54,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::profile::inspect_profile,
             commands::profile::apply_profile,
             commands::profile::export_profile,
+            commands::profile::export_profile_to_file,
             commands::profile::save_profile,
             commands::profile::list_profiles,
             commands::profile::get_saved_profile,

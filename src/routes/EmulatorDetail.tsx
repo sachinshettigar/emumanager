@@ -10,6 +10,7 @@ import {
   useEmulatorJob,
   useEmulatorLogTail,
   useExportProfile,
+  useExportProfileToFile,
   useHostReport,
   useLaunchEmulator,
   useRenameEmulator,
@@ -43,6 +44,7 @@ export function EmulatorDetail(): React.JSX.Element {
   const host = useHostReport();
   const stop = useStopEmulator();
   const exportProfile = useExportProfile();
+  const exportProfileToFile = useExportProfileToFile();
 
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [hw, setHw] = useState<{
@@ -366,9 +368,38 @@ export function EmulatorDetail(): React.JSX.Element {
           }}
           className="rounded-md border border-border-default px-3.5 py-2 text-[13px] disabled:opacity-50"
         >
-          Export profile
+          Copy profile
+        </button>
+        <button
+          type="button"
+          data-testid="export-profile-file"
+          disabled={exportProfileToFile.isPending}
+          onClick={() => {
+            exportProfileToFile.mutate(id);
+          }}
+          className="rounded-md border border-border-default px-3.5 py-2 text-[13px] disabled:opacity-50"
+        >
+          Save as .emuprofile
         </button>
       </section>
+
+      {exportProfileToFile.data ? (
+        <section className="flex flex-wrap items-center gap-2 text-[12px] text-muted">
+          <span>
+            Saved to <code data-testid="exported-path">{exportProfileToFile.data}</code>
+          </span>
+          <button
+            type="button"
+            data-testid="reveal-exported"
+            onClick={() => {
+              void revealPath(exportProfileToFile.data);
+            }}
+            className="rounded-md border border-border-default px-2.5 py-1 text-[11px]"
+          >
+            Show in folder
+          </button>
+        </section>
+      ) : null}
 
       {exportProfile.data ? (
         <section className="flex flex-col gap-1">
@@ -385,11 +416,22 @@ export function EmulatorDetail(): React.JSX.Element {
         </section>
       ) : null}
 
-      {(rename.error ?? editHardware.error ?? wipe.error ?? del.error ?? exportProfile.error) ? (
+      {(rename.error ??
+      editHardware.error ??
+      wipe.error ??
+      del.error ??
+      exportProfile.error ??
+      exportProfileToFile.error) ? (
         <p data-testid="action-error" className="text-[12.5px] text-danger">
           {
-            (rename.error ?? editHardware.error ?? wipe.error ?? del.error ?? exportProfile.error)
-              ?.ipc.message
+            (
+              rename.error ??
+              editHardware.error ??
+              wipe.error ??
+              del.error ??
+              exportProfile.error ??
+              exportProfileToFile.error
+            )?.ipc.message
           }
         </p>
       ) : null}

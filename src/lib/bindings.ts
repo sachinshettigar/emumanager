@@ -103,8 +103,14 @@ export const commands = {
 	 *  Streams on `job://emulator` with `jobId` `apply:<avdName>`. Returns the new tracked id.
 	 */
 	applyProfile: (bytes: number[], launch: boolean) => typedError<string, IpcError>(__TAURI_INVOKE("apply_profile", { bytes, launch })),
-	/**  The tracked emulator `id` as a pretty-printed `.emuprofile` JSON string. */
+	/**  The tracked emulator `id` as a pretty-printed `.emuprofile` JSON string (for the clipboard). */
 	exportProfile: (id: string) => typedError<string, IpcError>(__TAURI_INVOKE("export_profile", { id })),
+	/**
+	 *  Write the tracked emulator `id` as an `.emuprofile` file under `<data_dir>/exports/` and
+	 *  return its absolute path — a real file to hand around or drop back onto the Profiles screen,
+	 *  the mirror of that screen's drag-in import.
+	 */
+	exportProfileToFile: (id: string) => typedError<string, IpcError>(__TAURI_INVOKE("export_profile_to_file", { id })),
 	/**  Validate and save a `.emuprofile` to the local list (keyed by its `name`). */
 	saveProfile: (bytes: number[]) => typedError<null, IpcError>(__TAURI_INVOKE("save_profile", { bytes })),
 	/**  Every saved profile, newest first. */

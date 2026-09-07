@@ -17,6 +17,7 @@ vi.mock("../lib/bindings", () => ({
     launchEmulator: vi.fn(),
     stopEmulator: vi.fn(),
     reconcileNow: vi.fn(),
+    exportProfileToFile: vi.fn(),
     listComponents: vi.fn().mockResolvedValue({
       status: "ok",
       data: [
@@ -129,6 +130,25 @@ describe("Dashboard", () => {
     expect(screen.getByTestId("emulator-01J0RUNNING")).toHaveTextContent("emulator-5554");
     expect(screen.getByTestId("stop-01J0RUNNING")).toBeInTheDocument();
     expect(screen.getByTestId("launch-01J0STOPPED")).toBeInTheDocument();
+  });
+
+  it("exports an emulator profile to a file from its row", async () => {
+    listEmulatorsMock.mockResolvedValue({ status: "ok", data: [STOPPED] });
+    vi.mocked(commands.exportProfileToFile).mockResolvedValue({
+      status: "ok",
+      data: "/data/exports/tv_api33.emuprofile",
+    });
+    renderDashboard();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("export-01J0STOPPED")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("export-01J0STOPPED"));
+
+    await waitFor(() => {
+      expect(vi.mocked(commands.exportProfileToFile)).toHaveBeenCalledWith("01J0STOPPED");
+      expect(screen.getByTestId("export-01J0STOPPED")).toHaveTextContent("Exported");
+    });
   });
 
   it("calls stop_emulator when Stop is clicked", async () => {

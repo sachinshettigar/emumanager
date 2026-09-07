@@ -8,7 +8,12 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Phase (8-item feature batch, session 10):** user asked for seven things at once — live device
   telemetry (storage/network/logs), a logcat-style live+filterable viewer, real download/run
   progress %, proper device skins, export-profile parity, a rename, and grouped/customizable
-  device lists. Scoped into `0032`–`0038`. **`0035` (device skins) done:** `Hardware.device_frame`
+  device lists. Scoped into `0032`–`0038`. **`0036` (export parity) done:** export was
+  clipboard-only and buried on the detail panel; now `export_profile_to_file` writes a real
+  `<data_dir>/exports/<avd>.emuprofile` and returns its path. The detail panel offers "Copy
+  profile" and "Save as .emuprofile" (→ path + "Show in folder"), and every Dashboard row has an
+  "Export" button — the mirror of the Profiles screen's drag-in import (no save-as dialog: the
+  dialog plugin isn't wired, deliberately). **`0035` (device skins) done:** `Hardware.device_frame`
   — stored but read by nothing until now — is load-bearing. `DeviceProfile` carries the `<d:skin>`
   name; `AndroidProvider::launch` passes `-skin <name> -skindir <sdk>/skins` when the frame is
   wanted **and** the skin is actually installed under `<sdk>/skins/` (a cmdline-tools-only SDK

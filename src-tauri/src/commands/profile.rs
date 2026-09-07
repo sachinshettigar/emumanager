@@ -262,14 +262,11 @@ pub async fn apply_profile(
 // export
 // ---------------------------------------------------------------------------
 
-/// The tracked emulator `id` as a pretty-printed `.emuprofile` JSON string.
-#[tauri::command]
-#[specta::specta]
-pub async fn export_profile(
-    mgr: State<'_, ManagedProvider>,
+/// Build the `.emuprofile` JSON for a tracked emulator, plus the AVD name (a safe filename stem).
+async fn build_profile_json(
+    provider: &emu_android::provider::AndroidProvider,
     id: String,
-) -> Result<String, IpcError> {
-    let provider = mgr.get().await?;
+) -> Result<(String, String), IpcError> {
     let row = provider
         .detail(&EmulatorId(id))
         .await
@@ -281,6 +278,7 @@ pub async fn export_profile(
              reconcile or recreate it first",
         )
     })?;
+    let avd_name = row.avd_name.clone();
     let emulator = Emulator {
         id: row.id,
         avd_name: row.avd_name,
@@ -294,7 +292,48 @@ pub async fn export_profile(
         created_at: row.created_at,
         updated_at: row.updated_at,
     };
-    Ok(EmuProfile::from_emulator(&emulator).to_json_pretty())
+    Ok((
+        EmuProfile::from_emulator(&emulator).to_json_pretty(),
+        avd_name,
+    ))
+}
+
+/// The tracked emulator `id` as a pretty-printed `.emuprofile` JSON string (for the clipboard).
+#[tauri::command]
+#[specta::specta]
+pub async fn export_profile(
+    mgr: State<'_, ManagedProvider>,
+    id: String,
+) -> Result<String, IpcError> {
+    let provider = mgr.get().await?;
+    let (json, _) = build_profile_json(&provider, id).await?;
+    Ok(json)
+}
+
+/// Write the tracked emulator `id` as an `.emuprofile` file under `<data_dir>/exports/` and
+/// return its absolute path — a real file to hand around or drop back onto the Profiles screen,
+/// the mirror of that screen's drag-in import.
+#[tauri::command]
+#[specta::specta]
+pub async fn export_profile_to_file(
+    mgr: State<'_, ManagedProvider>,
+    id: String,
+) -> Result<String, IpcError> {
+    let provider = mgr.get().await?;
+    let (json, avd_name) = build_profile_json(&provider, id).await?;
+    let data_dir = mgr.data_dir().ok_or_else(|| {
+        IpcError::new(
+            "unsupported",
+            "this machine has no writable app-data directory to export into",
+        )
+    })?;
+    let dir = data_dir.join("exports");
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| IpcError::new("fs_error", format!("creating {}: {e}", dir.display())))?;
+    let path = dir.join(format!("{avd_name}.emuprofile"));
+    std::fs::write(&path, json)
+        .map_err(|e| IpcError::new("fs_error", format!("writing {}: {e}", path.display())))?;
+    Ok(path.display().to_string())
 }
 
 // ---------------------------------------------------------------------------
