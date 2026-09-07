@@ -32,8 +32,10 @@ fn specta_builder() -> Builder<tauri::Wry> {
     Builder::<tauri::Wry>::new()
         .commands(collect_commands![
             commands::ping,
+            commands::app_info,
             commands::toolchain::list_components,
             commands::toolchain::bootstrap_toolchain,
+            commands::toolchain::install_component,
             commands::emulator::list_devices,
             commands::emulator::list_images,
             commands::emulator::list_emulators,

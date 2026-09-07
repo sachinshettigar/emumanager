@@ -5,6 +5,7 @@ import {
   useBootstrapToolchain,
   useComponents,
   useHostReport,
+  useInstallComponent,
   useRunHelper,
 } from "../lib/ipc";
 import type { BootstrapRunState } from "../lib/ipc";
@@ -17,11 +18,18 @@ function formatSize(bytes: number): string {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb).toFixed(0)} MB`;
 }
 
-function ComponentRow({ component }: { component: ComponentInfo }): React.JSX.Element {
+function ComponentRow({
+  component,
+  busy,
+}: {
+  component: ComponentInfo;
+  busy: boolean;
+}): React.JSX.Element {
+  const install = useInstallComponent();
   return (
     <li
       data-testid={`component-${component.id}`}
-      className="flex items-center justify-between rounded-card border border-border-default bg-surface px-3.5 py-3 text-[13px]"
+      className="flex items-center justify-between gap-3 rounded-card border border-border-default bg-surface px-3.5 py-3 text-[13px]"
     >
       <div className="flex flex-col gap-0.5">
         <span>{component.name}</span>
@@ -29,11 +37,23 @@ function ComponentRow({ component }: { component: ComponentInfo }): React.JSX.El
           {component.version} · {formatSize(component.sizeBytes)}
         </span>
       </div>
-      <span className={`text-[12px] ${component.installed ? "text-running" : "text-attention"}`}>
-        {component.installed
-          ? `installed${component.source ? ` (${component.source})` : ""}`
-          : "not installed"}
-      </span>
+      {component.installed ? (
+        <span className="text-[12px] text-running">
+          installed{component.source ? ` (${component.source})` : ""}
+        </span>
+      ) : (
+        <button
+          type="button"
+          data-testid={`install-${component.id}`}
+          disabled={busy || install.isPending}
+          onClick={() => {
+            install.mutate(component.id);
+          }}
+          className="shrink-0 rounded-md border border-primary px-3 py-1.5 text-[12px] font-medium text-primary disabled:opacity-50"
+        >
+          {install.isPending ? "Installing…" : "Install"}
+        </button>
+      )}
     </li>
   );
 }
@@ -186,6 +206,10 @@ export function Dependencies(): React.JSX.Element {
     bootstrap.mutate();
   };
 
+  const allInstalled = components?.every((c) => c.installed) ?? false;
+  const installing = bootstrap.isPending || run.running;
+  const missingCount = components?.filter((c) => !c.installed).length ?? 0;
+
   let body: React.JSX.Element;
   if (isPending) {
     body = <Placeholder>Checking installed components…</Placeholder>;
@@ -195,37 +219,27 @@ export function Dependencies(): React.JSX.Element {
     body = (
       <ul className="grid gap-2 sm:grid-cols-2">
         {components.map((component) => (
-          <ComponentRow key={component.id} component={component} />
+          <ComponentRow key={component.id} component={component} busy={installing} />
         ))}
       </ul>
     );
-  }
-
-  const allInstalled = components?.every((c) => c.installed) ?? false;
-  const installing = bootstrap.isPending || run.running;
-
-  let buttonLabel: string;
-  if (installing) {
-    buttonLabel = "Installing…";
-  } else if (allInstalled) {
-    buttonLabel = "All installed";
-  } else {
-    buttonLabel = "Install";
   }
 
   return (
     <Screen
       title="Dependencies & SDK"
       actions={
-        <button
-          type="button"
-          data-testid="install-button"
-          onClick={handleInstall}
-          disabled={installing || allInstalled || isPending}
-          className="rounded-md bg-primary px-3.5 py-2 text-[13px] font-medium text-white disabled:opacity-50"
-        >
-          {buttonLabel}
-        </button>
+        missingCount > 1 && !allInstalled ? (
+          <button
+            type="button"
+            data-testid="install-button"
+            onClick={handleInstall}
+            disabled={installing || isPending}
+            className="rounded-md bg-primary px-3.5 py-2 text-[13px] font-medium text-white disabled:opacity-50"
+          >
+            {installing ? "Installing…" : `Install all (${String(missingCount)})`}
+          </button>
+        ) : undefined
       }
     >
       {body}

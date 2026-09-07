@@ -45,5 +45,13 @@ export function NavIcon({ name }: { name: NavItem["icon"] }): React.JSX.Element 
           <path d="M11 3v3h3" />
         </svg>
       );
+    case "about":
+      return (
+        <svg {...shared} aria-hidden="true">
+          <circle cx="10" cy="10" r="7" />
+          <line x1="10" y1="9" x2="10" y2="14" />
+          <circle cx="10" cy="6.5" r="0.6" fill="currentColor" />
+        </svg>
+      );
   }
 }

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Placeholder, Screen } from "../components/Screen";
 import type { EmulatorInfo } from "../lib/bindings";
 import {
+  useComponents,
   useEmulators,
   useHostReport,
   useLaunchEmulator,
@@ -10,6 +11,75 @@ import {
   useReconcileNow,
   useStopEmulator,
 } from "../lib/ipc";
+
+/** Compact first-run checklist. Hides itself once all three steps are done. */
+function OnboardingChecklist(): React.JSX.Element | null {
+  const components = useComponents();
+  const host = useHostReport();
+  const emulators = useEmulators();
+
+  const sdkReady =
+    (components.data?.every((c) => c.installed) ?? false) && components.data !== undefined;
+  const hostReady = host.data !== undefined && host.data.verdict !== "cannotRun";
+  const hasEmulator = (emulators.data?.length ?? 0) > 0;
+
+  if (sdkReady && hostReady && hasEmulator) {
+    return null;
+  }
+
+  const steps: { done: boolean; label: string; to: string; cta: string }[] = [
+    {
+      done: sdkReady,
+      label: "Install the Android SDK",
+      to: "/dependencies",
+      cta: "Open Dependencies",
+    },
+    {
+      done: hostReady,
+      label: "Check host readiness",
+      to: "/dependencies",
+      cta: "See the host panel",
+    },
+    {
+      done: hasEmulator,
+      label: "Create your first emulator",
+      to: "/create",
+      cta: "Open the wizard",
+    },
+  ];
+
+  return (
+    <section
+      data-testid="onboarding"
+      className="flex flex-col gap-2 rounded-card border border-primary/40 bg-panel p-4 text-[13px]"
+    >
+      <h2 className="text-[13px] font-semibold text-ink">Get started</h2>
+      <ol className="flex flex-col gap-2">
+        {steps.map((s, i) => (
+          <li key={s.to + s.label} className="flex items-center gap-2.5">
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] ${
+                s.done ? "border-running bg-running text-white" : "border-border-default text-muted"
+              }`}
+            >
+              {s.done ? "✓" : i + 1}
+            </span>
+            <span className={s.done ? "text-muted line-through" : "text-ink"}>{s.label}</span>
+            {!s.done ? (
+              <Link
+                to={s.to}
+                data-testid={`onboarding-step-${String(i)}`}
+                className="ml-auto text-[12px] text-primary underline"
+              >
+                {s.cta}
+              </Link>
+            ) : null}
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
 
 /** Backend liveness line: proves the typed IPC seam is wired end to end. */
 function BackendStatus(): React.JSX.Element {
@@ -164,12 +234,47 @@ export function Dashboard(): React.JSX.Element {
     >
       <div className="flex flex-wrap items-center gap-3.5 rounded-card border border-border-default bg-surface px-3.5 py-3 text-[12.5px] text-muted">
         <span className="font-semibold text-ink">Host</span>
-        <span>detection lands in M5</span>
+        <HostSummary />
         <span className="text-faint">|</span>
         <BackendStatus />
       </div>
 
+      <OnboardingChecklist />
+
       {body}
     </Screen>
+  );
+}
+
+/** One-line host verdict for the Dashboard strip; the full panel is on the Dependencies screen. */
+function HostSummary(): React.JSX.Element {
+  const host = useHostReport();
+  if (!host.data) {
+    return <span>{host.error ? "readiness check unavailable" : "checking readiness…"}</span>;
+  }
+  const label =
+    host.data.verdict === "canAccelerate"
+      ? "ready (hardware accelerated)"
+      : host.data.verdict === "degraded"
+        ? `degraded — ${host.data.verdictReason}`
+        : `cannot run — ${host.data.verdictReason}`;
+  const tone =
+    host.data.verdict === "canAccelerate"
+      ? "text-running"
+      : host.data.verdict === "degraded"
+        ? "text-attention"
+        : "text-danger";
+  return (
+    <span className={tone}>
+      {label}
+      {host.data.verdict !== "canAccelerate" ? (
+        <>
+          {" "}
+          <Link to="/dependencies" className="underline">
+            fix
+          </Link>
+        </>
+      ) : null}
+    </span>
   );
 }

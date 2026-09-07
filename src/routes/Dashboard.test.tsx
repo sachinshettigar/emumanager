@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 
@@ -17,6 +17,19 @@ vi.mock("../lib/bindings", () => ({
     launchEmulator: vi.fn(),
     stopEmulator: vi.fn(),
     reconcileNow: vi.fn(),
+    listComponents: vi.fn().mockResolvedValue({
+      status: "ok",
+      data: [
+        {
+          id: "emulator",
+          name: "emulator",
+          version: "35",
+          sizeBytes: 1,
+          installed: true,
+          source: "app-managed",
+        },
+      ],
+    }),
     probeHost: vi.fn().mockResolvedValue({
       status: "ok",
       data: {
@@ -85,6 +98,25 @@ describe("Dashboard", () => {
     await waitFor(() => {
       expect(screen.getByText(/No emulators yet/)).toBeInTheDocument();
     });
+  });
+
+  it("shows the onboarding checklist until setup is complete, then hides it", async () => {
+    listEmulatorsMock.mockResolvedValue({ status: "ok", data: [] });
+    renderDashboard();
+    await waitFor(() => {
+      expect(screen.getByTestId("onboarding")).toBeInTheDocument();
+    });
+    // "Create your first emulator" is the only outstanding step (SDK + host are ok in the mock).
+    expect(screen.getByTestId("onboarding-step-2")).toHaveAttribute("href", "/create");
+
+    listEmulatorsMock.mockResolvedValue({ status: "ok", data: [RUNNING] });
+    // A fresh render with an emulator present: all three steps done → card gone.
+    cleanup();
+    renderDashboard();
+    await waitFor(() => {
+      expect(screen.getByTestId("emulator-01J0RUNNING")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("onboarding")).not.toBeInTheDocument();
   });
 
   it("lists emulators with their live state and the right action per row", async () => {

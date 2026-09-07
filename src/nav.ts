@@ -3,7 +3,7 @@ export interface NavItem {
   readonly to: string;
   readonly label: string;
   /** Simple key used to pick the icon in Sidebar. */
-  readonly icon: "dashboard" | "create" | "dependencies" | "profiles";
+  readonly icon: "dashboard" | "create" | "dependencies" | "profiles" | "about";
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -11,4 +11,5 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { to: "/create", label: "Create emulator", icon: "create" },
   { to: "/dependencies", label: "Dependencies", icon: "dependencies" },
   { to: "/profiles", label: "Profiles", icon: "profiles" },
+  { to: "/about", label: "About", icon: "about" },
 ];

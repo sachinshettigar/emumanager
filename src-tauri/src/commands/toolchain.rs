@@ -203,7 +203,40 @@ pub async fn bootstrap_toolchain(app: AppHandle) -> Result<(), IpcError> {
     let (os, arch) = host()?;
     let catalog = resolve_catalog(os, arch).await?;
     let (data_dir, state) = scan_installed(&app, os).await?;
+    run_bootstrap(&app, &data_dir, &catalog, &state, os).await
+}
 
+/// Install a **single** SDK component by its `sdkmanager` package path (`ComponentInfo.id`, e.g.
+/// `platform-tools`). Same `job://bootstrap` progress channel as [`bootstrap_toolchain`] — only
+/// one such job runs at a time. A component that's already installed is a clean no-op.
+#[tauri::command]
+#[specta::specta]
+pub async fn install_component(app: AppHandle, component_id: String) -> Result<(), IpcError> {
+    let (os, arch) = host()?;
+    let catalog = resolve_catalog(os, arch).await?;
+    let wanted: Vec<Component> = catalog
+        .into_iter()
+        .filter(|c| c.id.repo_path() == component_id)
+        .collect();
+    if wanted.is_empty() {
+        return Err(IpcError::new(
+            "not_found",
+            format!("no SDK component with id '{component_id}'"),
+        ));
+    }
+    let (data_dir, state) = scan_installed(&app, os).await?;
+    run_bootstrap(&app, &data_dir, &wanted, &state, os).await
+}
+
+/// Shared tail of `bootstrap_toolchain` / `install_component`: build the ports + job, run
+/// `toolchain::bootstrap` for `wanted`, and emit the terminal `job://bootstrap` event.
+async fn run_bootstrap(
+    app: &AppHandle,
+    data_dir: &std::path::Path,
+    wanted: &[Component],
+    state: &InstalledState,
+    os: HostOs,
+) -> Result<(), IpcError> {
     let fs = NativeFs;
     let downloader = NativeDownloader::new();
     let process = NativeProcessRunner;
@@ -232,10 +265,10 @@ pub async fn bootstrap_toolchain(app: AppHandle) -> Result<(), IpcError> {
         }),
     );
 
-    match toolchain::bootstrap(&data_dir, &catalog, &state, os, &ports, &job).await {
+    match toolchain::bootstrap(data_dir, wanted, state, os, &ports, &job).await {
         Ok(()) => {
             emit_progress(
-                &app,
+                app,
                 BootstrapProgressKind::Done {
                     ok: true,
                     error: None,
@@ -246,7 +279,7 @@ pub async fn bootstrap_toolchain(app: AppHandle) -> Result<(), IpcError> {
         Err(e) => {
             let ipc = IpcError::from(e);
             emit_progress(
-                &app,
+                app,
                 BootstrapProgressKind::Done {
                     ok: false,
                     error: Some(ipc.clone()),

@@ -16,6 +16,8 @@ export const commands = {
 	 *  against before any milestone-1 command exists.
 	 */
 	ping: (name: string) => typedError<Pong, IpcError>(__TAURI_INVOKE("ping", { name })),
+	/**  Return [`AppInfo`]. Everything is a compile-time constant. */
+	appInfo: () => __TAURI_INVOKE<AppInfo>("app_info"),
 	/**
 	 *  The real component catalog, merged with real installed state — what the Dependencies screen
 	 *  renders.
@@ -26,6 +28,12 @@ export const commands = {
 	 *  progress on `job://bootstrap` as it goes.
 	 */
 	bootstrapToolchain: () => typedError<null, IpcError>(__TAURI_INVOKE("bootstrap_toolchain")),
+	/**
+	 *  Install a **single** SDK component by its `sdkmanager` package path (`ComponentInfo.id`, e.g.
+	 *  `platform-tools`). Same `job://bootstrap` progress channel as [`bootstrap_toolchain`] — only
+	 *  one such job runs at a time. A component that's already installed is a clean no-op.
+	 */
+	installComponent: (componentId: string) => typedError<null, IpcError>(__TAURI_INVOKE("install_component", { componentId })),
 	/**  Every Google device profile, parsed from the installed `sdklib` jar. */
 	listDevices: () => typedError<DeviceInfo[], IpcError>(__TAURI_INVOKE("list_devices")),
 	/**
@@ -111,6 +119,22 @@ export const events = {
 };
 
 /* Types */
+/**
+ *  Static app metadata for the About screen — version, licence, repo, and a one-line-per-feature
+ *  summary. No I/O.
+ */
+export type AppInfo = {
+	name: string,
+	/**  `CARGO_PKG_VERSION`. */
+	version: string,
+	/**  `CARGO_PKG_LICENSE` — `"UNLICENSED"` today; a real OSS licence is M7's `LICENSE`-chosen line. */
+	license: string,
+	repository: string,
+	description: string,
+	/**  One short line per headline feature. */
+	features: string[],
+};
+
 /**  Live progress for a `bootstrap_toolchain` run, emitted as `job://bootstrap`. */
 export type BootstrapProgress = {
 	/**

@@ -16,7 +16,10 @@ Narrative companion to `.agent/state.json`. Update both together (see
   unsigned installers + signed updater artifacts on a `v*` tag (macOS arm64+x64 / Linux /
   Windows), `actionlint`-clean. `just package` verified locally — a 6.8 MB `.dmg` came out.
   ADR 0007 + `docs/playbooks/release-signing.md` document the unsigned decision and the key flow.
-  Next: `0029` (rotating logs + `export_diagnostics`), then `0030` (E2E harness skeleton).
+  `0031` then added, on user request: **each SDK component installs on its own** (per-row Install
+  button + `install_component` command), a Dashboard **first-run onboarding checklist**, and an
+  **About** screen (version, licence, per-feature summary). Next: `0029` (rotating logs +
+  `export_diagnostics`), then `0030` (E2E harness skeleton).
 - **Phase:** M4 done end to end. `0024`: `src/routes/Profiles.tsx` rewritten — a `FileReader`
   drop zone → `inspect_profile` → a requirement table + Apply / Apply & launch (streams
   `useEmulatorJob`) + Save-to-library; a saved-profiles list with Load / Delete. Emulator detail
@@ -152,13 +155,34 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - [~] M5 Host readiness & elevated helper — tasks `0025`–`0027` all `done`. Stays `in_progress`
       on the live-CI DoD + Windows verification (M6).
 - [~] M6 Cross-platform hardening & packaging — **current milestone**; **unsigned** (ADR 0007).
-      `0028` (packaging + `release.yml`) **done**; `0029`–`0030` todo. The tag-triggered CI run
-      itself is gated on GitHub billing.
+      `0028` (packaging + `release.yml`) and `0031` (per-SDK install + onboarding + About) **done**;
+      `0029`–`0030` todo. The tag-triggered CI run itself is gated on GitHub billing.
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-08 — session 9 (continued) (Claude Code) — task 0031 done (per-SDK install + first-run onboarding + About) — user request
+
+Three small first-run improvements the user asked for:
+
+- **Each SDK component installs on its own.** `install_component(componentId)` filters the resolved
+  catalog to one component and runs `toolchain::bootstrap` for that single-element `wanted` slice
+  (a shared `run_bootstrap` helper — `bootstrap_toolchain` was refactored onto it too). The
+  Dependencies screen gives every not-installed row its own "Install" button; the top button is now
+  "Install all (N)" and appears only when more than one component is missing.
+- **First-run onboarding.** A compact `OnboardingChecklist` on the Dashboard: three numbered steps
+  (install the SDK → check host readiness → create your first emulator), each ticked when done and
+  linking to the screen that resolves it. It unmounts once all three are satisfied. The stale
+  "Host detection lands in M5" strip was replaced with a live one-line host verdict.
+- **About screen.** `app_info()` (a plain `#[tauri::command]`) returns name / version
+  (`CARGO_PKG_VERSION`) / licence (`CARGO_PKG_LICENSE` = `UNLICENSED`, shown honestly as "all
+  rights reserved — OSS license TBD") / repo / a 9-line feature summary. New `/about` route + nav
+  item + icon.
+
+28 commands. 4 new/changed Vitest specs (38 web tests total), 154 rust tests, `just validate`
+green.
 
 ### 2026-09-07 — session 9 (continued) (Claude Code) — ADR 0007 (ship unsigned); M6 scoped; task 0028 done (packaging + release.yml)
 

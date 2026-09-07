@@ -10,6 +10,7 @@ vi.mock("../lib/bindings", () => ({
   commands: {
     listComponents: vi.fn(),
     bootstrapToolchain: vi.fn(),
+    installComponent: vi.fn(),
     probeHost: vi.fn(),
     runHelper: vi.fn(),
   },
@@ -20,6 +21,7 @@ vi.mock("../lib/bindings", () => ({
 
 const listComponentsMock = vi.mocked(commands.listComponents);
 const bootstrapToolchainMock = vi.mocked(commands.bootstrapToolchain);
+const installComponentMock = vi.mocked(commands.installComponent);
 const probeHostMock = vi.mocked(commands.probeHost);
 const runHelperMock = vi.mocked(commands.runHelper);
 const listenMock = vi.mocked(events.jobBootstrap.listen);
@@ -82,6 +84,15 @@ const PLATFORM_TOOLS: ComponentInfo = {
   source: null,
 };
 
+const EMULATOR: ComponentInfo = {
+  id: "emulator",
+  name: "emulator",
+  version: "35.1",
+  sizeBytes: 900_000_000,
+  installed: false,
+  source: null,
+};
+
 function renderDependencies(): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
@@ -99,6 +110,7 @@ describe("Dependencies screen", () => {
   beforeEach(() => {
     listComponentsMock.mockReset();
     bootstrapToolchainMock.mockReset();
+    installComponentMock.mockReset();
     probeHostMock.mockReset();
     runHelperMock.mockReset();
     probeHostMock.mockResolvedValue(HOST_OK);
@@ -112,7 +124,7 @@ describe("Dependencies screen", () => {
     });
   });
 
-  it("shows installed and not-installed components with their source", async () => {
+  it("shows installed components with their source and an Install button for the rest", async () => {
     listComponentsMock.mockResolvedValue({
       status: "ok",
       data: [CMDLINE_TOOLS, PLATFORM_TOOLS],
@@ -125,18 +137,35 @@ describe("Dependencies screen", () => {
         "installed (app-managed)",
       );
     });
-    expect(screen.getByTestId("component-platform-tools")).toHaveTextContent("not installed");
+    expect(screen.getByTestId("install-platform-tools")).toBeInTheDocument();
+    expect(screen.queryByTestId("install-cmdline-tools;latest")).not.toBeInTheDocument();
   });
 
-  it("disables Install once every component is already installed", async () => {
+  it("installs a single component when its row button is clicked", async () => {
+    listComponentsMock.mockResolvedValue({ status: "ok", data: [CMDLINE_TOOLS, PLATFORM_TOOLS] });
+    installComponentMock.mockResolvedValue({ status: "ok", data: null });
+
+    renderDependencies();
+    await waitFor(() => {
+      expect(screen.getByTestId("install-platform-tools")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("install-platform-tools"));
+
+    await waitFor(() => {
+      expect(installComponentMock).toHaveBeenCalledWith("platform-tools");
+    });
+  });
+
+  it("hides the Install-all button once every component is installed", async () => {
     listComponentsMock.mockResolvedValue({ status: "ok", data: [CMDLINE_TOOLS] });
 
     renderDependencies();
 
     await waitFor(() => {
-      expect(screen.getByTestId("install-button")).toHaveTextContent("All installed");
+      expect(screen.getByTestId("component-cmdline-tools;latest")).toHaveTextContent("installed");
     });
-    expect(screen.getByTestId("install-button")).toBeDisabled();
+    expect(screen.queryByTestId("install-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("install-cmdline-tools;latest")).not.toBeInTheDocument();
   });
 
   it("surfaces a catalog load failure", async () => {
@@ -153,7 +182,7 @@ describe("Dependencies screen", () => {
   });
 
   it("streams live progress and log lines while installing, then shows completion", async () => {
-    listComponentsMock.mockResolvedValue({ status: "ok", data: [PLATFORM_TOOLS] });
+    listComponentsMock.mockResolvedValue({ status: "ok", data: [PLATFORM_TOOLS, EMULATOR] });
     bootstrapToolchainMock.mockResolvedValue({ status: "ok", data: null });
 
     renderDependencies();
@@ -194,7 +223,7 @@ describe("Dependencies screen", () => {
   });
 
   it("shows the real error when a run fails", async () => {
-    listComponentsMock.mockResolvedValue({ status: "ok", data: [PLATFORM_TOOLS] });
+    listComponentsMock.mockResolvedValue({ status: "ok", data: [PLATFORM_TOOLS, EMULATOR] });
     bootstrapToolchainMock.mockResolvedValue({
       status: "error",
       error: { code: "process_failed", message: "sdkmanager exited with 1", details: null },

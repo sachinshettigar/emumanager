@@ -8,6 +8,7 @@ describe("route rendering", () => {
     { path: "/create", heading: /create emulator/i },
     { path: "/dependencies", heading: /dependencies & sdk/i },
     { path: "/profiles", heading: /^profiles$/i },
+    { path: "/about", heading: /^about$/i },
   ];
 
   for (const { path, heading } of cases) {

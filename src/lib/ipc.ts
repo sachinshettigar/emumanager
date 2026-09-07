@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tan
 import {
   commands,
   events,
+  type AppInfo,
   type BootstrapProgressKind,
   type ComponentInfo,
   type CreateEmulatorRequest,
@@ -100,6 +101,31 @@ export function useBootstrapToolchain() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: COMPONENTS_QUERY_KEY });
     },
+  });
+}
+
+async function installComponent(componentId: string): Promise<undefined> {
+  unwrap(await commands.installComponent(componentId));
+  return undefined;
+}
+
+/** Mutation hook for a single component's "Install" button. Refetches {@link useComponents}. */
+export function useInstallComponent() {
+  const queryClient = useQueryClient();
+  return useMutation<undefined, IpcCallError, string>({
+    mutationFn: installComponent,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: COMPONENTS_QUERY_KEY });
+    },
+  });
+}
+
+/** Static app metadata (version, licence, features) for the About screen. Never fails. */
+export function useAppInfo(): UseQueryResult<AppInfo, IpcCallError> {
+  return useQuery<AppInfo, IpcCallError>({
+    queryKey: ["app-info"],
+    queryFn: () => commands.appInfo(),
+    staleTime: Infinity,
   });
 }
 

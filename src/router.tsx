@@ -1,4 +1,5 @@
 import { createBrowserRouter } from "react-router-dom";
+import { About } from "./routes/About";
 import { App } from "./App";
 import { Dashboard } from "./routes/Dashboard";
 import { Create } from "./routes/Create";
@@ -12,6 +13,7 @@ export const routeChildren = [
   { path: "emulator/:id", element: <EmulatorDetail /> },
   { path: "dependencies", element: <Dependencies /> },
   { path: "profiles", element: <Profiles /> },
+  { path: "about", element: <About /> },
 ] as const;
 
 /** Opt in to React Router v7 behavior now to keep console output clean. */
