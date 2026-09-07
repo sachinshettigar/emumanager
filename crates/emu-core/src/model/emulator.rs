@@ -147,7 +147,7 @@ pub struct LiveState {
     pub uptime_secs: Option<u64>,
 }
 
-/// A tracked emulator: an AVD on disk plus EmuManager metadata.
+/// A tracked emulator: an AVD on disk plus Emulator Studio metadata.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Emulator {

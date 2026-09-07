@@ -16,7 +16,7 @@ export function Sidebar(): React.JSX.Element {
         >
           E
         </span>
-        <span className="text-sm font-semibold tracking-tight">EmuManager</span>
+        <span className="text-sm font-semibold tracking-tight">Emulator Studio</span>
       </div>
 
       <nav className="flex flex-col gap-0.5" aria-label="Primary">

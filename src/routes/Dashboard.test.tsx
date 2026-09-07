@@ -11,7 +11,7 @@ vi.mock("../lib/bindings", () => ({
   commands: {
     ping: vi.fn().mockResolvedValue({
       status: "ok",
-      data: { message: "pong, EmuManager", version: "1.2.3" },
+      data: { message: "pong, Emulator Studio", version: "1.2.3" },
     }),
     listEmulators: vi.fn(),
     launchEmulator: vi.fn(),
@@ -203,7 +203,7 @@ describe("Dashboard", () => {
     renderDashboard();
     await waitFor(() => {
       expect(screen.getByTestId("backend-status")).toHaveTextContent(
-        "pong, EmuManager from v1.2.3",
+        "pong, Emulator Studio from v1.2.3",
       );
     });
   });

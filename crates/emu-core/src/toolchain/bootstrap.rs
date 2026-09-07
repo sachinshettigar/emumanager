@@ -149,7 +149,7 @@ async fn ensure_jdk(process: &dyn ProcessRunner) -> Result<()> {
     match parse_java_major_version(text) {
         Some(major) if major >= 17 => Ok(()),
         Some(major) => Err(CoreError::Unsupported(format!(
-            "found a JDK, but it's version {major}; EmuManager needs JDK 17 or newer on PATH or \
+            "found a JDK, but it's version {major}; Emulator Studio needs JDK 17 or newer on PATH or \
              JAVA_HOME (docs/adr/0006-require-system-jdk.md)"
         ))),
         None => Err(jdk_missing_err()),
@@ -159,7 +159,7 @@ async fn ensure_jdk(process: &dyn ProcessRunner) -> Result<()> {
 fn jdk_missing_err() -> CoreError {
     CoreError::Unsupported(
         "no JDK 17+ found on PATH or JAVA_HOME; install one (e.g. Eclipse Temurin 17+) and set \
-         JAVA_HOME, then retry — EmuManager does not bundle a JRE \
+         JAVA_HOME, then retry — Emulator Studio does not bundle a JRE \
          (docs/adr/0006-require-system-jdk.md)"
             .to_string(),
     )

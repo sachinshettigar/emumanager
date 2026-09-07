@@ -1,4 +1,4 @@
-//! `emu-core` — domain logic and orchestration for EmuManager.
+//! `emu-core` — domain logic and orchestration for Emulator Studio.
 //!
 //! This crate holds all business logic and defines the **port traits** for every side effect
 //! (process spawning, downloads, host probing, the clock, the filesystem). It has **no `tauri`

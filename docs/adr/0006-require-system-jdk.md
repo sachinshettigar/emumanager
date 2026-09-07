@@ -17,7 +17,7 @@ rather than assumed:
   needs a JDK on `PATH`/`JAVA_HOME` to run at all — it's a shell/batch wrapper around a `java`
   invocation, not a self-contained binary. Google has not shipped a bundled JRE with `cmdline-tools`
   since API level tooling moved off the old standalone SDK Tools package.
-- A "bundled JRE" means EmuManager would have to fetch, verify, unpack, and keep updated a full
+- A "bundled JRE" means Emulator Studio would have to fetch, verify, unpack, and keep updated a full
   per-OS/per-arch JRE (Eclipse Temurin or similar) *before* it can even ask `sdkmanager` anything —
   a second, unrelated toolchain-management problem on top of the Android SDK one.
 
@@ -37,7 +37,7 @@ justify it — tracked here, not silently dropped.
 - Easier: `bootstrap()` stays scoped to what it's actually for (the Android SDK), one fewer
   download/verify/unpack pipeline to build and keep current against upstream JRE releases.
 - Harder: goal 1 ("zero external setup... no terminal commands the user runs") is not fully met for
-  a machine with no JDK at all — that user must install one manually before EmuManager can finish
+  a machine with no JDK at all — that user must install one manually before Emulator Studio can finish
   setup. Mitigated by making the failure immediate and specific rather than a late, confusing
   `sdkmanager` crash.
 - Most target users (mobile/QA engineers, `docs/spec.md` §2) already have a JDK from other Android

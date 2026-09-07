@@ -1,4 +1,4 @@
-# EmuManager task runner — the source of truth for commands (AGENTS.md §4).
+# Emulator Studio task runner — the source of truth for commands (AGENTS.md §4).
 # `package.json` scripts and the Makefile mirror the important ones.
 # Recipes marked (M0) are stubs until their milestone-0 task lands.
 #

@@ -149,7 +149,7 @@ fn fixes_for(kind: AcceleratorKind, s: &HostSignals) -> Vec<Fix> {
             scriptable: false,
             needs_reboot: true,
             description: "Reboot into firmware setup and turn on Intel VT-x / AMD-V (sometimes \
-                          labelled \"SVM Mode\" or \"Virtualization Technology\"). EmuManager \
+                          labelled \"SVM Mode\" or \"Virtualization Technology\"). Emulator Studio \
                           can't change a firmware setting for you."
                 .to_string(),
         });

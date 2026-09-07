@@ -53,7 +53,7 @@ pub struct AppInfo {
 #[specta::specta]
 pub fn app_info() -> AppInfo {
     AppInfo {
-        name: "EmuManager".to_owned(),
+        name: "Emulator Studio".to_owned(),
         version: env!("CARGO_PKG_VERSION").to_owned(),
         license: option_env!("CARGO_PKG_LICENSE")
             .unwrap_or("UNLICENSED")

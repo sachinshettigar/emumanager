@@ -1,4 +1,4 @@
-# EmuManager — architecture
+# Emulator Studio — architecture
 
 Companion to `docs/spec.md`. Describes the components, their boundaries, and the main data flows.
 Decisions with trade-offs are recorded in `docs/adr/`.
@@ -38,7 +38,7 @@ Decisions with trade-offs are recorded in `docs/adr/`.
    dl.google.com (SDK repo,       OS (elevation prompt, once)
    system images, checksums)
 
-Data dir  (directories crate: e.g. %LOCALAPPDATA%\EmuManager, ~/Library/Application Support/EmuManager, ~/.local/share/emumanager)
+Data dir  (keyed off the bundle identifier com.emulatorstudio.desktop: e.g. %LOCALAPPDATA%\com.emulatorstudio.desktop, ~/Library/Application Support/com.emulatorstudio.desktop, ~/.local/share/com.emulatorstudio.desktop)
   sdk/                cmdline-tools, platform-tools, emulator, jre, system-images
   avd/               ANDROID_AVD_HOME
   db.sqlite          registry

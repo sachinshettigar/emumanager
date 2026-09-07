@@ -28,7 +28,7 @@ describe("About", () => {
 
   it("shows the version, license and feature list", async () => {
     appInfoMock.mockResolvedValue({
-      name: "EmuManager",
+      name: "Emulator Studio",
       version: "0.1.0",
       license: "UNLICENSED",
       repository: "https://github.com/sachinshettigar/emumanager",

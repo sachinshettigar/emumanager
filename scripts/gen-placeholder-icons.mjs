@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "..", "src-tauri", "icons");
 mkdirSync(OUT, { recursive: true });
 
-// EmuManager blue (#2f6db3) with a lighter inset square, RGBA.
+// Emulator Studio blue (#2f6db3) with a lighter inset square, RGBA.
 const BG = [0x2f, 0x6d, 0xb3, 0xff];
 const FG = [0xff, 0xff, 0xff, 0x26];
 

@@ -25,16 +25,16 @@ describe("usePing", () => {
   it("surfaces the message and version from an ok result", async () => {
     pingMock.mockResolvedValue({
       status: "ok",
-      data: { message: "pong, EmuManager", version: "9.9.9" },
+      data: { message: "pong, Emulator Studio", version: "9.9.9" },
     });
 
-    const { result } = renderHook(() => usePing("EmuManager"), { wrapper });
+    const { result } = renderHook(() => usePing("Emulator Studio"), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isSuccess).toBe(true);
     });
-    expect(result.current.data).toEqual({ message: "pong, EmuManager", version: "9.9.9" });
-    expect(pingMock).toHaveBeenCalledWith("EmuManager");
+    expect(result.current.data).toEqual({ message: "pong, Emulator Studio", version: "9.9.9" });
+    expect(pingMock).toHaveBeenCalledWith("Emulator Studio");
   });
 
   it("rejects with the backend IpcError on an error result", async () => {

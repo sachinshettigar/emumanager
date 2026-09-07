@@ -7,7 +7,7 @@ import "./index.css";
 
 const rootEl = document.getElementById("root");
 if (!rootEl) {
-  throw new Error("EmuManager: #root element not found in index.html");
+  throw new Error("Emulator Studio: #root element not found in index.html");
 }
 
 // One client for the app. Commands are explicit user actions or cheap probes,

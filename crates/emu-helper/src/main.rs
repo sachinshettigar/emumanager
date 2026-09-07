@@ -18,7 +18,7 @@ use serde::Serialize;
 #[derive(Parser)]
 #[command(
     name = "emu-helper",
-    about = "Elevated helper for EmuManager. Run via the app, not by hand.",
+    about = "Elevated helper for Emulator Studio. Run via the app, not by hand.",
     version
 )]
 struct Cli {

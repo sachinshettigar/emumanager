@@ -1,4 +1,4 @@
-# AGENTS.md — EmuManager operating manual
+# AGENTS.md — Emulator Studio operating manual
 
 **This file is the single source of truth for any AI coding agent or human working on this repo.**
 Every harness (Claude Code, Cursor, Gemini CLI, Antigravity/Windsurf, Copilot, Aider, …) is

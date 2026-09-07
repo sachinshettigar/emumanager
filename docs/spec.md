@@ -1,4 +1,4 @@
-# EmuManager — product spec
+# Emulator Studio — product spec
 
 Status: draft v1 · Scope: **B — Android emulators only, Windows / Linux / macOS**
 

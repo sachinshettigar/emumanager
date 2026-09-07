@@ -1,4 +1,4 @@
-You are working on EmuManager. Before writing any code:
+You are working on Emulator Studio. Before writing any code:
 
 1. Read `AGENTS.md` at the repo root, fully, plus `docs/spec.md` and `docs/architecture.md`.
 2. Read the newest file in `.agent/journal/`.

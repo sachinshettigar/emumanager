@@ -83,7 +83,7 @@ function OnboardingChecklist(): React.JSX.Element | null {
 
 /** Backend liveness line: proves the typed IPC seam is wired end to end. */
 function BackendStatus(): React.JSX.Element {
-  const { data, error, isPending } = usePing("EmuManager");
+  const { data, error, isPending } = usePing("Emulator Studio");
 
   let text: string;
   if (isPending) {

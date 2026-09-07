@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "EmuManager",
+  "productName": "Emulator Studio",
   "version": "0.1.0",
-  "identifier": "com.emumanager.desktop",
+  "identifier": "com.emulatorstudio.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "EmuManager",
+        "title": "Emulator Studio",
         "width": 1280,
         "height": 900,
         "minWidth": 960,
@@ -37,7 +37,7 @@
     ],
     "category": "DeveloperTool",
     "shortDescription": "Create, launch and share Android emulators without Android Studio.",
-    "longDescription": "EmuManager is a cross-platform desktop app to create, launch, track and share Android emulators. It manages the Android command-line SDK for you — no Android Studio, no terminal.",
+    "longDescription": "Emulator Studio is a cross-platform desktop app to create, launch, track and share Android emulators. It manages the Android command-line SDK for you — no Android Studio, no terminal.",
     "linux": {
       "deb": {
         "depends": ["libwebkit2gtk-4.1-0", "libgtk-3-0"]

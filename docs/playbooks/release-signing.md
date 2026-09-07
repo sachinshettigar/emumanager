@@ -1,6 +1,6 @@
 # Playbook: release keys & cutting a release
 
-EmuManager ships **unsigned** OS installers (ADR 0007). The only signing credential is the **Tauri
+Emulator Studio ships **unsigned** OS installers (ADR 0007). The only signing credential is the **Tauri
 updater key** (Ed25519), used to sign the auto-update artifacts so the app can verify them.
 
 ## One-time: generate the updater keypair

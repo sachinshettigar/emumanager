@@ -1,4 +1,4 @@
-# EmuManager
+# Emulator Studio
 
 A cross-platform desktop app to **create, launch, track, and share Android emulators** — no
 Android Studio, no manual `sdkmanager` commands. Windows, Linux, macOS.
@@ -27,7 +27,7 @@ Once past that, the app auto-updates (the updater *is* signature-verified).
   Open**. (A plain double-click is blocked by Gatekeeper the first time only.)
 - **Windows** (`.msi` / setup `.exe`): run it; on the SmartScreen prompt click **More info → Run
   anyway**.
-- **Linux** (`.AppImage`): `chmod +x EmuManager_*.AppImage` and run it. `.deb` also provided.
+- **Linux** (`.AppImage`): `chmod +x` the `.AppImage` and run it. `.deb` also provided.
 
 ## Build & run
 

@@ -1,4 +1,4 @@
-//! EmuManager Tauri shell.
+//! Emulator Studio Tauri shell.
 //!
 //! This crate is **glue only** — Tauri commands, event emitters, and dependency
 //! wiring. All domain logic lives in `emu-core` and the provider crates
@@ -99,7 +99,7 @@ pub fn run() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building the EmuManager application")
+        .expect("error while building the Emulator Studio application")
         .run(|handle, event| {
             // On quit, reap every emulator child the provider still holds so we never orphan one
             // we launched. Time-boxed — a stuck child must not wedge shutdown.

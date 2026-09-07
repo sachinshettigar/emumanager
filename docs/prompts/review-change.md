@@ -1,4 +1,4 @@
-Review this change (`<diff / PR link / branch>`) against EmuManager's standards.
+Review this change (`<diff / PR link / branch>`) against Emulator Studio's standards.
 
 Check, in order:
 1. **Correctness** — does it do what the task's acceptance criteria say? Edge cases, error paths,

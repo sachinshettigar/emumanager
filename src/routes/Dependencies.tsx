@@ -253,9 +253,10 @@ export function Dependencies(): React.JSX.Element {
       ) : null}
 
       <Placeholder>
-        Components resolve live from Google&apos;s repository and install into EmuManager&apos;s own
-        data directory — no Android Studio, no terminal. A component already found on this machine
-        (an existing Android Studio SDK, for example) is reused, never re-downloaded.
+        Components resolve live from Google&apos;s repository and install into Emulator
+        Studio&apos;s own data directory — no Android Studio, no terminal. A component already found
+        on this machine (an existing Android Studio SDK, for example) is reused, never
+        re-downloaded.
       </Placeholder>
     </Screen>
   );

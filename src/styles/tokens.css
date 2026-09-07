@@ -1,5 +1,5 @@
 /*
- * EmuManager design tokens — the single place colors and core scales are defined.
+ * Emulator Studio design tokens — the single place colors and core scales are defined.
  * Mirrors the wireframe system (docs/design/wireframes): IBM Plex Sans/Mono,
  * blue = primary action, green = running / installed, amber = needs attention.
  * Components and Tailwind utilities read these vars; no component hard-codes hex.

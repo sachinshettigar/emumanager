@@ -5,6 +5,18 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
+- **Phase (8-item feature batch, session 10):** user asked for seven things at once — live device
+  telemetry (storage/network/logs), a logcat-style live+filterable viewer, real download/run
+  progress %, proper device skins, export-profile parity, a rename, and grouped/customizable
+  device lists. Scoped into `0032`–`0038`. **`0032` (rename) done:** the product is now
+  **Emulator Studio** everywhere user-facing — `tauri.conf.json` `productName` + window title,
+  `app_info().name`, the sidebar brand, the window/tab `<title>`, backend liveness ping, all
+  user-visible copy and error strings in `crates/*`, and README + `docs/*`. Bundle identifier
+  `com.emumanager.desktop` → `com.emulatorstudio.desktop` (resets the app data-dir path and the
+  updater identity — fine pre-1.0, no shipped users). Internal names are unchanged: Rust crates
+  (`emu-core`/`emu-android`/`emu-host`/`emu-helper`, `emumanager`/`emumanager_lib`), the npm
+  package, the GitHub repo and every URL pointing at it, the `.emuprofile` schema `$id`. No
+  bindings change; `just validate` green. Next: `0033` (uninstall SDK components).
 - **Milestone:** M6 — Cross-platform hardening & packaging. **Scope narrowed by ADR 0007**: v1
   ships **unsigned** installers (project owner's call — no Apple/Windows certs; the Tauri updater
   keeps its own Ed25519 signature). Scoped into `0028`–`0030`; `0028` (packaging + `release.yml`)
