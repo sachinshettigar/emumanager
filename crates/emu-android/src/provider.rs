@@ -609,6 +609,26 @@ impl Provider for AndroidProvider {
         if let Some(graphics) = opts.graphics {
             cmd = cmd.args(["-gpu", gpu_mode(graphics)]);
         }
+        // Device frame/bezel. `-skin <name>` + `-skindir <dir>` are the documented flags
+        // (<https://developer.android.com/studio/run/emulator-commandline>). Only passed when the
+        // skin is actually installed under `<sdk>/skins/<name>` — a cmdline-tools-only SDK has no
+        // `skins/` dir, and passing the flags anyway makes the emulator print a scary warning and
+        // still draw no frame. When it's missing we say so on the job log instead.
+        let mut skin_note: Option<String> = None;
+        if let Some(skin) = &opts.skin {
+            let skins_dir = sdk_root.join("skins");
+            if self.fs.exists(&skins_dir.join(skin)).await? {
+                cmd = cmd
+                    .args(["-skin", skin])
+                    .args(["-skindir", &skins_dir.display().to_string()]);
+            } else {
+                skin_note = Some(format!(
+                    "device-frame skin '{skin}' isn't installed under {} — launching without a \
+                     frame",
+                    skins_dir.display()
+                ));
+            }
+        }
         cmd = cmd.args(opts.extra_args.iter().cloned());
 
         // Fresh log file for this run: `<data_dir>/logs/<avd>.log`.
@@ -616,6 +636,9 @@ impl Provider for AndroidProvider {
         let _ = self.fs.ensure_dir(&self.data_dir.join("logs")).await;
         let _ = self.fs.write_atomic(&log_path, b"").await;
 
+        if let Some(note) = skin_note {
+            self.emit_log(job, &log_path, note).await;
+        }
         self.emit_log(job, &log_path, format!("launching {}", cmd.display()))
             .await;
         let child = self.process.spawn(cmd).await?;
@@ -1349,6 +1372,66 @@ mod tests {
             .await
             .expect("launch with flags");
         // The `on_spawn` needle above only matches if the argv was built with those exact flags.
+    }
+
+    #[tokio::test]
+    async fn launch_adds_skin_flags_when_the_frame_skin_is_installed() {
+        let fs = InMemoryFs::new();
+        fs.write_atomic(Path::new("/data/sdk/skins/pixel_6/layout"), b"skin")
+            .await
+            .unwrap();
+        let process = FakeProcessRunner::new()
+            .on_spawn(
+                "emulator @pixel6_api34 -skin pixel_6 -skindir /data/sdk/skins",
+                Vec::<String>::new(),
+                ok(""),
+            )
+            .on_run(
+                "adb devices",
+                ok("List of devices attached\nemulator-5554\tdevice\n"),
+            )
+            .on_run("shell getprop sys.boot_completed", ok("1\n"));
+        let (provider, _dir) = provider_with(process, fs).await;
+        let id = seed_emulator(&provider).await;
+
+        let opts = LaunchOpts {
+            skin: Some("pixel_6".into()),
+            ..LaunchOpts::default()
+        };
+        provider.launch(id, opts, &job()).await.expect("launch");
+        // `on_spawn` needle matches only if `-skin` + `-skindir` were in the argv.
+    }
+
+    #[tokio::test]
+    async fn launch_skips_the_skin_when_it_is_not_installed_and_says_so() {
+        let fs = InMemoryFs::new();
+        let process = FakeProcessRunner::new()
+            .on_spawn("emulator @pixel6_api34", Vec::<String>::new(), ok(""))
+            .on_run(
+                "adb devices",
+                ok("List of devices attached\nemulator-5554\tdevice\n"),
+            )
+            .on_run("shell getprop sys.boot_completed", ok("1\n"));
+        let (provider, _dir) = provider_with(process, fs).await;
+        let id = seed_emulator(&provider).await;
+
+        let (jh, log) = JobHandle::collector(JobId("j".into()));
+        let opts = LaunchOpts {
+            skin: Some("pixel_6".into()),
+            ..LaunchOpts::default()
+        };
+        provider.launch(id, opts, &jh).await.expect("launch");
+
+        let said_missing = log
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(|p| p.log_line.clone())
+            .any(|l| l.contains("isn't installed"));
+        assert!(
+            said_missing,
+            "a missing frame skin is called out on the log"
+        );
     }
 
     #[tokio::test]

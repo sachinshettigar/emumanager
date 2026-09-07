@@ -76,7 +76,7 @@ export const commands = {
 	 *  Update an emulator's stored RAM / storage / graphics. Recorded now; applied when the AVD is next
 	 *  (re)created — see `AndroidProvider::set_hardware`.
 	 */
-	editHardware: (id: string, ramMb: number, storageMb: number, graphics: string) => typedError<null, IpcError>(__TAURI_INVOKE("edit_hardware", { id, ramMb, storageMb, graphics })),
+	editHardware: (id: string, ramMb: number, storageMb: number, graphics: string, deviceFrame: boolean) => typedError<null, IpcError>(__TAURI_INVOKE("edit_hardware", { id, ramMb, storageMb, graphics, deviceFrame })),
 	/**
 	 *  Delete a tracked emulator. `wipe` also removes the AVD from disk (`avdmanager delete avd`);
 	 *  `wipe = false` just untracks it.
@@ -202,6 +202,8 @@ export type CreateEmulatorRequest = {
 	imageCoord: string,
 	ramMb: number,
 	storageMb: number,
+	/**  Draw the device frame/bezel when this emulator launches (uses the device profile's skin). */
+	deviceFrame: boolean,
 	/**  Also launch it once created ("Create & launch"). */
 	launch: boolean,
 };
@@ -224,6 +226,11 @@ export type DeviceInfo = {
 	densityDpi: number,
 	/**  Physical diagonal in inches. */
 	diagonalIn: number | null,
+	/**
+	 *  Device-frame skin name (`<d:skin>`), when the profile declares one — the bezel the
+	 *  emulator can draw around the screen. `None` = no dedicated frame for this device.
+	 */
+	skin: string | null,
 };
 
 /**  Full config + live state for the detail panel. */
@@ -241,6 +248,8 @@ export type EmulatorDetail = {
 	storageMb: number,
 	/**  `auto` / `host` / `swiftshader`. */
 	graphics: string,
+	/**  Whether the emulator launches with a device frame/bezel drawn around the screen. */
+	deviceFrame: boolean,
 	/**  `created here` / `adopted` / `from profile` / `imported`. */
 	source: string,
 	/**  Live: `stopped` / `booting` / `running` / `error`. */

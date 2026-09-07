@@ -45,7 +45,12 @@ export function EmulatorDetail(): React.JSX.Element {
   const exportProfile = useExportProfile();
 
   const [nameDraft, setNameDraft] = useState<string | null>(null);
-  const [hw, setHw] = useState<{ ramMb: number; storageMb: number; graphics: string } | null>(null);
+  const [hw, setHw] = useState<{
+    ramMb: number;
+    storageMb: number;
+    graphics: string;
+    deviceFrame: boolean;
+  } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [alsoRemoveAvd, setAlsoRemoveAvd] = useState(true);
 
@@ -55,6 +60,7 @@ export function EmulatorDetail(): React.JSX.Element {
     ramMb: d?.ramMb ?? 2048,
     storageMb: d?.storageMb ?? 6144,
     graphics: d?.graphics ?? "auto",
+    deviceFrame: d?.deviceFrame ?? true,
   };
 
   const consoleLines = useMemo(() => {
@@ -213,6 +219,17 @@ export function EmulatorDetail(): React.JSX.Element {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="flex items-center gap-2 self-end pb-2 text-[12.5px] text-muted">
+            <input
+              type="checkbox"
+              data-testid="device-frame-input"
+              checked={effectiveHw.deviceFrame}
+              onChange={(e) => {
+                setHw({ ...effectiveHw, deviceFrame: e.target.checked });
+              }}
+            />
+            Device frame
           </label>
         </div>
         <button

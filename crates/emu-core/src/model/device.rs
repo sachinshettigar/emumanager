@@ -57,6 +57,10 @@ pub struct DeviceProfile {
     pub default_ram_mb: u32,
     /// Sensor ids the profile advertises (e.g. `accelerometer`, `gyroscope`).
     pub sensors: Vec<String>,
+    /// Skin name from the device definition's `<d:skin>` element (e.g. `pixel_6`), if it declares
+    /// one. This is the bezel/frame artwork the `emulator` binary draws around the screen when
+    /// passed `-skin <name>`; `None` means the device has no dedicated frame.
+    pub skin: Option<String>,
     /// `true` when the user created this profile rather than Google.
     pub is_custom: bool,
 }

@@ -143,6 +143,16 @@ fn build_profile(node: &roxmltree::Node<'_, '_>, source: DeviceSource) -> Option
     let default_ram_mb = parse_ram_mb(&hardware)?;
     let sensors = sensors_of(&hardware);
     let form_factor = form_factor_for(source, &id, &display_name);
+    // `<d:skin>` is an optional direct child of `<d:hardware>` naming the bezel artwork
+    // (`pixel_6`, `wearos_small_round`, …) — verified against the real `nexus.xml` / `wear.xml` /
+    // `tv.xml` / `automotive.xml` fixtures. Absent on most handset entries in `devices.xml`.
+    let skin = hardware
+        .children()
+        .find(|n| n.has_tag_name("skin"))
+        .and_then(|n| n.text())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
 
     Some(DeviceProfile {
         id,
@@ -157,6 +167,7 @@ fn build_profile(node: &roxmltree::Node<'_, '_>, source: DeviceSource) -> Option
         },
         default_ram_mb,
         sensors,
+        skin,
         is_custom: false,
     })
 }
@@ -280,6 +291,14 @@ mod tests {
         assert_eq!(got[0].oem, "Google");
         assert_eq!(got[0].form_factor, FormFactor::Phone);
         assert_eq!(got[0].default_ram_mb, 8192);
+        assert_eq!(got[0].skin.as_deref(), Some("pixel_6")); // `<d:skin>` — the device frame
+    }
+
+    #[test]
+    fn a_device_with_no_skin_element_has_none() {
+        let got = parse(DEVICES, DeviceSource::Handset).expect("parse");
+        let phone = got.iter().find(|d| d.id == "medium_phone").expect("phone");
+        assert_eq!(phone.skin, None);
     }
 
     #[test]

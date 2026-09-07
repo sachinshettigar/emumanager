@@ -420,10 +420,19 @@ interface EditHardwareVars {
   ramMb: number;
   storageMb: number;
   graphics: string;
+  deviceFrame: boolean;
 }
 
 async function editHardware(vars: EditHardwareVars): Promise<undefined> {
-  unwrap(await commands.editHardware(vars.id, vars.ramMb, vars.storageMb, vars.graphics));
+  unwrap(
+    await commands.editHardware(
+      vars.id,
+      vars.ramMb,
+      vars.storageMb,
+      vars.graphics,
+      vars.deviceFrame,
+    ),
+  );
   return undefined;
 }
 

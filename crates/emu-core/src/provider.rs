@@ -29,6 +29,10 @@ pub struct LaunchOpts {
     pub cold_boot: bool,
     /// Override the AVD's graphics mode for this launch only.
     pub graphics: Option<Graphics>,
+    /// Draw the device frame/bezel using this skin (`-skin <name>`, resolved under
+    /// `<sdk>/skins/`). `None` launches with just the screen — the emulator's default when no
+    /// skin is given.
+    pub skin: Option<String>,
     /// Extra raw flags passed through to the `emulator` binary (advanced/escape hatch).
     pub extra_args: Vec<String>,
 }
@@ -96,6 +100,7 @@ mod tests {
         assert!(!o.wipe_data);
         assert!(!o.cold_boot);
         assert!(o.graphics.is_none());
+        assert!(o.skin.is_none());
         assert!(o.extra_args.is_empty());
     }
 

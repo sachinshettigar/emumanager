@@ -201,6 +201,7 @@ export function Create(): React.JSX.Element {
   const [name, setName] = useState("");
   const [ramMb, setRamMb] = useState(2048);
   const [storageMb, setStorageMb] = useState(6144);
+  const [deviceFrame, setDeviceFrame] = useState(true);
 
   const device = devicesQuery.data?.find((d) => d.id === deviceId) ?? null;
   const image = imagesQuery.data?.find((i) => i.coord === imageCoord) ?? null;
@@ -220,6 +221,7 @@ export function Create(): React.JSX.Element {
       imageCoord,
       ramMb,
       storageMb,
+      deviceFrame,
       launch,
     });
   };
@@ -293,6 +295,20 @@ export function Create(): React.JSX.Element {
           onChange={setStorageMb}
           testId="storage-input"
         />
+        <label className="flex items-center gap-2 text-[13px] text-ink">
+          <input
+            type="checkbox"
+            data-testid="device-frame-input"
+            checked={deviceFrame}
+            onChange={(e) => {
+              setDeviceFrame(e.target.checked);
+            }}
+          />
+          Show device frame (bezel)
+          {device && device.skin === null ? (
+            <span className="text-[11px] text-muted">— this device has no dedicated frame</span>
+          ) : null}
+        </label>
       </div>
     );
   } else {
@@ -311,6 +327,8 @@ export function Create(): React.JSX.Element {
         <dd>{ramMb} MB</dd>
         <dt className="text-muted">Storage</dt>
         <dd>{storageMb} MB</dd>
+        <dt className="text-muted">Device frame</dt>
+        <dd>{deviceFrame ? "on" : "off"}</dd>
       </dl>
     );
   }

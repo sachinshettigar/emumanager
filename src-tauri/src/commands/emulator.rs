@@ -71,6 +71,9 @@ pub struct DeviceInfo {
     pub density_dpi: u32,
     /// Physical diagonal in inches.
     pub diagonal_in: f32,
+    /// Device-frame skin name (`<d:skin>`), when the profile declares one — the bezel the
+    /// emulator can draw around the screen. `None` = no dedicated frame for this device.
+    pub skin: Option<String>,
 }
 
 fn form_factor_label(form_factor: FormFactor) -> &'static str {
@@ -97,6 +100,7 @@ impl From<&DeviceProfile> for DeviceInfo {
             resolution: format!("{} × {}", device.screen.width_px, device.screen.height_px),
             density_dpi: device.screen.density_dpi,
             diagonal_in: device.screen.diagonal_in,
+            skin: device.skin.clone(),
         }
     }
 }
@@ -368,6 +372,8 @@ pub struct CreateEmulatorRequest {
     pub image_coord: String,
     pub ram_mb: u32,
     pub storage_mb: u32,
+    /// Draw the device frame/bezel when this emulator launches (uses the device profile's skin).
+    pub device_frame: bool,
     /// Also launch it once created ("Create & launch").
     pub launch: bool,
 }
@@ -406,6 +412,7 @@ pub async fn create_emulator(
             hardware: Hardware {
                 ram_mb: request.ram_mb.max(512),
                 storage_mb: request.storage_mb.max(1024),
+                device_frame: request.device_frame,
                 ..Hardware::default()
             },
         };
@@ -414,9 +421,8 @@ pub async fn create_emulator(
 
         if request.launch {
             job.report(Progress::log("launching…"));
-            provider
-                .launch(id.clone(), LaunchOpts::default(), &job)
-                .await?;
+            let opts = launch_opts_for(&provider, &id).await;
+            provider.launch(id.clone(), opts, &job).await?;
         }
         Ok(id)
     }
@@ -449,6 +455,38 @@ pub async fn create_emulator(
     }
 }
 
+/// The device-frame skin for a device profile id, read from the installed `sdklib` jar (the same
+/// source [`list_devices`] uses). `None` if the SDK isn't installed, the id is unknown, or the
+/// profile declares no `<d:skin>`.
+async fn device_skin(
+    provider: &emu_android::provider::AndroidProvider,
+    device_id: &str,
+) -> Option<String> {
+    let sdk_root = provider.sdk_root().await.ok()?;
+    let jar = read_sdklib_jar(&sdk_root).ok()?;
+    emu_android::devices::parse_from_jar(&jar)
+        .ok()?
+        .into_iter()
+        .find(|d| d.id == device_id)
+        .and_then(|d| d.skin)
+}
+
+/// Build the [`LaunchOpts`] for a tracked emulator: everything defaults, plus `skin` set to the
+/// device profile's frame skin when the emulator's stored `device_frame` is on. Any lookup
+/// failure just means "no frame" — launch still proceeds.
+async fn launch_opts_for(
+    provider: &emu_android::provider::AndroidProvider,
+    id: &EmulatorId,
+) -> LaunchOpts {
+    let mut opts = LaunchOpts::default();
+    if let Ok(row) = provider.detail(id).await {
+        if row.hardware.device_frame {
+            opts.skin = device_skin(provider, &row.device_profile_id).await;
+        }
+    }
+    opts
+}
+
 /// Launch an already-created emulator and wait for it to boot. Streams on `job://emulator` with
 /// `jobId` `launch:<id>`.
 #[tauri::command]
@@ -462,10 +500,9 @@ pub async fn launch_emulator(
     let provider = mgr.get().await?;
     let job = job_handle(&app, &job_id);
 
-    match provider
-        .launch(EmulatorId(id), LaunchOpts::default(), &job)
-        .await
-    {
+    let emu_id = EmulatorId(id);
+    let opts = launch_opts_for(&provider, &emu_id).await;
+    match provider.launch(emu_id, opts, &job).await {
         Ok(_handle) => {
             emit_job(
                 &app,
@@ -551,6 +588,8 @@ pub struct EmulatorDetail {
     pub storage_mb: u32,
     /// `auto` / `host` / `swiftshader`.
     pub graphics: String,
+    /// Whether the emulator launches with a device frame/bezel drawn around the screen.
+    pub device_frame: bool,
     /// `created here` / `adopted` / `from profile` / `imported`.
     pub source: String,
     /// Live: `stopped` / `booting` / `running` / `error`.
@@ -593,6 +632,7 @@ pub async fn edit_hardware(
     ram_mb: u32,
     storage_mb: u32,
     graphics: String,
+    device_frame: bool,
 ) -> Result<(), IpcError> {
     let provider = mgr.get().await?;
     let current = provider
@@ -607,6 +647,7 @@ pub async fn edit_hardware(
             "swiftshader" => Graphics::SwiftshaderIndirect,
             _ => Graphics::Auto,
         },
+        device_frame,
         ..current.hardware
     };
     provider
@@ -696,6 +737,7 @@ pub async fn emulator_detail(
         ram_mb: row.hardware.ram_mb,
         storage_mb: row.hardware.storage_mb,
         graphics: graphics_label(row.hardware.graphics).to_string(),
+        device_frame: row.hardware.device_frame,
         source: source_label(&row.source).to_string(),
         state: run_state_label(state).to_string(),
         adb_serial,

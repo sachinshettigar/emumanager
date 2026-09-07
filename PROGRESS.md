@@ -8,7 +8,13 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Phase (8-item feature batch, session 10):** user asked for seven things at once — live device
   telemetry (storage/network/logs), a logcat-style live+filterable viewer, real download/run
   progress %, proper device skins, export-profile parity, a rename, and grouped/customizable
-  device lists. Scoped into `0032`–`0038`. **`0034` (progress) done:** `bootstrap` now streams
+  device lists. Scoped into `0032`–`0038`. **`0035` (device skins) done:** `Hardware.device_frame`
+  — stored but read by nothing until now — is load-bearing. `DeviceProfile` carries the `<d:skin>`
+  name; `AndroidProvider::launch` passes `-skin <name> -skindir <sdk>/skins` when the frame is
+  wanted **and** the skin is actually installed under `<sdk>/skins/` (a cmdline-tools-only SDK
+  has none — the launch log then says so instead of the emulator printing a scary warning). A
+  "Show device frame" checkbox in the Create wizard and the detail-panel hardware form.
+  **`0034` (progress) done:** `bootstrap` now streams
   `sdkmanager`'s own output line by line (`ProcessRunner::spawn`) instead of dumping it at the
   end — the ~900 MB `emulator` download no longer looks frozen. No output-format parsing (no
   fixture; AGENTS §6.2): the `sdkmanager` phase shows an indeterminate pulse bar, while the

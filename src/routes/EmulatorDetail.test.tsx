@@ -56,6 +56,7 @@ const DETAIL: EmulatorDetailDto = {
   ramMb: 2048,
   storageMb: 6144,
   graphics: "auto",
+  deviceFrame: true,
   source: "created here",
   state: "stopped",
   adbSerial: null,

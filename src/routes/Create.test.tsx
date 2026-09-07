@@ -31,6 +31,7 @@ const PIXEL: DeviceInfo = {
   resolution: "1080 × 2400",
   densityDpi: 420,
   diagonalIn: 6.4,
+  skin: "pixel_6",
 };
 
 const IMAGE: ImageInfo = {
@@ -111,6 +112,7 @@ describe("Create wizard", () => {
           name: "My Pixel",
           deviceId: "pixel_6",
           imageCoord: "system-images;android-34;google_apis_playstore;x86_64",
+          deviceFrame: true,
           launch: false,
         }),
       );
