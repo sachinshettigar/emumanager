@@ -8,7 +8,12 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Phase (8-item feature batch, session 10):** user asked for seven things at once — live device
   telemetry (storage/network/logs), a logcat-style live+filterable viewer, real download/run
   progress %, proper device skins, export-profile parity, a rename, and grouped/customizable
-  device lists. Scoped into `0032`–`0038`. **`0036` (export parity) done:** export was
+  device lists. Scoped into `0032`–`0038`. **`0037` (device grouping) done:** the Create wizard's
+  device step was one flat list; it's now grouped into collapsible sections by form factor
+  (Phones / Tablets / Foldables / Wear OS / Android TV / Automotive / Desktop) with per-group
+  counts, collapsed by default and auto-opening on search or selection. Each row shows OEM /
+  resolution / dpi / RAM and a "frame" badge. The full custom-device-profile editor stays M7.
+  **`0036` (export parity) done:** export was
   clipboard-only and buried on the detail panel; now `export_profile_to_file` writes a real
   `<data_dir>/exports/<avd>.emuprofile` and returns its path. The detail panel offers "Copy
   profile" and "Save as .emuprofile" (→ path + "Show in folder"), and every Dashboard row has an

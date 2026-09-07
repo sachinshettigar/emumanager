@@ -149,4 +149,27 @@ describe("Create wizard", () => {
     fireEvent.click(screen.getByTestId("device-pixel_6"));
     expect(screen.getByTestId("next-button")).not.toBeDisabled();
   });
+
+  it("groups devices by form factor", async () => {
+    const WEAR: DeviceInfo = {
+      ...PIXEL,
+      id: "wear_round",
+      name: "Wear OS Small Round",
+      formFactor: "wear",
+      skin: "wearos_small_round",
+    };
+    listDevicesMock.mockResolvedValue({ status: "ok", data: [PIXEL, WEAR] });
+    renderCreate();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("device-group-phone")).toHaveTextContent("Phones (1)");
+    });
+    expect(screen.getByTestId("device-group-wear")).toHaveTextContent("Wear OS (1)");
+    // A search narrows a group and drops the others.
+    fireEvent.change(screen.getByTestId("device-search"), { target: { value: "wear" } });
+    await waitFor(() => {
+      expect(screen.queryByTestId("device-group-phone")).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId("device-wear_round")).toBeInTheDocument();
+  });
 });

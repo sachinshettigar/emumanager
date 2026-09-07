@@ -37,6 +37,63 @@ function StepTabs({ current }: { current: number }): React.JSX.Element {
   );
 }
 
+/** Device form factors in the order the grouped list shows them. Anything unknown → "Other". */
+const FORM_FACTOR_ORDER = [
+  "phone",
+  "tablet",
+  "foldable",
+  "wear",
+  "tv",
+  "automotive",
+  "desktop",
+] as const;
+
+const FORM_FACTOR_LABEL: Record<string, string> = {
+  phone: "Phones",
+  tablet: "Tablets",
+  foldable: "Foldables",
+  wear: "Wear OS",
+  tv: "Android TV",
+  automotive: "Automotive",
+  desktop: "Desktop",
+  other: "Other",
+};
+
+function DeviceRow({
+  device,
+  selectedId,
+  onSelect,
+}: {
+  device: DeviceInfo;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      data-testid={`device-${device.id}`}
+      data-selected={device.id === selectedId}
+      onClick={() => {
+        onSelect(device.id);
+      }}
+      className="flex w-full flex-col gap-0.5 rounded-card border border-border-default bg-surface px-3.5 py-3 text-left text-[13px] data-[selected=true]:border-primary"
+    >
+      <span className="flex items-center gap-2">
+        {device.name}
+        {device.skin ? (
+          <span className="rounded bg-running/15 px-1.5 py-0.5 text-[10px] text-running">
+            frame
+          </span>
+        ) : null}
+      </span>
+      <span className="text-[11px] text-muted">
+        {device.oem ? `${device.oem} · ` : ""}
+        {device.resolution} · {device.densityDpi}dpi · {device.ramMb} MB RAM
+      </span>
+    </button>
+  );
+}
+
 function DeviceStep({
   devices,
   selectedId,
@@ -47,12 +104,28 @@ function DeviceStep({
   onSelect: (id: string) => void;
 }): React.JSX.Element {
   const [query, setQuery] = useState("");
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q
+  const q = query.trim().toLowerCase();
+
+  const groups = useMemo(() => {
+    const filtered = q
       ? devices.filter((d) => `${d.name} ${d.oem} ${d.id}`.toLowerCase().includes(q))
       : devices;
-  }, [devices, query]);
+    const byFactor = new Map<string, DeviceInfo[]>();
+    for (const d of filtered) {
+      const key = (FORM_FACTOR_ORDER as readonly string[]).includes(d.formFactor)
+        ? d.formFactor
+        : "other";
+      const list = byFactor.get(key) ?? [];
+      list.push(d);
+      byFactor.set(key, list);
+    }
+    const keys = [...FORM_FACTOR_ORDER, "other"].filter((k) => byFactor.has(k));
+    return keys.map((k) => ({
+      key: k,
+      label: FORM_FACTOR_LABEL[k] ?? k,
+      items: byFactor.get(k) ?? [],
+    }));
+  }, [devices, q]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -66,27 +139,33 @@ function DeviceStep({
         placeholder="Search devices…"
         className="rounded-md border border-border-default bg-surface px-3 py-2 text-[13px]"
       />
-      <ul className="grid max-h-80 gap-2 overflow-y-auto sm:grid-cols-2">
-        {filtered.map((device) => (
-          <li key={device.id}>
-            <button
-              type="button"
-              data-testid={`device-${device.id}`}
-              data-selected={device.id === selectedId}
-              onClick={() => {
-                onSelect(device.id);
-              }}
-              className="flex w-full flex-col gap-0.5 rounded-card border border-border-default bg-surface px-3.5 py-3 text-left text-[13px] data-[selected=true]:border-primary"
+      <div className="flex max-h-80 flex-col gap-2 overflow-y-auto">
+        {groups.length === 0 ? (
+          <Placeholder>No devices match “{query}”.</Placeholder>
+        ) : (
+          groups.map((group) => (
+            <details
+              key={group.key}
+              data-testid={`device-group-${group.key}`}
+              // Collapsed by default, except while searching (matches should be visible) or when
+              // the selected device lives in this group.
+              open={q !== "" || group.items.some((d) => d.id === selectedId) || groups.length === 1}
+              className="rounded-card border border-border-default bg-panel/40"
             >
-              <span>{device.name}</span>
-              <span className="text-[11px] text-muted">
-                {device.formFactor} · {device.resolution} · {device.densityDpi}dpi · {device.ramMb}{" "}
-                MB RAM
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+              <summary className="cursor-pointer px-3 py-2 text-[12px] font-semibold text-ink">
+                {group.label} <span className="font-normal text-muted">({group.items.length})</span>
+              </summary>
+              <ul className="grid gap-2 p-2 sm:grid-cols-2">
+                {group.items.map((device) => (
+                  <li key={device.id}>
+                    <DeviceRow device={device} selectedId={selectedId} onSelect={onSelect} />
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ))
+        )}
+      </div>
     </div>
   );
 }
