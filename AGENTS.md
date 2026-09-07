@@ -16,7 +16,8 @@ A cross-platform **desktop app to create, launch, track, and share Android emula
 installing Android Studio. Scope is deliberately **Android only** (see `docs/adr/0003`).
 
 - Product spec: `docs/spec.md`
-- Architecture: `docs/architecture.md`
+- Architecture (reference): `docs/architecture.md`
+- Orientation (how to read the code, add a feature): `docs/understanding-the-codebase.md`
 - Milestones + definition of done: `MILESTONES.md`
 - Current state: `PROGRESS.md` and `.agent/state.json`
 - Design (wireframes): `docs/design/wireframes/` (open `docs/design/emumanager-wireframes.html`)

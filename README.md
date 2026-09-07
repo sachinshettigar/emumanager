@@ -52,6 +52,7 @@ This repo is built to be developed by AI coding agents and to survive switching 
 
 - Plan & milestones: [`MILESTONES.md`](MILESTONES.md)
 - Architecture: [`docs/architecture.md`](docs/architecture.md)
+- New here? [`docs/understanding-the-codebase.md`](docs/understanding-the-codebase.md) — a guided tour
 - Decisions: [`docs/adr/`](docs/adr/)
 - Working state (tasks, journal, machine-readable progress): [`.agent/`](.agent/)
 - Recipes ("skills"): [`docs/playbooks/`](docs/playbooks/)

@@ -5,6 +5,12 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
+- **Learning document delivered** (session 10, end of the 8-item batch):
+  `docs/understanding-the-codebase.md` — an orientation guide (complements the
+  `docs/architecture.md` reference): the five layers + the no-`tauri`-in-`emu-core` rule, the
+  ports/adapters idea, the typed IPC + event seam, the registry, a full "click Launch" trace, the
+  add-a-feature recipe, a where-things-live map, the dev-loop gotchas, and the load-bearing
+  conventions. Linked from `README.md` and `AGENTS.md`.
 - **Phase (8-item feature batch, session 10):** user asked for seven things at once — live device
   telemetry (storage/network/logs), a logcat-style live+filterable viewer, real download/run
   progress %, proper device skins, export-profile parity, a rename, and grouped/customizable
