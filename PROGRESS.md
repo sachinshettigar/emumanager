@@ -5,19 +5,18 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
-- **Milestone:** M6 — Cross-platform hardening & packaging (`currentMilestone` advanced). M5 is
-  **functionally complete** — `0025`–`0027` all `done` (host detection, `emu-helper` + elevation
-  IPC, host panel + launch-gating) — and stays `in_progress` on the live-CI "no nested virt →
-  `CannotRun`" DoD assertion + Windows verification, both deferred to M6's CI. M4/M3/M2 likewise
-  wait on M6's E2E line.
-- **Phase:** M5 done end to end. `0027`: `Dependencies.tsx` gets a `HostPanel` — a verdict banner,
-  four tiles (virtualization / accelerator / RAM / disk-free) from `probe_host`, and per-fix rows
-  with a "Fix it" button (`run_helper` + re-probe) for the scriptable ones. `cannotRun` disables
-  "Launch" on the Dashboard and the detail panel with the verdict reason shown. `useHostReport` /
-  `useRunHelper` share one query key so a fix re-probes everywhere. Next milestone: **M6** —
-  cross-platform hardening & packaging, which is largely **CI-gated** (signed installers,
-  notarization, the E2E matrix) and can't finish while GitHub Actions is blocked on the account's
-  billing.
+- **Milestone:** M6 — Cross-platform hardening & packaging. **Scope narrowed by ADR 0007**: v1
+  ships **unsigned** installers (project owner's call — no Apple/Windows certs; the Tauri updater
+  keeps its own Ed25519 signature). Scoped into `0028`–`0030`; `0028` (packaging + `release.yml`)
+  **done** (in review). M5 (and M4/M3/M2) stay `in_progress` on lines that need a green CI run.
+- **Phase:** `0028` landed the packaging path. `tauri.conf.json` now bundles (`active: true`,
+  `targets: all`, updater artifacts) with real `.icns`/`.ico` icons and a generated Ed25519
+  updater pubkey; `tauri-plugin-updater` is registered; `capabilities/default.json` is
+  least-privilege (`core:default` + `updater:default`). `.github/workflows/release.yml` builds
+  unsigned installers + signed updater artifacts on a `v*` tag (macOS arm64+x64 / Linux /
+  Windows), `actionlint`-clean. `just package` verified locally — a 6.8 MB `.dmg` came out.
+  ADR 0007 + `docs/playbooks/release-signing.md` document the unsigned decision and the key flow.
+  Next: `0029` (rotating logs + `export_diagnostics`), then `0030` (E2E harness skeleton).
 - **Phase:** M4 done end to end. `0024`: `src/routes/Profiles.tsx` rewritten — a `FileReader`
   drop zone → `inspect_profile` → a requirement table + Apply / Apply & launch (streams
   `useEmulatorJob`) + Save-to-library; a saved-profiles list with Load / Delete. Emulator detail
@@ -127,11 +126,10 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Toolchains:** rustc 1.98.1, pnpm 10.0.0, `just` 1.58 (brew), java 21 (system JDK).
 - **Published:** private GitHub repo `sachinshettigar/emumanager` (`main` pushed).
 - **Last validated commit:** see `.agent/state.json` `lastValidatedCommit`.
-- **Next action:** M6 (Cross-platform hardening & packaging) is next but its DoD — signed +
-  notarized installers built by CI, the E2E suite running per-PR, an auto-updating pre-release —
-  is **unreachable from code alone** while GitHub Actions is billing-blocked (needs a human in
-  Settings → Billing). The buildable slices (least-privilege Tauri capability audit; a
-  `release.yml` / updater config that CI would run; the E2E harness itself) can still be written.
+- **Next action:** task `0029` — `src-tauri` logging: `tracing` + a daily-rotating file layer in
+  `<data_dir>/logs/`, wired at the top of `setup`; an `export_diagnostics` command that zips the
+  recent logs + latest `HostReport` + versions + a redacted `emulators` dump, then `reveal_path`s
+  it; an "Export diagnostics" button on the Dependencies screen. Then `0030` (E2E harness).
   Separately: once GitHub billing is fixed, re-watch the next `ci.yml` push run,
   then flip `0009`/`M0` to `done`.
 
@@ -151,15 +149,43 @@ Narrative companion to `.agent/state.json`. Update both together (see
       `in_progress` on the same M6 `tauri-driver` E2E line as M0/M1/M2.
 - [~] M4 Profiles: export / import / recreate — tasks `0022`–`0024` all `done` (engine, IPC,
       Profiles screen). Stays `in_progress` on the export→wipe→import E2E deferred to M6.
-- [~] M5 Host readiness & elevated helper — tasks `0025`–`0027` all `done` (detection, helper +
-      IPC, host panel + gating). Stays `in_progress` on the live-CI DoD + Windows verification (M6).
-- [~] M6 Cross-platform hardening & packaging — **current milestone**; largely CI/signing-gated
-      (blocked on GitHub billing)
+- [~] M5 Host readiness & elevated helper — tasks `0025`–`0027` all `done`. Stays `in_progress`
+      on the live-CI DoD + Windows verification (M6).
+- [~] M6 Cross-platform hardening & packaging — **current milestone**; **unsigned** (ADR 0007).
+      `0028` (packaging + `release.yml`) **done**; `0029`–`0030` todo. The tag-triggered CI run
+      itself is gated on GitHub billing.
 - [ ] M5 Host readiness & elevated helper
 - [ ] M6 Cross-platform hardening & packaging
 - [ ] M7 Feature-complete v1.0
 
 ## Log
+
+### 2026-09-07 — session 9 (continued) (Claude Code) — ADR 0007 (ship unsigned); M6 scoped; task 0028 done (packaging + release.yml)
+
+Project owner: ship v1 installers **unsigned** — no Apple/Windows code-signing certs, users do the
+standard first-run OS override. Wrote `docs/adr/0007-ship-unsigned-v1.md`, amended `docs/spec.md`
+§6 + §8, and rescoped `MILESTONES.md` M6 (dropped "signed + notarized" / "no Gatekeeper warning"
+from the DoD; kept unsigned installers + the signature-verified Tauri updater + the CI matrix).
+M6 scoped into `0028` (packaging + `release.yml`), `0029` (logs + diagnostics), `0030` (E2E
+harness).
+
+**Task `0028` done.** `src-tauri/tauri.conf.json` now bundles: `bundle.active = true`,
+`targets = "all"`, `createUpdaterArtifacts = true`, an `icon` list with real `icon.icns` / `icon.ico`
+(regenerated via `pnpm tauri icon`), `deb` deps, NSIS `currentUser`. `plugins.updater` carries a
+real generated Ed25519 **public** key (the private key lives only in the session scratchpad — the
+release manager regenerates their own before the first tag; `docs/playbooks/release-signing.md`).
+`tauri-plugin-updater = "2"` is registered in `run()`; `capabilities/default.json` is
+least-privilege (`core:default` + `updater:default`, no wildcard). `.github/workflows/release.yml`
+(new) builds **unsigned** installers on a `v*` tag — matrix `macos-latest` ×2 (arm64 + x64) /
+`ubuntu-latest` / `windows-latest` via `tauri-apps/tauri-action@v0` — signs the updater artifacts
+with the `TAURI_SIGNING_*` secrets, and drafts a pre-release. `actionlint` clean.
+
+`just package` (new recipe = `pnpm tauri build`) ran on this Mac: `EmuManager.app` 16 MB,
+`EmuManager_0.1.0_aarch64.dmg` **6.8 MB** (spec §6 wants < 20 MB), plus a signed
+`EmuManager.app.tar.gz` + `.sig`. `README.md` got an "Install (pre-release)" section with the
+per-OS unsigned first-run steps. `.gitignore` blocks `*.key`. `just validate` green — the workflow
+is written + lint-clean only; the tag-triggered CI run still waits on the GitHub Actions billing
+block (same one holding `ci.yml`).
 
 ### 2026-09-06 — session 9 (continued) (Claude Code) — task 0027 done (host panel + launch-gating); M5 functionally complete
 

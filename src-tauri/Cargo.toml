@@ -40,6 +40,10 @@ futures-util = "0.3"
 time = { version = "0.3", default-features = false, features = ["std"] }
 tokio = { version = "1", features = ["process", "fs", "rt-multi-thread", "macros", "io-util", "sync", "net"] }
 reqwest = { version = "0.13", default-features = false, features = ["rustls", "stream"] }
+# Self-update from GitHub Releases, verified against the Ed25519 pubkey in `tauri.conf.json`
+# (ADR 0007 — OS installers are unsigned, the updater is not). `release.yml` produces the
+# `latest.json` + `.sig` artifacts it consumes.
+tauri-plugin-updater = "2"
 
 [dev-dependencies]
 tempfile = "3"

@@ -105,8 +105,11 @@ page. There is no small, cross-platform GUI that owns the whole lifecycle.
   x64. ARM Linux best-effort.
 - **Footprint:** app installer < 20 MB; data dir grows on demand (system images 1–3.5 GB each).
 - **Cold start** to interactive dashboard < 1.5 s.
-- **Security:** signed + notarized (macOS), signed (Windows). Least-privilege Tauri capabilities.
-  Elevated helper is a separate audited binary invoked only on explicit user action.
+- **Security:** v1 installers ship **unsigned** (ADR 0007) — users do the standard first-run OS
+  override (macOS right-click → Open; Windows SmartScreen → Run anyway), documented in the README.
+  OS code signing + notarization are a later config/secrets change, not a rewrite. The Tauri
+  **updater** stays signature-verified (self-generated Ed25519 key). Least-privilege Tauri
+  capabilities. Elevated helper is a separate audited binary invoked only on explicit user action.
 - **Reliability:** killing the app never corrupts an AVD; on next start, state reconciles.
 - **Accessibility:** keyboard navigable, honors OS reduced-motion and color-scheme.
 - **Observability:** rotating local logs; "export diagnostics" bundle (redacted).
@@ -127,3 +130,6 @@ page. There is no small, cross-platform GUI that owns the whole lifecycle.
 > Decide by M2.
 
 > QUESTION: do we sign `.emuprofile` files (detached signature) for provenance? Decide by M4.
+
+> DECIDED (M6, ADR 0007): v1 OS installers ship unsigned / un-notarized; only the Tauri updater
+> keeps a signature (Ed25519). OS code signing is deferred to a later config + secrets change.

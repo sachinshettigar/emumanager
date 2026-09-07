@@ -17,6 +17,18 @@ Android Studio, no manual `sdkmanager` commands. Windows, Linux, macOS.
 Scope is Android only — iOS simulators cannot run off macOS, so they are out of scope
 ([ADR 0003](docs/adr/0003-android-only-scope.md)).
 
+## Install (pre-release)
+
+Downloads on the [Releases page](https://github.com/sachinshettigar/emumanager/releases) are
+**unsigned** ([ADR 0007](docs/adr/0007-ship-unsigned-v1.md)) — your OS will warn on first launch.
+Once past that, the app auto-updates (the updater *is* signature-verified).
+
+- **macOS** (`.dmg`): open it, drag the app to Applications, then **right-click the app → Open →
+  Open**. (A plain double-click is blocked by Gatekeeper the first time only.)
+- **Windows** (`.msi` / setup `.exe`): run it; on the SmartScreen prompt click **More info → Run
+  anyway**.
+- **Linux** (`.AppImage`): `chmod +x EmuManager_*.AppImage` and run it. `.deb` also provided.
+
 ## Build & run
 
 Prerequisites: Rust (stable), Node 20+, `pnpm`, `just`. Then:
@@ -25,6 +37,7 @@ Prerequisites: Rust (stable), Node 20+, `pnpm`, `just`. Then:
 just setup     # install remaining toolchains + dev deps (idempotent)
 just dev       # run the app
 just validate  # run the full check gate (what CI runs)
+just package   # build an unsigned installer for this OS (pnpm tauri build)
 ```
 
 Platform notes: emulator acceleration needs KVM (Linux), the Windows Hypervisor Platform

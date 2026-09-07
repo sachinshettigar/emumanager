@@ -1,0 +1,63 @@
+name: release
+
+# A pushed `v*` tag builds UNSIGNED installers (ADR 0007) for all three OSes plus the
+# signature-verified updater artifacts, and attaches them to a GitHub Release. Nothing here is
+# code-signed or notarized — first-run steps are in the README. Only the Tauri updater is signed,
+# with the Ed25519 key whose public half is in `src-tauri/tauri.conf.json`.
+#
+# Requires two repo secrets:
+#   TAURI_SIGNING_PRIVATE_KEY           contents of the `.key` from `pnpm tauri signer generate`
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  its password (empty string if generated without one)
+# See docs/playbooks/release-signing.md.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            args: "--target aarch64-apple-darwin"
+          - os: macos-latest
+            args: "--target x86_64-apple-darwin"
+          - os: ubuntu-latest
+            args: ""
+          - os: windows-latest
+            args: ""
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - name: add the macOS Rust target
+        if: matrix.os == 'macos-latest'
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "EmuManager ${{ github.ref_name }}"
+          releaseBody: |
+            Unsigned pre-release (see ADR 0007). First run:
+            - macOS: right-click the app → Open → Open.
+            - Windows: SmartScreen → More info → Run anyway.
+            - Linux: `chmod +x` the `.AppImage`.
+          releaseDraft: true
+          prerelease: true
+          args: ${{ matrix.args }}

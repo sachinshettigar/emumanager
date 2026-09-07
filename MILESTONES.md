@@ -202,15 +202,26 @@ deferred to M6 along with the rest of the harness. M5 stays `in_progress` on tha
 
 ## M6 — Cross-platform hardening & packaging  (coverage gate: 72%)
 
-- [ ] CI matrix builds installers: `.dmg` (signed+notarized), `.msi`/NSIS (signed), `.AppImage` + `.deb`
-- [ ] Tauri updater configured; `release.yml` publishes update artifacts + signatures
-- [ ] Least-privilege Tauri v2 capabilities audited; no wildcard fs/shell scopes
-- [ ] E2E suite runs in CI on Linux + Windows each PR; macOS smoke via Playwright + a manual checklist
-- [ ] Crash/日志: rotating logs, "export diagnostics" (redacted) command
-- [ ] Arch coverage: Apple Silicon + Intel mac, x86_64 Linux/Windows all exercised
+Scope narrowed by **ADR 0007**: v1 ships **unsigned** installers (no Apple/Windows code-signing
+certs). OS signing/notarization is a later config + secrets change. The Tauri updater keeps its own
+Ed25519 signature.
 
-DoD: a tagged pre-release produces installers for all three OSes from CI; installing the macOS
-build shows no Gatekeeper warning; the app auto-updates from the previous pre-release.
+- [ ] CI matrix builds **unsigned** installers: `.dmg`, `.msi`/NSIS, `.AppImage` + `.deb`
+      (`bundle.active = true`, `bundle.targets` per OS)
+- [ ] Tauri updater configured (Ed25519 key, public key in `tauri.conf.json`); `release.yml`
+      publishes `latest.json` + per-artifact `.sig` on a tag
+- [ ] Least-privilege Tauri v2 capabilities audited; no wildcard fs/shell scopes
+- [ ] E2E suite (`tauri-driver` + WebdriverIO/Playwright) exists and runs in CI on Linux + Windows
+      each PR — this is where M2/M3/M4/M5's deferred "real boot" DoD lines land
+- [ ] Rotating local logs (`tracing` + a file layer); `export_diagnostics` command → a redacted
+      zip (logs, `HostReport`, versions — no tokens/paths-with-usernames)
+- [ ] README + download docs: the unsigned first-run steps per OS (right-click → Open / SmartScreen)
+- [ ] Arch coverage: Apple Silicon + Intel mac, x86_64 Linux/Windows all exercised in the matrix
+
+DoD: a tagged pre-release produces **unsigned** installers for all three OSes from CI, and the app
+auto-updates from the previous pre-release (updater signature verified). Still gated on GitHub
+Actions billing (see M0) — the code, config and workflows land now, marked so the moment CI is
+unblocked it's one flip.
 
 ---
 

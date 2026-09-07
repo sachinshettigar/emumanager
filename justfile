@@ -26,6 +26,11 @@ hooks:
 dev:
     pnpm tauri dev
 
+# Build an unsigned installer for the current OS/arch (ADR 0007). Output in
+# src-tauri/target/release/bundle/. CI does the 3-OS matrix (release.yml).
+package:
+    pnpm tauri build
+
 # --- inner loop ------------------------------------------------------------------
 
 # Fast feedback: fmt-check, typecheck, clippy, changed-crate tests.
