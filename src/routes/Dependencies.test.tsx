@@ -11,6 +11,7 @@ vi.mock("../lib/bindings", () => ({
     listComponents: vi.fn(),
     bootstrapToolchain: vi.fn(),
     installComponent: vi.fn(),
+    uninstallComponent: vi.fn(),
     probeHost: vi.fn(),
     runHelper: vi.fn(),
   },
@@ -22,6 +23,7 @@ vi.mock("../lib/bindings", () => ({
 const listComponentsMock = vi.mocked(commands.listComponents);
 const bootstrapToolchainMock = vi.mocked(commands.bootstrapToolchain);
 const installComponentMock = vi.mocked(commands.installComponent);
+const uninstallComponentMock = vi.mocked(commands.uninstallComponent);
 const probeHostMock = vi.mocked(commands.probeHost);
 const runHelperMock = vi.mocked(commands.runHelper);
 const listenMock = vi.mocked(events.jobBootstrap.listen);
@@ -93,6 +95,18 @@ const EMULATOR: ComponentInfo = {
   source: null,
 };
 
+const EMULATOR_INSTALLED: ComponentInfo = {
+  ...EMULATOR,
+  installed: true,
+  source: "app-managed",
+};
+
+const PLATFORM_TOOLS_SYSTEM: ComponentInfo = {
+  ...PLATFORM_TOOLS,
+  installed: true,
+  source: "system:/opt/android-sdk",
+};
+
 function renderDependencies(): void {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
@@ -111,6 +125,7 @@ describe("Dependencies screen", () => {
     listComponentsMock.mockReset();
     bootstrapToolchainMock.mockReset();
     installComponentMock.mockReset();
+    uninstallComponentMock.mockReset();
     probeHostMock.mockReset();
     runHelperMock.mockReset();
     probeHostMock.mockResolvedValue(HOST_OK);
@@ -154,6 +169,44 @@ describe("Dependencies screen", () => {
     await waitFor(() => {
       expect(installComponentMock).toHaveBeenCalledWith("platform-tools");
     });
+  });
+
+  it("uninstalls an app-managed component after a confirm step", async () => {
+    listComponentsMock.mockResolvedValue({
+      status: "ok",
+      data: [CMDLINE_TOOLS, EMULATOR_INSTALLED],
+    });
+    uninstallComponentMock.mockResolvedValue({ status: "ok", data: null });
+
+    renderDependencies();
+    await waitFor(() => {
+      expect(screen.getByTestId("uninstall-emulator")).toBeInTheDocument();
+    });
+    // The command-line tools can never be removed from the UI.
+    expect(screen.queryByTestId("uninstall-cmdline-tools;latest")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("uninstall-emulator"));
+    expect(uninstallComponentMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("uninstall-confirm-emulator"));
+    await waitFor(() => {
+      expect(uninstallComponentMock).toHaveBeenCalledWith("emulator");
+    });
+  });
+
+  it("offers no Uninstall for a component found in a system SDK", async () => {
+    listComponentsMock.mockResolvedValue({
+      status: "ok",
+      data: [CMDLINE_TOOLS, PLATFORM_TOOLS_SYSTEM],
+    });
+
+    renderDependencies();
+    await waitFor(() => {
+      expect(screen.getByTestId("component-platform-tools")).toHaveTextContent(
+        "installed (system:/opt/android-sdk)",
+      );
+    });
+    expect(screen.queryByTestId("uninstall-platform-tools")).not.toBeInTheDocument();
   });
 
   it("hides the Install-all button once every component is installed", async () => {

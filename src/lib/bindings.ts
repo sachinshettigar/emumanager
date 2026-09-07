@@ -34,6 +34,13 @@ export const commands = {
 	 *  one such job runs at a time. A component that's already installed is a clean no-op.
 	 */
 	installComponent: (componentId: string) => typedError<null, IpcError>(__TAURI_INVOKE("install_component", { componentId })),
+	/**
+	 *  Remove a **single** app-managed SDK component — the mirror of [`install_component`], running
+	 *  `sdkmanager --uninstall <id>`. `cmdline-tools` can't be removed here (it's the uninstaller
+	 *  itself), and a component that lives in an existing system SDK is left untouched. Fast enough
+	 *  that it needs no progress stream: the caller re-reads [`list_components`] afterwards.
+	 */
+	uninstallComponent: (componentId: string) => typedError<null, IpcError>(__TAURI_INVOKE("uninstall_component", { componentId })),
 	/**  Every Google device profile, parsed from the installed `sdklib` jar. */
 	listDevices: () => typedError<DeviceInfo[], IpcError>(__TAURI_INVOKE("list_devices")),
 	/**

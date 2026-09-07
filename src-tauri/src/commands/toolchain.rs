@@ -228,6 +228,29 @@ pub async fn install_component(app: AppHandle, component_id: String) -> Result<(
     run_bootstrap(&app, &data_dir, &wanted, &state, os).await
 }
 
+/// Remove a **single** app-managed SDK component — the mirror of [`install_component`], running
+/// `sdkmanager --uninstall <id>`. `cmdline-tools` can't be removed here (it's the uninstaller
+/// itself), and a component that lives in an existing system SDK is left untouched. Fast enough
+/// that it needs no progress stream: the caller re-reads [`list_components`] afterwards.
+#[tauri::command]
+#[specta::specta]
+pub async fn uninstall_component(app: AppHandle, component_id: String) -> Result<(), IpcError> {
+    let (os, _arch) = host()?;
+    let target = ComponentId::from_repo_path(&component_id).ok_or_else(|| {
+        IpcError::new(
+            "not_found",
+            format!("no SDK component with id '{component_id}'"),
+        )
+    })?;
+    let (data_dir, state) = scan_installed(&app, os).await?;
+    let process = NativeProcessRunner;
+    let ports = toolchain::UninstallPorts { process: &process };
+    let job = JobHandle::noop(JobId(JOB_ID.to_string()));
+    toolchain::uninstall(&data_dir, target, &state, os, &ports, &job)
+        .await
+        .map_err(IpcError::from)
+}
+
 /// Shared tail of `bootstrap_toolchain` / `install_component`: build the ports + job, run
 /// `toolchain::bootstrap` for `wanted`, and emit the terminal `job://bootstrap` event.
 async fn run_bootstrap(

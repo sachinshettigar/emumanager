@@ -4,9 +4,12 @@
 //!
 //! - [`installed_state`] — what's on disk right now, app-managed *and* any existing system SDK.
 //! - [`bootstrap`] — fetch + unpack `cmdline-tools`, accept licenses, install the rest.
+//! - [`uninstall`] — the inverse: `sdkmanager --uninstall` for one app-managed component.
 
 pub mod bootstrap;
 pub mod installed_state;
+pub mod uninstall;
 
 pub use bootstrap::{bootstrap, BootstrapPorts};
 pub use installed_state::{binary_path, scan, ComponentLocation, InstalledState, SdkSource};
+pub use uninstall::{uninstall, UninstallPorts};

@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Screen, Placeholder } from "../components/Screen";
 import type { ComponentInfo, HostReportDto } from "../lib/bindings";
 import {
@@ -7,8 +9,12 @@ import {
   useHostReport,
   useInstallComponent,
   useRunHelper,
+  useUninstallComponent,
 } from "../lib/ipc";
 import type { BootstrapRunState } from "../lib/ipc";
+
+/** The `sdkmanager` package path of the command-line tools — never removable from the UI. */
+const CMDLINE_TOOLS_ID = "cmdline-tools;latest";
 
 function formatSize(bytes: number): string {
   if (bytes <= 0) {
@@ -26,6 +32,13 @@ function ComponentRow({
   busy: boolean;
 }): React.JSX.Element {
   const install = useInstallComponent();
+  const uninstall = useUninstallComponent();
+  const [confirming, setConfirming] = useState(false);
+
+  // The backend only removes components it installed itself, and never the command-line tools.
+  const removable =
+    component.installed && component.source === "app-managed" && component.id !== CMDLINE_TOOLS_ID;
+
   return (
     <li
       data-testid={`component-${component.id}`}
@@ -36,11 +49,61 @@ function ComponentRow({
         <span className="text-[11px] text-muted">
           {component.version} · {formatSize(component.sizeBytes)}
         </span>
+        {uninstall.error ? (
+          <span data-testid={`uninstall-error-${component.id}`} className="text-[11px] text-danger">
+            {uninstall.error.ipc.message}
+          </span>
+        ) : null}
       </div>
       {component.installed ? (
-        <span className="text-[12px] text-running">
-          installed{component.source ? ` (${component.source})` : ""}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-[12px] text-running">
+            installed{component.source ? ` (${component.source})` : ""}
+          </span>
+          {removable && !confirming ? (
+            <button
+              type="button"
+              data-testid={`uninstall-${component.id}`}
+              disabled={busy || uninstall.isPending}
+              onClick={() => {
+                setConfirming(true);
+              }}
+              className="rounded-md border border-border-default px-2.5 py-1 text-[11px] text-muted hover:text-danger disabled:opacity-50"
+            >
+              Uninstall
+            </button>
+          ) : null}
+          {removable && confirming ? (
+            <>
+              <button
+                type="button"
+                data-testid={`uninstall-confirm-${component.id}`}
+                disabled={uninstall.isPending}
+                onClick={() => {
+                  uninstall.mutate(component.id, {
+                    onSettled: () => {
+                      setConfirming(false);
+                    },
+                  });
+                }}
+                className="rounded-md border border-danger px-2.5 py-1 text-[11px] font-medium text-danger disabled:opacity-50"
+              >
+                {uninstall.isPending ? "Removing…" : "Confirm remove"}
+              </button>
+              <button
+                type="button"
+                data-testid={`uninstall-cancel-${component.id}`}
+                disabled={uninstall.isPending}
+                onClick={() => {
+                  setConfirming(false);
+                }}
+                className="text-[11px] text-muted underline disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </>
+          ) : null}
+        </div>
       ) : (
         <button
           type="button"

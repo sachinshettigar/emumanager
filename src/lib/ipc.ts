@@ -120,6 +120,26 @@ export function useInstallComponent() {
   });
 }
 
+async function uninstallComponent(componentId: string): Promise<undefined> {
+  unwrap(await commands.uninstallComponent(componentId));
+  return undefined;
+}
+
+/**
+ * Mutation hook for a component row's "Uninstall" button — the mirror of
+ * {@link useInstallComponent}. Refetches {@link useComponents} on success so the row flips back
+ * to its "Install" state.
+ */
+export function useUninstallComponent() {
+  const queryClient = useQueryClient();
+  return useMutation<undefined, IpcCallError, string>({
+    mutationFn: uninstallComponent,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: COMPONENTS_QUERY_KEY });
+    },
+  });
+}
+
 /** Static app metadata (version, licence, features) for the About screen. Never fails. */
 export function useAppInfo(): UseQueryResult<AppInfo, IpcCallError> {
   return useQuery<AppInfo, IpcCallError>({

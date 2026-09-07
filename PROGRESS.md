@@ -8,7 +8,13 @@ Narrative companion to `.agent/state.json`. Update both together (see
 - **Phase (8-item feature batch, session 10):** user asked for seven things at once — live device
   telemetry (storage/network/logs), a logcat-style live+filterable viewer, real download/run
   progress %, proper device skins, export-profile parity, a rename, and grouped/customizable
-  device lists. Scoped into `0032`–`0038`. **`0032` (rename) done:** the product is now
+  device lists. Scoped into `0032`–`0038`. **`0033` (uninstall) done:** the Dependencies screen's
+  per-row Install now has a mirror — an "Uninstall" button (→ "Confirm remove" / "Cancel") on any
+  installed, app-managed component that isn't the command-line tools. New
+  `emu_core::toolchain::uninstall` module runs `sdkmanager --uninstall <pkg> --sdk_root=…`;
+  it refuses to touch a component that came from a system SDK (Android Studio, `ANDROID_HOME`) —
+  both client-side (no button) and server-side (`Unsupported`). `uninstall_component` command,
+  `useUninstallComponent` hook. 6 core + 2 web tests. **`0032` (rename) done:** the product is now
   **Emulator Studio** everywhere user-facing — `tauri.conf.json` `productName` + window title,
   `app_info().name`, the sidebar brand, the window/tab `<title>`, backend liveness ping, all
   user-visible copy and error strings in `crates/*`, and README + `docs/*`. Bundle identifier

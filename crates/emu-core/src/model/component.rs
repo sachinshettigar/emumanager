@@ -33,6 +33,18 @@ impl ComponentId {
         }
     }
 
+    /// The inverse of [`repo_path`](Self::repo_path): the component a `sdkmanager` package path
+    /// names, or `None` for anything outside the managed set.
+    #[must_use]
+    pub fn from_repo_path(path: &str) -> Option<Self> {
+        match path {
+            "cmdline-tools;latest" => Some(ComponentId::CmdlineTools),
+            "platform-tools" => Some(ComponentId::PlatformTools),
+            "emulator" => Some(ComponentId::Emulator),
+            _ => None,
+        }
+    }
+
     /// All components M1 bootstraps, in install order (`cmdline-tools` must land first).
     #[must_use]
     pub const fn m1_set() -> [ComponentId; 3] {
