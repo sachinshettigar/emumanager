@@ -34,11 +34,17 @@ Once past that, the app auto-updates (the updater *is* signature-verified).
 Prerequisites: Rust (stable), Node 20+, `pnpm`, `just`. Then:
 
 ```bash
-just setup     # install remaining toolchains + dev deps (idempotent)
-just dev       # run the app
-just validate  # run the full check gate (what CI runs)
-just package   # build an unsigned installer for this OS (pnpm tauri build)
+just setup           # install remaining toolchains + dev deps (idempotent)
+just dev             # run the app
+just validate        # run the full check gate (what CI runs)
+just package         # build an unsigned installer for the current OS (pnpm tauri build)
+just package-mac     # macOS .app + .dmg  (add --universal for x86_64 too)
+just package-windows # Windows .exe + .msi — MUST run on Windows (PowerShell)
 ```
+
+Each OS's installers can only be built on that OS (Tauri's bundlers don't cross-compile). From a
+Mac you get the macOS installers; Windows and Linux need their own machine, a VM, or CI. Full
+matrix and commands: [`docs/playbooks/packaging.md`](docs/playbooks/packaging.md).
 
 Platform notes: emulator acceleration needs KVM (Linux), the Windows Hypervisor Platform
 (Windows), or Hypervisor.framework (macOS). The app detects and guides; a one-time elevated

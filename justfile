@@ -31,6 +31,16 @@ dev:
 package:
     pnpm tauri build
 
+# macOS installers (.app + .dmg), unsigned. `--universal` also builds x86_64.
+# See docs/playbooks/packaging.md for the "what can I build where" matrix.
+package-mac *ARGS:
+    bash ./scripts/package-mac.sh {{ARGS}}
+
+# Windows installers (.exe / .msi), unsigned. MUST run on Windows (PowerShell) —
+# Tauri's Windows bundlers don't cross-compile from macOS/Linux.
+package-windows:
+    pwsh ./scripts/package-windows.ps1
+
 # --- inner loop ------------------------------------------------------------------
 
 # Fast feedback: fmt-check, typecheck, clippy, changed-crate tests.
