@@ -55,7 +55,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::profile::inspect_profile,
             commands::profile::apply_profile,
             commands::profile::export_profile,
-            commands::profile::export_profile_to_file,
+            commands::profile::export_profile_to_path,
             commands::profile::save_profile,
             commands::profile::list_profiles,
             commands::profile::get_saved_profile,
@@ -81,6 +81,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);

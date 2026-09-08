@@ -44,6 +44,8 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls", "s
 # (ADR 0007 — OS installers are unsigned, the updater is not). `release.yml` produces the
 # `latest.json` + `.sig` artifacts it consumes.
 tauri-plugin-updater = "2"
+# Native "Save As…" file picker for exporting a `.emuprofile` to a location the user chooses.
+tauri-plugin-dialog = "2"
 
 # Logging (task 0029). `AGENTS.md` §7: `tracing`, never `println!`. A daily-rotating file layer
 # in the data dir + a stderr layer in debug; `EnvFilter` from `RUST_LOG` else `info`.

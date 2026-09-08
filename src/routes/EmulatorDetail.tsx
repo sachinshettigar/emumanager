@@ -382,30 +382,16 @@ export function EmulatorDetail(): React.JSX.Element {
           data-testid="export-profile-file"
           disabled={exportProfileToFile.isPending}
           onClick={() => {
-            exportProfileToFile.mutate(id);
+            exportProfileToFile.mutate({ id, suggestedName: d.avdName });
           }}
           className="rounded-md border border-border-default px-3.5 py-2 text-[13px] disabled:opacity-50"
         >
-          Save as .emuprofile
+          Save as .emuprofile…
         </button>
       </section>
 
-      {exportProfileToFile.data ? (
-        <section className="flex flex-wrap items-center gap-2 text-[12px] text-muted">
-          <span>
-            Saved to <code data-testid="exported-path">{exportProfileToFile.data}</code>
-          </span>
-          <button
-            type="button"
-            data-testid="reveal-exported"
-            onClick={() => {
-              void revealPath(exportProfileToFile.data);
-            }}
-            className="rounded-md border border-border-default px-2.5 py-1 text-[11px]"
-          >
-            Show in folder
-          </button>
-        </section>
+      {exportProfileToFile.data !== null && exportProfileToFile.data !== undefined ? (
+        <ExportedPathRow path={exportProfileToFile.data} />
       ) : null}
 
       {exportProfile.data ? (
@@ -654,6 +640,27 @@ function DeviceInspector({ id, running }: { id: string; running: boolean }): Rea
           ))
         )}
       </div>
+    </section>
+  );
+}
+
+/** "Saved to <path>" + Show-in-folder, shown after a successful export. */
+function ExportedPathRow({ path }: { path: string }): React.JSX.Element {
+  return (
+    <section className="flex flex-wrap items-center gap-2 text-[12px] text-muted">
+      <span>
+        Saved to <code data-testid="exported-path">{path}</code>
+      </span>
+      <button
+        type="button"
+        data-testid="reveal-exported"
+        onClick={() => {
+          void revealPath(path);
+        }}
+        className="rounded-md border border-border-default px-2.5 py-1 text-[11px]"
+      >
+        Show in folder
+      </button>
     </section>
   );
 }

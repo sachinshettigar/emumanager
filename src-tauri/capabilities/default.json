@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Base capability set for the main window. Every Emulator Studio IPC command is a `#[tauri::command]` reached through the generated bindings (always allowed); only plugin permissions are listed here, kept to exactly what the app uses (task 0028 / ADR 0007).",
   "windows": ["main"],
-  "permissions": ["core:default", "updater:default"]
+  "permissions": ["core:default", "updater:default", "dialog:allow-save"]
 }

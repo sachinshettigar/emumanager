@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { save } from "@tauri-apps/plugin-dialog";
 
 import {
   commands,
@@ -606,16 +607,36 @@ export function useExportProfile() {
   return useMutation<string, IpcCallError, string>({ mutationFn: exportProfile });
 }
 
-async function exportProfileToFile(id: string): Promise<string> {
-  return unwrap(await commands.exportProfileToFile(id));
+interface ExportProfileVars {
+  id: string;
+  /** Filename stem offered in the Save dialog (usually the AVD name). */
+  suggestedName: string;
 }
 
 /**
- * Mutation hook that writes an emulator's `.emuprofile` to a file under the app data dir and
- * resolves to its path — the mirror of the Profiles screen's drag-in import.
+ * Open the native Save dialog, then write the emulator's `.emuprofile` to the chosen path.
+ * Resolves to that path, or `null` if the user cancelled the dialog.
+ */
+async function exportProfileToFile(vars: ExportProfileVars): Promise<string | null> {
+  const path = await save({
+    defaultPath: `${vars.suggestedName}.emuprofile`,
+    filters: [{ name: "Emulator profile", extensions: ["emuprofile"] }],
+  });
+  if (path === null) {
+    return null;
+  }
+  unwrap(await commands.exportProfileToPath(vars.id, path));
+  return path;
+}
+
+/**
+ * Mutation hook: pick a location, then export the emulator's `.emuprofile` there — the mirror of
+ * the Profiles screen's drag-in import. `data` is `null` when the Save dialog was cancelled.
  */
 export function useExportProfileToFile() {
-  return useMutation<string, IpcCallError, string>({ mutationFn: exportProfileToFile });
+  return useMutation<string | null, IpcCallError, ExportProfileVars>({
+    mutationFn: exportProfileToFile,
+  });
 }
 
 async function listProfiles(): Promise<ProfileSummary[]> {

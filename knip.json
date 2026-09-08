@@ -12,5 +12,5 @@
   "project": ["src/**/*.{ts,tsx}", "scripts/*.mjs"],
   "ignore": ["src/lib/bindings.ts"],
   "ignoreDependencies": ["markdownlint-cli2"],
-  "ignoreBinaries": ["just", "playwright"]
+  "ignoreBinaries": ["just"]
 }

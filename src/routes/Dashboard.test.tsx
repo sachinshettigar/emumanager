@@ -5,6 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import { Dashboard } from "./Dashboard";
 import { commands } from "../lib/bindings";
+import { save } from "@tauri-apps/plugin-dialog";
 import type { EmulatorInfo } from "../lib/bindings";
 
 vi.mock("../lib/bindings", () => ({
@@ -17,7 +18,7 @@ vi.mock("../lib/bindings", () => ({
     launchEmulator: vi.fn(),
     stopEmulator: vi.fn(),
     reconcileNow: vi.fn(),
-    exportProfileToFile: vi.fn(),
+    exportProfileToPath: vi.fn(),
     listComponents: vi.fn().mockResolvedValue({
       status: "ok",
       data: [
@@ -132,12 +133,10 @@ describe("Dashboard", () => {
     expect(screen.getByTestId("launch-01J0STOPPED")).toBeInTheDocument();
   });
 
-  it("exports an emulator profile to a file from its row", async () => {
+  it("exports an emulator profile to a chosen location from its row", async () => {
     listEmulatorsMock.mockResolvedValue({ status: "ok", data: [STOPPED] });
-    vi.mocked(commands.exportProfileToFile).mockResolvedValue({
-      status: "ok",
-      data: "/data/exports/tv_api33.emuprofile",
-    });
+    vi.mocked(save).mockResolvedValue("/Users/u/Desktop/tv_api33.emuprofile");
+    vi.mocked(commands.exportProfileToPath).mockResolvedValue({ status: "ok", data: null });
     renderDashboard();
 
     await waitFor(() => {
@@ -146,7 +145,13 @@ describe("Dashboard", () => {
     fireEvent.click(screen.getByTestId("export-01J0STOPPED"));
 
     await waitFor(() => {
-      expect(vi.mocked(commands.exportProfileToFile)).toHaveBeenCalledWith("01J0STOPPED");
+      expect(vi.mocked(save)).toHaveBeenCalledWith(
+        expect.objectContaining({ defaultPath: "tv_api33.emuprofile" }),
+      );
+      expect(vi.mocked(commands.exportProfileToPath)).toHaveBeenCalledWith(
+        "01J0STOPPED",
+        "/Users/u/Desktop/tv_api33.emuprofile",
+      );
       expect(screen.getByTestId("export-01J0STOPPED")).toHaveTextContent("Exported");
     });
   });

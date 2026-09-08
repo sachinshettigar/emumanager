@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { EmulatorDetail } from "./EmulatorDetail";
+import { save } from "@tauri-apps/plugin-dialog";
 import { commands, events } from "../lib/bindings";
 import type { EmulatorDetail as EmulatorDetailDto } from "../lib/bindings";
 
@@ -19,7 +20,7 @@ vi.mock("../lib/bindings", () => ({
     stopEmulator: vi.fn(),
     revealPath: vi.fn(),
     exportProfile: vi.fn(),
-    exportProfileToFile: vi.fn(),
+    exportProfileToPath: vi.fn(),
     probeHost: vi.fn().mockResolvedValue({
       status: "ok",
       data: {
@@ -88,6 +89,8 @@ describe("EmulatorDetail", () => {
     detailMock.mockReset();
     logTailMock.mockReset();
     renameMock.mockReset();
+    vi.mocked(save).mockReset();
+    vi.mocked(commands.exportProfileToPath).mockReset();
     logTailMock.mockResolvedValue({ status: "ok", data: [] });
   });
 
@@ -203,12 +206,10 @@ describe("EmulatorDetail", () => {
     expect(screen.getByTestId("logcat-console")).toHaveTextContent("FATAL EXCEPTION");
   });
 
-  it("saves the profile to a file and shows the path", async () => {
+  it("picks a location then exports the profile there", async () => {
     detailMock.mockResolvedValue({ status: "ok", data: DETAIL });
-    vi.mocked(commands.exportProfileToFile).mockResolvedValue({
-      status: "ok",
-      data: "/home/u/.local/share/emulator-studio/exports/pixel6_api34.emuprofile",
-    });
+    vi.mocked(save).mockResolvedValue("/Users/u/Desktop/pixel6_api34.emuprofile");
+    vi.mocked(commands.exportProfileToPath).mockResolvedValue({ status: "ok", data: null });
     renderDetail();
 
     await waitFor(() => {
@@ -217,8 +218,31 @@ describe("EmulatorDetail", () => {
     fireEvent.click(screen.getByTestId("export-profile-file"));
 
     await waitFor(() => {
-      expect(vi.mocked(commands.exportProfileToFile)).toHaveBeenCalledWith("01J0ABC");
+      expect(vi.mocked(save)).toHaveBeenCalledWith(
+        expect.objectContaining({ defaultPath: "pixel6_api34.emuprofile" }),
+      );
+      expect(vi.mocked(commands.exportProfileToPath)).toHaveBeenCalledWith(
+        "01J0ABC",
+        "/Users/u/Desktop/pixel6_api34.emuprofile",
+      );
       expect(screen.getByTestId("exported-path")).toHaveTextContent("pixel6_api34.emuprofile");
     });
+  });
+
+  it("does nothing when the Save dialog is cancelled", async () => {
+    detailMock.mockResolvedValue({ status: "ok", data: DETAIL });
+    vi.mocked(save).mockResolvedValue(null);
+    renderDetail();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("export-profile-file")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("export-profile-file"));
+
+    await waitFor(() => {
+      expect(vi.mocked(save)).toHaveBeenCalled();
+    });
+    expect(vi.mocked(commands.exportProfileToPath)).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("exported-path")).not.toBeInTheDocument();
   });
 });

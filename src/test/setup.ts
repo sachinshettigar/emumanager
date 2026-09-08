@@ -24,6 +24,13 @@ vi.mock("@tauri-apps/api/event", () => ({
   emit: vi.fn(() => Promise.resolve()),
 }));
 
+// Native file dialogs: no host under jsdom. Default `save` to "user cancelled" (resolves null);
+// tests exercising an export mock `@tauri-apps/plugin-dialog`'s `save` to return a path.
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  save: vi.fn(() => Promise.resolve(null)),
+  open: vi.fn(() => Promise.resolve(null)),
+}));
+
 // jsdom has no matchMedia; provide a minimal stub so components/tests that
 // probe prefers-color-scheme / prefers-reduced-motion don't throw.
 if (!window.matchMedia) {
