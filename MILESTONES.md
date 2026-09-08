@@ -213,8 +213,13 @@ Ed25519 signature.
 - [ ] Least-privilege Tauri v2 capabilities audited; no wildcard fs/shell scopes
 - [ ] E2E suite (`tauri-driver` + WebdriverIO/Playwright) exists and runs in CI on Linux + Windows
       each PR — this is where M2/M3/M4/M5's deferred "real boot" DoD lines land
-- [ ] Rotating local logs (`tracing` + a file layer); `export_diagnostics` command → a redacted
-      zip (logs, `HostReport`, versions — no tokens/paths-with-usernames)
+- [x] Rotating local logs (`tracing` + a file layer); `export_diagnostics` command → a redacted
+      zip (logs, `HostReport`, versions — no tokens/paths-with-usernames). Task `0029`:
+      `src-tauri/src/logging.rs` (daily-rolling file under `<data_dir>/logs/`, `EnvFilter`,
+      stderr in debug); `commands/diagnostics.rs` `export_diagnostics()` bundles the log tail +
+      fresh host report + versions + a hand-built (notes/tags-omitted) emulators table, with
+      home-path → `~` redaction (non-path secrets are a documented non-goal). "Export
+      diagnostics" button on the Dependencies screen.
 - [ ] README + download docs: the unsigned first-run steps per OS (right-click → Open / SmartScreen)
 - [ ] Arch coverage: Apple Silicon + Intel mac, x86_64 Linux/Windows all exercised in the matrix
 

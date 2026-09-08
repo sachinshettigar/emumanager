@@ -14,6 +14,8 @@ vi.mock("../lib/bindings", () => ({
     uninstallComponent: vi.fn(),
     probeHost: vi.fn(),
     runHelper: vi.fn(),
+    exportDiagnostics: vi.fn(),
+    revealPath: vi.fn().mockResolvedValue({ status: "ok", data: null }),
   },
   events: {
     jobBootstrap: { listen: vi.fn() },
@@ -341,6 +343,30 @@ describe("Dependencies screen", () => {
     await waitFor(() => {
       expect(runHelperMock).toHaveBeenCalledWith("add-kvm-group");
       expect(screen.getByTestId("fix-result")).toHaveTextContent("kvm group");
+    });
+  });
+
+  it("exports a diagnostics bundle and reveals it", async () => {
+    listComponentsMock.mockResolvedValue({ status: "ok", data: [CMDLINE_TOOLS] });
+    vi.mocked(commands.exportDiagnostics).mockResolvedValue({
+      status: "ok",
+      data: "/data/diagnostics-1750000000.zip",
+    });
+    renderDependencies();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("export-diagnostics")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("export-diagnostics"));
+
+    await waitFor(() => {
+      expect(vi.mocked(commands.exportDiagnostics)).toHaveBeenCalled();
+      expect(screen.getByTestId("diagnostics-path")).toHaveTextContent(
+        "diagnostics-1750000000.zip",
+      );
+      expect(vi.mocked(commands.revealPath)).toHaveBeenCalledWith(
+        "/data/diagnostics-1750000000.zip",
+      );
     });
   });
 });

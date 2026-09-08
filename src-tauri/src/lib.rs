@@ -12,6 +12,7 @@
 
 mod commands;
 mod ipc_error;
+mod logging;
 mod ports;
 mod provider_state;
 
@@ -64,6 +65,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::device::start_logcat,
             commands::device::stop_logcat,
             commands::device::device_facts,
+            commands::diagnostics::export_diagnostics,
         ])
         .events(collect_events![
             commands::toolchain::BootstrapProgress,
@@ -86,6 +88,13 @@ pub fn run() {
             // One shared AndroidProvider for the app's lifetime (see `provider_state`).
             let os = emu_core::model::HostOs::current();
             let data_dir = app.path().app_data_dir().ok();
+
+            // Logging first (task 0029): a daily-rotating file under `<data_dir>/logs/`, plus
+            // stderr in debug. The writer guard must outlive the app — park it in managed state.
+            if let Some(guard) = logging::init(data_dir.as_deref()) {
+                app.manage(std::sync::Mutex::new(guard));
+            }
+
             app.manage(ManagedProvider::new(data_dir, os));
 
             // Converge the registry to on-disk / adb reality once at startup — spawned, not
@@ -95,9 +104,23 @@ pub fn run() {
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 if let Some(mgr) = handle.try_state::<ManagedProvider>() {
-                    if let Ok(provider) = mgr.get().await {
-                        use emu_core::provider::Provider as _;
-                        let _ = provider.reconcile().await;
+                    match mgr.get().await {
+                        Ok(provider) => {
+                            use emu_core::provider::Provider as _;
+                            match provider.reconcile().await {
+                                Ok(states) => tracing::info!(
+                                    tracked = states.len(),
+                                    "startup reconcile complete"
+                                ),
+                                Err(e) => tracing::warn!(
+                                    error = %e,
+                                    "startup reconcile failed — recovered by later polls"
+                                ),
+                            }
+                        }
+                        Err(e) => {
+                            tracing::info!(error = %e, "provider not available at startup (no SDK yet?)");
+                        }
                     }
                 }
             });
@@ -115,11 +138,17 @@ pub fn run() {
                     .and_then(|mgr| mgr.peek())
                 {
                     tauri::async_runtime::block_on(async {
-                        let _ = tokio::time::timeout(
+                        let reaped = tokio::time::timeout(
                             std::time::Duration::from_secs(8),
                             provider.shutdown(),
                         )
-                        .await;
+                        .await
+                        .is_ok();
+                        if reaped {
+                            tracing::info!("shutdown: reaped emulator child processes");
+                        } else {
+                            tracing::warn!("shutdown: child reaper timed out after 8s");
+                        }
                     });
                 }
             }

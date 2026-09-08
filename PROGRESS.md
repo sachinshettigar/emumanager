@@ -5,6 +5,15 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
+- **`0029` (logging + diagnostics) done** (session 10): `src-tauri` finally has real logging —
+  `src-tauri/src/logging.rs` sets up a `tracing` subscriber with a daily-rotating file under
+  `<data_dir>/logs/emulator-studio.log` (plus stderr in debug), `EnvFilter` from `RUST_LOG` else
+  `info`. The startup `reconcile()` and the exit child-reaper now log their outcome instead of
+  `let _ = …`. New `export_diagnostics()` command bundles the log tail + a fresh host report +
+  `{app,tauri,os,arch}` versions + a hand-built (notes/tags-omitted) emulators table into
+  `<data_dir>/diagnostics-<ts>.zip`, with home-path → `~` redaction (non-path secrets are a
+  documented non-goal — the app's own logs are authored not to contain any). "Export diagnostics"
+  button at the bottom of the Dependencies screen → reveals the zip.
 - **Learning document delivered** (session 10, end of the 8-item batch):
   `docs/understanding-the-codebase.md` — an orientation guide (complements the
   `docs/architecture.md` reference): the five layers + the no-`tauri`-in-`emu-core` rule, the

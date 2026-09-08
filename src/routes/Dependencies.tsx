@@ -3,9 +3,11 @@ import { useState } from "react";
 import { Screen, Placeholder } from "../components/Screen";
 import type { ComponentInfo, HostReportDto } from "../lib/bindings";
 import {
+  revealPath,
   useBootstrapProgress,
   useBootstrapToolchain,
   useComponents,
+  useExportDiagnostics,
   useHostReport,
   useInstallComponent,
   useRunHelper,
@@ -337,6 +339,39 @@ export function Dependencies(): React.JSX.Element {
         on this machine (an existing Android Studio SDK, for example) is reused, never
         re-downloaded.
       </Placeholder>
+
+      <DiagnosticsRow />
     </Screen>
+  );
+}
+
+/** "Export diagnostics" — writes a redacted zip (log tail + host report + versions + emulators)
+ * and reveals it, for attaching to a bug report. */
+function DiagnosticsRow(): React.JSX.Element {
+  const exportDiag = useExportDiagnostics();
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted">
+      <button
+        type="button"
+        data-testid="export-diagnostics"
+        disabled={exportDiag.isPending}
+        onClick={() => {
+          exportDiag.mutate(undefined, {
+            onSuccess: (path) => {
+              void revealPath(path);
+            },
+          });
+        }}
+        className="rounded-md border border-border-default px-3 py-1.5 disabled:opacity-50"
+      >
+        {exportDiag.isPending ? "Collecting…" : "Export diagnostics"}
+      </button>
+      {exportDiag.data ? (
+        <span data-testid="diagnostics-path">Saved to {exportDiag.data}</span>
+      ) : null}
+      {exportDiag.error ? (
+        <span className="text-danger">{exportDiag.error.ipc.message}</span>
+      ) : null}
+    </div>
   );
 }

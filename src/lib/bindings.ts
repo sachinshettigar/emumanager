@@ -132,6 +132,8 @@ export const commands = {
 	stopLogcat: (id: string) => typedError<null, IpcError>(__TAURI_INVOKE("stop_logcat", { id })),
 	/**  Model / Android version / battery / `/data` usage for a running emulator. */
 	deviceFacts: (id: string) => typedError<DeviceFactsDto, IpcError>(__TAURI_INVOKE("device_facts", { id })),
+	/**  Write a redacted diagnostics zip to `<data_dir>/diagnostics-<unix-ts>.zip`. */
+	exportDiagnostics: () => typedError<string, IpcError>(__TAURI_INVOKE("export_diagnostics")),
 };
 
 /** Events */

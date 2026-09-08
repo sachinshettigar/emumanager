@@ -45,6 +45,15 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls", "s
 # `latest.json` + `.sig` artifacts it consumes.
 tauri-plugin-updater = "2"
 
+# Logging (task 0029). `AGENTS.md` §7: `tracing`, never `println!`. A daily-rotating file layer
+# in the data dir + a stderr layer in debug; `EnvFilter` from `RUST_LOG` else `info`.
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+# Writing the redacted `export_diagnostics` bundle. Read-only elsewhere, but the shell needs
+# write + deflate here. Same major as `emu-core`/`emu-android`.
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
 [dev-dependencies]
 tempfile = "3"
 

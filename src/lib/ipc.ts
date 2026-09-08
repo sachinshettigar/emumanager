@@ -702,6 +702,16 @@ export function useRunHelper() {
   });
 }
 
+async function exportDiagnostics(): Promise<string> {
+  return unwrap(await commands.exportDiagnostics());
+}
+
+/** Write a redacted diagnostics zip (log tail + host report + versions + emulators) to the data
+ * dir and resolve to its path — for attaching to a bug report. */
+export function useExportDiagnostics() {
+  return useMutation<string, IpcCallError>({ mutationFn: exportDiagnostics });
+}
+
 // ---------------------------------------------------------------------------
 // Device inspector (task 0038)
 // ---------------------------------------------------------------------------
