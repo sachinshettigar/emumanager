@@ -778,6 +778,23 @@ impl Provider for AndroidProvider {
             })?
             .avd_name;
 
+        // Fail fast on a missing prerequisite rather than spawning the emulator and then timing
+        // out for 5 minutes because `adb` (used to detect boot) doesn't exist.
+        let state = self.installed_state().await?;
+        if !state.is_installed(ComponentId::Emulator) {
+            return Err(CoreError::Unsupported(
+                "the emulator package isn't installed — install it on the Dependencies screen."
+                    .to_string(),
+            ));
+        }
+        if !state.is_installed(ComponentId::PlatformTools) {
+            return Err(CoreError::Unsupported(
+                "platform-tools (adb) isn't installed — Emulator Studio needs it to launch and \
+                 track emulators. Install it on the Dependencies screen, then try again."
+                    .to_string(),
+            ));
+        }
+
         let sdk_root = self.sdk_root().await?;
         let adb = self.adb_path(&sdk_root);
 
@@ -1303,13 +1320,18 @@ mod tests {
     ) -> (AndroidProvider, tempfile::TempDir) {
         let dir = tempfile::tempdir().expect("tempdir");
         let registry = Registry::open(dir.path()).await.expect("open registry");
-        // A real cmdline-tools install so `sdk_root()` resolves to the app-managed dir.
-        fs.write_atomic(
-            Path::new("/data/sdk/cmdline-tools/latest/bin/sdkmanager"),
-            b"#!/bin/sh",
-        )
-        .await
-        .unwrap();
+        // A complete app-managed SDK: cmdline-tools (so `sdk_root()` resolves here), platform-tools
+        // and emulator (so `launch`'s prerequisite check passes). Marker files only — the fake
+        // ProcessRunner supplies behaviour.
+        for marker in [
+            "/data/sdk/cmdline-tools/latest/bin/sdkmanager",
+            "/data/sdk/platform-tools/adb",
+            "/data/sdk/emulator/emulator",
+        ] {
+            fs.write_atomic(Path::new(marker), b"#!/bin/sh")
+                .await
+                .unwrap();
+        }
         let provider = AndroidProvider::new(
             Arc::new(process),
             Arc::new(fs),
@@ -1614,6 +1636,41 @@ mod tests {
             .await
             .expect("launch with flags");
         // The `on_spawn` needle above only matches if the argv was built with those exact flags.
+    }
+
+    #[tokio::test]
+    async fn launch_fails_clearly_when_platform_tools_is_missing() {
+        let fs = InMemoryFs::new();
+        // cmdline-tools + emulator, but NO platform-tools/adb.
+        fs.write_atomic(
+            Path::new("/data/sdk/cmdline-tools/latest/bin/sdkmanager"),
+            b"#!/bin/sh",
+        )
+        .await
+        .unwrap();
+        fs.write_atomic(Path::new("/data/sdk/emulator/emulator"), b"#!/bin/sh")
+            .await
+            .unwrap();
+        // `provider_with` would add adb — build the provider directly instead.
+        let dir = tempfile::tempdir().unwrap();
+        let registry = Registry::open(dir.path()).await.unwrap();
+        let provider = AndroidProvider::new(
+            Arc::new(FakeProcessRunner::new()),
+            Arc::new(fs),
+            registry,
+            PathBuf::from("/data"),
+            HostOs::Linux,
+        );
+        let id = seed_emulator(&provider).await;
+
+        let err = provider
+            .launch(id, LaunchOpts::default(), &job())
+            .await
+            .expect_err("no adb → launch must refuse");
+        match err {
+            CoreError::Unsupported(msg) => assert!(msg.contains("platform-tools")),
+            other => panic!("expected Unsupported, got {other:?}"),
+        }
     }
 
     #[tokio::test]
