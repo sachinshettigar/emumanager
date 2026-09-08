@@ -141,7 +141,7 @@ describe("Dependencies screen", () => {
     });
   });
 
-  it("shows installed components with their source and an Install button for the rest", async () => {
+  it("shows installed components and an Install button for the rest", async () => {
     listComponentsMock.mockResolvedValue({
       status: "ok",
       data: [CMDLINE_TOOLS, PLATFORM_TOOLS],
@@ -150,10 +150,13 @@ describe("Dependencies screen", () => {
     renderDependencies();
 
     await waitFor(() => {
-      expect(screen.getByTestId("component-cmdline-tools;latest")).toHaveTextContent(
-        "installed (app-managed)",
-      );
+      expect(screen.getByTestId("component-cmdline-tools;latest")).toHaveTextContent("installed");
     });
+    // cmdline-tools is installed but not removable — the reason is shown instead of a button.
+    expect(screen.getByTestId("component-cmdline-tools;latest")).toHaveTextContent(
+      "reset the data directory",
+    );
+    expect(screen.queryByTestId("uninstall-cmdline-tools;latest")).not.toBeInTheDocument();
     expect(screen.getByTestId("install-platform-tools")).toBeInTheDocument();
     expect(screen.queryByTestId("install-cmdline-tools;latest")).not.toBeInTheDocument();
   });
@@ -205,9 +208,12 @@ describe("Dependencies screen", () => {
     renderDependencies();
     await waitFor(() => {
       expect(screen.getByTestId("component-platform-tools")).toHaveTextContent(
-        "installed (system:/opt/android-sdk)",
+        "installed (system SDK)",
       );
     });
+    expect(screen.getByTestId("component-platform-tools")).toHaveTextContent(
+      "provided by your system SDK",
+    );
     expect(screen.queryByTestId("uninstall-platform-tools")).not.toBeInTheDocument();
   });
 

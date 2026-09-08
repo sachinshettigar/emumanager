@@ -105,6 +105,9 @@ function DeviceStep({
 }): React.JSX.Element {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
+  // Every group is expanded by default (like Android Studio's device manager); collapsing is
+  // opt-in and remembered. A search always forces every matching group open.
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
 
   const groups = useMemo(() => {
     const filtered = q
@@ -139,7 +142,7 @@ function DeviceStep({
         placeholder="Search devices…"
         className="rounded-md border border-border-default bg-surface px-3 py-2 text-[13px]"
       />
-      <div className="flex max-h-80 flex-col gap-2 overflow-y-auto">
+      <div className="flex max-h-[30rem] flex-col gap-2 overflow-y-auto">
         {groups.length === 0 ? (
           <Placeholder>No devices match “{query}”.</Placeholder>
         ) : (
@@ -147,9 +150,19 @@ function DeviceStep({
             <details
               key={group.key}
               data-testid={`device-group-${group.key}`}
-              // Collapsed by default, except while searching (matches should be visible) or when
-              // the selected device lives in this group.
-              open={q !== "" || group.items.some((d) => d.id === selectedId) || groups.length === 1}
+              open={q !== "" || !collapsed.has(group.key)}
+              onToggle={(e) => {
+                const isOpen = e.currentTarget.open;
+                setCollapsed((prev) => {
+                  const next = new Set(prev);
+                  if (isOpen) {
+                    next.delete(group.key);
+                  } else {
+                    next.add(group.key);
+                  }
+                  return next;
+                });
+              }}
               className="rounded-card border border-border-default bg-panel/40"
             >
               <summary className="cursor-pointer px-3 py-2 text-[12px] font-semibold text-ink">

@@ -38,8 +38,17 @@ function ComponentRow({
   const [confirming, setConfirming] = useState(false);
 
   // The backend only removes components it installed itself, and never the command-line tools.
-  const removable =
-    component.installed && component.source === "app-managed" && component.id !== CMDLINE_TOOLS_ID;
+  const isCmdlineTools = component.id === CMDLINE_TOOLS_ID;
+  const isSystemSourced = (component.source ?? "").startsWith("system:");
+  const removable = component.installed && component.source === "app-managed" && !isCmdlineTools;
+  // Why an installed component has no "Uninstall" button.
+  const notRemovableReason = !component.installed
+    ? null
+    : isSystemSourced
+      ? "provided by your system SDK"
+      : isCmdlineTools
+        ? "core — reset the data directory to remove"
+        : null;
 
   return (
     <li
@@ -60,8 +69,11 @@ function ComponentRow({
       {component.installed ? (
         <div className="flex shrink-0 items-center gap-2">
           <span className="text-[12px] text-running">
-            installed{component.source ? ` (${component.source})` : ""}
+            installed{isSystemSourced ? " (system SDK)" : ""}
           </span>
+          {notRemovableReason ? (
+            <span className="text-[11px] text-faint">{notRemovableReason}</span>
+          ) : null}
           {removable && !confirming ? (
             <button
               type="button"
@@ -70,7 +82,7 @@ function ComponentRow({
               onClick={() => {
                 setConfirming(true);
               }}
-              className="rounded-md border border-border-default px-2.5 py-1 text-[11px] text-muted hover:text-danger disabled:opacity-50"
+              className="rounded-md border border-border-default px-3 py-1.5 text-[12px] text-ink hover:border-danger hover:text-danger disabled:opacity-50"
             >
               Uninstall
             </button>
