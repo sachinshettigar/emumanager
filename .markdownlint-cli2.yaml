@@ -19,6 +19,7 @@ globs:
 
 ignores:
   - node_modules
+  - "**/node_modules/**"
   - target
   - ".agent/templates/**"
   - "docs/design/**"

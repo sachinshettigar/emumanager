@@ -46,3 +46,26 @@ jobs:
           name: app-${{ matrix.os }}
           path: src-tauri/target/debug/bundle/
           if-no-files-found: ignore
+
+  # E2E smoke via tauri-driver + WebdriverIO (task 0030). Linux/Windows only —
+  # tauri-driver has no macOS support. The deferred M2-M5 "real boot" DoD lines
+  # flip once this runs green, which it will not until the account's GitHub
+  # Actions billing block is lifted (see M0 / MILESTONES.md).
+  e2e:
+    needs: fast
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: WebKitWebDriver (linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y webkit2gtk-driver
+      - name: install tauri-driver
+        run: cargo install tauri-driver --locked
+      - name: e2e smoke
+        run: just e2e

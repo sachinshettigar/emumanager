@@ -5,6 +5,17 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
+- **`0030` (E2E harness) done** (session 10) — with `0029`, the last open M6 items that aren't
+  blocked on CI billing. New self-contained `e2e/` npm project (own `package.json` /
+  `node_modules`, outside the pnpm workspace, so it never affects `just validate`):
+  `wdio.conf.ts` (spawns/kills `tauri-driver`), one smoke spec (`e2e/specs/smoke.e2e.ts` — app
+  launches, Dashboard + sidebar render, the typed IPC seam reaches a `pong`), a `tsconfig` and a
+  README. `just e2e` → `scripts/e2e.sh`: on Linux/Windows it builds the debug app and runs
+  `wdio`; on macOS it prints a pointer to the new `docs/playbooks/macos-e2e-checklist.md` (the
+  manual M2-DoD flow) and exits 0. An `e2e` job was added to `ci.yml` (ubuntu + windows,
+  `cargo install tauri-driver`); the nightly's placeholder e2e step is now the real thing. None
+  of the CI runs until the GitHub Actions billing block is lifted — that unblocks M0's `ci.yml`,
+  the M2–M5 "real boot" DoD lines, and M6's `release.yml` all at once.
 - **`0029` (logging + diagnostics) done** (session 10): `src-tauri` finally has real logging —
   `src-tauri/src/logging.rs` sets up a `tracing` subscriber with a daily-rotating file under
   `<data_dir>/logs/emulator-studio.log` (plus stderr in debug), `EnvFilter` from `RUST_LOG` else

@@ -2,10 +2,10 @@
 id: "0030"
 title: "E2E harness — tauri-driver + WebdriverIO skeleton"
 milestone: "M6"
-status: "todo"
-owner: ""
+status: "review"
+owner: "Claude Code"
 created: "2026-09-07"
-updated: "2026-09-07"
+updated: "2026-09-08"
 ---
 
 ## Goal
@@ -36,20 +36,20 @@ moment GitHub Actions is unblocked, the deferred DoDs are one flip away, not a f
 
 ## Acceptance criteria
 
-- [ ] `e2e/specs/smoke.e2e.ts` — launches the built app via `tauri-driver`, waits for the
+- [x] `e2e/specs/smoke.e2e.ts` — launches the built app via `tauri-driver`, waits for the
       Dashboard, asserts the "My emulators" heading + the sidebar render, and that
       `data-testid="backend-status"` eventually shows a `pong` (the typed-IPC seam is live). No
       emulator creation yet — that spec is a follow-up once the harness runs green in CI.
-- [ ] `wdio.conf.ts` starts/stops `tauri-driver`, points `capabilities` at the debug binary path
+- [x] `wdio.conf.ts` starts/stops `tauri-driver`, points `capabilities` at the debug binary path
       per OS, sane timeouts.
-- [ ] `just e2e`: on Linux/Windows runs `wdio`; on macOS prints "E2E via tauri-driver is
+- [x] `just e2e`: on Linux/Windows runs `wdio`; on macOS prints "E2E via tauri-driver is
       Linux/Windows only — see docs/playbooks/macos-e2e-checklist.md" and exits 0 (so it never
       fails the nightly on a Mac). **Not** part of `just validate`.
-- [ ] A CI job (`e2e`, `ubuntu-latest` + `windows-latest`) that builds the app and runs `just e2e`.
+- [x] A CI job (`e2e`, `ubuntu-latest` + `windows-latest`) that builds the app and runs `just e2e`.
       `actionlint` clean. It will not *run* until billing is fixed — that's expected and noted.
-- [ ] `docs/playbooks/macos-e2e-checklist.md` — the manual steps for a Mac (launch, create + boot a
+- [x] `docs/playbooks/macos-e2e-checklist.md` — the manual steps for a Mac (launch, create + boot a
       Play Store x86_64 emulator, stop it) that M2's DoD describes.
-- [ ] `just check-fast` then `just validate` green (the e2e deps/config don't touch the Rust or the
+- [x] `just check-fast` then `just validate` green (the e2e deps/config don't touch the Rust or the
       unit-test web build; `knip` must not flag the `e2e/` tree — add it to `knip.json` ignores).
 
 ## Validate
@@ -62,6 +62,26 @@ just e2e   # on this Mac: prints the checklist pointer and exits 0
 
 ## Notes / findings
 
-(Fill in: `tauri-driver` version + whether it needs `webkit2gtk-driver` on Linux; how the debug
-binary path is resolved per OS; the `knip.json` ignore entry; why macOS is excluded (no
-`tauri-driver` macOS support); what the smoke spec actually asserts.)
+- **`e2e/` is a fully separate npm project** — its own `package.json` + `package-lock.json` +
+  `node_modules` (gitignored), NOT part of the root pnpm workspace. That's the cleanest way to
+  keep the wdio dep tree from touching `just validate`: root `tsc -b` only sees `src`, and
+  `eslint`/`prettier`/`knip` are told to skip `e2e/`.
+- **Excludes added**: `eslint.config.js` `ignores` += `e2e/**`; `.prettierignore` += `e2e/`;
+  `.markdownlint-cli2.yaml` `ignores` += `**/node_modules/**` (nested `node_modules` weren't
+  excluded before — `e2e/node_modules` is the first nested one in the repo). `knip.json` needed
+  no change (its `project` is `src/**` + `scripts/*.mjs`).
+- **`tauri-driver` is a cargo binary** (`cargo install tauri-driver --locked`), not npm — so it's
+  installed in the CI job / `scripts/e2e.sh` checks for it, not a `package.json` dep.
+- **macOS**: `scripts/e2e.sh` detects Darwin, prints the `docs/playbooks/macos-e2e-checklist.md`
+  pointer, exits 0. Verified locally (`just e2e` → pointer, exit 0).
+- **The wdio deps DO resolve and typecheck** — ran `npm install` in `e2e/` (493 pkgs) +
+  `tsc --noEmit -p e2e/tsconfig.json` clean. Not run against a real `tauri-driver` (macOS box,
+  and no billing to run CI) — the spec assertions are written against the real DOM
+  (`<h1>My emulators`, `<aside>` with "Dependencies", `[data-testid="backend-status"]` → `pong`).
+- **CI**: `e2e` job added to `ci.yml` (ubuntu + windows, `cargo install tauri-driver`, Linux also
+  `apt-get install webkit2gtk-driver`, then `just e2e`). `nightly-integration.yml`'s old
+  "skip if no playwright.config" step replaced with the real `just e2e`. Both `actionlint`-clean.
+  Neither runs until the GitHub Actions billing block is lifted — expected, in the criteria.
+- `pnpm tauri build --debug --no-bundle` builds `src-tauri/target/debug/emumanager` (bin name =
+  Cargo package name, since `tauri.conf.json` sets no `mainBinaryName`). `wdio.conf.ts` tries a
+  small candidate list so a future rename doesn't silently break it.

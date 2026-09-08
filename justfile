@@ -92,9 +92,11 @@ test-web:
 test-integration:
     cargo test --workspace -- --ignored
 
-# End-to-end: Playwright UI everywhere; tauri-driver on Linux/Windows.
+# End-to-end smoke: build the debug app + drive it via tauri-driver + WebdriverIO.
+# Linux/Windows only; on macOS prints the manual-checklist pointer and exits 0.
+# NOT part of `just validate` (see docs/testing-and-validation.md).
 e2e:
-    pnpm e2e
+    bash ./scripts/e2e.sh
 
 # --- schema --------------------------------------------------------------------
 

@@ -1,0 +1,19 @@
+{
+  "name": "emulator-studio-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end smoke suite: drives the built Tauri app through tauri-driver + WebdriverIO. Linux/Windows only (tauri-driver has no macOS support). Self-contained — its own node_modules, not part of the root pnpm workspace, so it never touches `just validate`.",
+  "scripts": {
+    "test": "wdio run ./wdio.conf.ts"
+  },
+  "devDependencies": {
+    "@wdio/cli": "^9.4.1",
+    "@wdio/local-runner": "^9.4.1",
+    "@wdio/mocha-framework": "^9.4.1",
+    "@wdio/spec-reporter": "^9.4.1",
+    "@types/node": "^22.9.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}

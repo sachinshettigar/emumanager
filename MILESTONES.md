@@ -211,8 +211,12 @@ Ed25519 signature.
 - [ ] Tauri updater configured (Ed25519 key, public key in `tauri.conf.json`); `release.yml`
       publishes `latest.json` + per-artifact `.sig` on a tag
 - [ ] Least-privilege Tauri v2 capabilities audited; no wildcard fs/shell scopes
-- [ ] E2E suite (`tauri-driver` + WebdriverIO/Playwright) exists and runs in CI on Linux + Windows
-      each PR — this is where M2/M3/M4/M5's deferred "real boot" DoD lines land
+- [x] E2E suite (`tauri-driver` + WebdriverIO) **exists** and is wired into CI on Linux + Windows
+      each PR — this is where M2/M3/M4/M5's deferred "real boot" DoD lines land. Task `0030`:
+      `e2e/` (self-contained npm project), one smoke spec, `just e2e` (Linux/Windows runs `wdio`;
+      macOS → `docs/playbooks/macos-e2e-checklist.md` + exit 0), an `e2e` job in `ci.yml`. It has
+      not *run* yet — gated on the same GitHub Actions billing block. The deferred M2–M5 "real
+      boot" lines flip once it goes green in CI.
 - [x] Rotating local logs (`tracing` + a file layer); `export_diagnostics` command → a redacted
       zip (logs, `HostReport`, versions — no tokens/paths-with-usernames). Task `0029`:
       `src-tauri/src/logging.rs` (daily-rolling file under `<data_dir>/logs/`, `EnvFilter`,

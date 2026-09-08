@@ -67,3 +67,11 @@ install`. CI never triggers these — it calls `just validate` directly, and the
   guards in `scripts/validate.sh` and `lefthook.yml`.
 - **Real-binary tests** (`adb`, `sdkmanager`, …) live behind `#[ignore]` /
   `just test-integration` and are **not** part of `just validate` (`AGENTS.md` §6.4).
+- **E2E** (`just e2e`, task 0030) builds the debug app and drives it through
+  `tauri-driver` + WebdriverIO (`e2e/`, self-contained — its own `package.json`
+  and `node_modules`, so it never affects `just validate`). One smoke spec today
+  (`e2e/specs/smoke.e2e.ts`: app launches, Dashboard + sidebar render, the typed
+  IPC seam reaches a `pong`). Linux/Windows only — `tauri-driver` has no macOS
+  support, so on a Mac `just e2e` prints a pointer to
+  `docs/playbooks/macos-e2e-checklist.md` and exits 0. Runs in CI's `e2e` job and
+  the nightly (both gated on the GitHub Actions billing block, same as the rest).

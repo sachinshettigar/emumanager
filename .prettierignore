@@ -15,6 +15,7 @@ src-tauri/
 crates/
 .sqlx/
 migrations/
+e2e/
 
 .agent/
 docs/
