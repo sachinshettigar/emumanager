@@ -131,7 +131,7 @@ function DeviceStep({
   }, [devices, q]);
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       <input
         type="search"
         data-testid="device-search"
@@ -142,7 +142,7 @@ function DeviceStep({
         placeholder="Search devices…"
         className="rounded-md border border-border-default bg-surface px-3 py-2 text-[13px]"
       />
-      <div className="flex max-h-[30rem] flex-col gap-2 overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         {groups.length === 0 ? (
           <Placeholder>No devices match “{query}”.</Placeholder>
         ) : (
@@ -193,7 +193,7 @@ function ImageStep({
   onSelect: (coord: string) => void;
 }): React.JSX.Element {
   return (
-    <ul className="grid max-h-80 gap-2 overflow-y-auto sm:grid-cols-2">
+    <ul className="grid min-h-0 flex-1 auto-rows-min gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
       {images.map((image) => (
         <li key={image.coord}>
           <button
@@ -203,7 +203,7 @@ function ImageStep({
             onClick={() => {
               onSelect(image.coord);
             }}
-            className="flex w-full flex-col gap-0.5 rounded-card border border-border-default bg-surface px-3.5 py-3 text-left text-[13px] data-[selected=true]:border-primary"
+            className="flex h-full w-full flex-col gap-0.5 rounded-card border border-border-default bg-surface px-3.5 py-3 text-left text-[13px] data-[selected=true]:border-primary"
           >
             <span>
               Android {image.androidVersion} · API {image.api}
