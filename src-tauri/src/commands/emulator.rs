@@ -419,6 +419,16 @@ pub async fn create_emulator(
         job.report(Progress::log(format!("creating AVD {avd_name}")));
         let id = provider.create(spec).await?;
 
+        // The provider may have de-duplicated the name against an existing emulator.
+        if let Ok(row) = provider.detail(&id).await {
+            if row.avd_name != avd_name {
+                job.report(Progress::log(format!(
+                    "'{avd_name}' was taken — created as '{}' ({})",
+                    row.display_name, row.avd_name
+                )));
+            }
+        }
+
         if request.launch {
             job.report(Progress::log("launching…"));
             let opts = launch_opts_for(&provider, &id).await;

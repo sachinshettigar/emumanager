@@ -9,4 +9,4 @@
 
 mod resolve;
 
-pub use resolve::{resolve, sanitize_avd_name};
+pub use resolve::{resolve, sanitize_avd_name, unique_avd_name, unique_display_name};

@@ -88,6 +88,38 @@ pub fn sanitize_avd_name(display_name: &str) -> String {
     }
 }
 
+/// A name that isn't already in `taken`, made unique by appending a suffix built from `suffix`
+/// (`suffix(2)`, `suffix(3)`, …) until it's free. `desired` itself is returned when it's free.
+///
+/// Used for both the on-disk AVD name (`|n| format!("_{n}")`) and the user-facing display name
+/// (`|n| format!(" ({n})")`) so creating "Pixel 6" twice yields "Pixel 6" and "Pixel 6 (2)".
+#[must_use]
+fn unique_name(desired: &str, taken: &[String], suffix: impl Fn(u32) -> String) -> String {
+    if !taken.iter().any(|t| t == desired) {
+        return desired.to_string();
+    }
+    for n in 2..=9999 {
+        let candidate = format!("{desired}{}", suffix(n));
+        if !taken.iter().any(|t| t == &candidate) {
+            return candidate;
+        }
+    }
+    // 9998 collisions is absurd; fall back to a timestamp-ish disambiguator.
+    format!("{desired}{}", suffix(u32::MAX))
+}
+
+/// A free AVD name (`name` or `name_2`, `name_3`, …), given the names already `taken`. (`name_2`).
+#[must_use]
+pub fn unique_avd_name(desired: &str, taken: &[String]) -> String {
+    unique_name(desired, taken, |n| format!("_{n}"))
+}
+
+/// A free display name (`Name` or `Name (2)`, `Name (3)`, …), given the names already `taken`. (`Name (2)`).
+#[must_use]
+pub fn unique_display_name(desired: &str, taken: &[String]) -> String {
+    unique_name(desired, taken, |n| format!(" ({n})"))
+}
+
 fn component_label(kind: RequirementKind) -> &'static str {
     match kind {
         RequirementKind::CmdlineTools => "Command-line tools",
@@ -103,6 +135,25 @@ mod tests {
     use super::*;
     use crate::model::profile::EmuProfile;
     use crate::toolchain::{ComponentLocation, SdkSource};
+
+    #[test]
+    fn unique_name_appends_the_next_free_suffix() {
+        let taken: Vec<String> = ["Pixel 6", "Pixel 6 (2)", "Pixel 6 (3)"]
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        // Free name → unchanged.
+        assert_eq!(unique_display_name("Tablet", &taken), "Tablet");
+        // Taken → first free numbered variant.
+        assert_eq!(unique_display_name("Pixel 6", &taken), "Pixel 6 (4)");
+        // AVD-name style uses `_N`.
+        let avds: Vec<String> = ["pixel_6", "pixel_6_2"]
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        assert_eq!(unique_avd_name("pixel_6", &avds), "pixel_6_3");
+        assert_eq!(unique_avd_name("tv_api33", &avds), "tv_api33");
+    }
 
     const VALID_DIR: &str = concat!(
         env!("CARGO_MANIFEST_DIR"),

@@ -186,6 +186,26 @@ impl AndroidProvider {
         &self.registry
     }
 
+    /// Every AVD name `avdmanager list avd` reports (loadable *or* broken) — the set an
+    /// `avdmanager create avd -n <name>` would collide with. `Ok([])` if `avdmanager` can't run.
+    async fn list_avd_names(&self) -> Vec<String> {
+        let Ok(sdk_root) = self.sdk_root().await else {
+            return Vec::new();
+        };
+        let avdmanager = self.avdmanager_path(&sdk_root);
+        match self
+            .process
+            .run(Command::new(avdmanager.display().to_string()).args(["list", "avd"]))
+            .await
+        {
+            Ok(out) => parse_avdmanager_list_avd(&out.stdout)
+                .into_iter()
+                .map(|a| a.name)
+                .collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+
     /// `true` when `coord`'s system image is installed under the resolved SDK root — the same
     /// `source.properties` marker check `ensure_image` uses.
     ///
@@ -257,13 +277,23 @@ impl AndroidProvider {
             })
     }
 
-    /// Change an emulator's display name. `NotFound` if untracked.
+    /// Change an emulator's display name. Made unique against the *other* emulators' names
+    /// (`Name` → `Name (2)`), so renames can't produce two identical rows. `NotFound` if untracked.
     ///
     /// # Errors
     /// [`CoreError::NotFound`] for an unknown id; [`CoreError`] from the registry.
     pub async fn rename(&self, id: &EmulatorId, display_name: &str) -> Result<()> {
         self.detail(id).await?; // existence check
-        self.registry.rename(id.as_str(), display_name).await
+        let taken: Vec<String> = self
+            .registry
+            .list_rows()
+            .await?
+            .into_iter()
+            .filter(|r| r.id.as_str() != id.as_str())
+            .map(|r| r.display_name)
+            .collect();
+        let unique = emu_core::profile::unique_display_name(display_name, &taken);
+        self.registry.rename(id.as_str(), &unique).await
     }
 
     /// Replace an emulator's provenance (profile apply → `Imported`). `NotFound` if untracked.
@@ -728,12 +758,25 @@ impl Provider for AndroidProvider {
         let sdk_root = self.sdk_root().await?;
         let avdmanager = self.avdmanager_path(&sdk_root);
 
+        // De-duplicate against what already exists so "create Pixel 6" twice yields "Pixel 6" and
+        // "Pixel 6 (2)" (on disk: `pixel_6` and `pixel_6_2`) instead of a hard "already exists"
+        // error. Ground truth for AVD names is `avdmanager list avd` ∪ our registry; display
+        // names come from the registry.
+        let rows = self.registry.list_rows().await?;
+        let mut taken_avd = self.list_avd_names().await;
+        taken_avd.extend(rows.iter().map(|r| r.avd_name.clone()));
+        let taken_display: Vec<String> = rows.iter().map(|r| r.display_name.clone()).collect();
+
+        let avd_name = emu_core::profile::unique_avd_name(&spec.avd_name, &taken_avd);
+        let display_name =
+            emu_core::profile::unique_display_name(&spec.display_name, &taken_display);
+
         let cmd = Command {
             stdin: Some(Self::prompt_answer_stdin()),
             ..Command::new(avdmanager.display().to_string())
                 .arg("create")
                 .arg("avd")
-                .args(["-n", &spec.avd_name])
+                .args(["-n", &avd_name])
                 .args(["-k", &spec.image_coord.to_string()])
                 .args(["-d", &spec.device_profile_id])
         };
@@ -745,8 +788,8 @@ impl Provider for AndroidProvider {
         let id = EmulatorId::generate();
         let row = EmulatorRow::new(
             id.clone(),
-            spec.avd_name.clone(),
-            spec.display_name.clone(),
+            avd_name,
+            display_name,
             spec.device_profile_id.clone(),
             spec.image_coord,
             spec.hardware.clone(),
@@ -1427,6 +1470,62 @@ mod tests {
         assert_eq!(row.device_profile_id, "pixel_6");
         assert_eq!(row.image_coord, Some(coord()));
         assert_eq!(row.last_state, RunState::Stopped);
+    }
+
+    #[tokio::test]
+    async fn create_de_duplicates_a_name_that_is_already_taken() {
+        let fs = InMemoryFs::new();
+        // First create runs against the original name; the second gets the `_2` suffix.
+        let process = FakeProcessRunner::new()
+            .on_run("avdmanager create avd -n pixel6_api34 -k", ok(""))
+            .on_run("avdmanager create avd -n pixel6_api34_2 -k", ok(""));
+        let (provider, dir) = provider_with(process, fs).await;
+
+        provider.create(spec()).await.expect("first create");
+        let id2 = provider.create(spec()).await.expect("second create");
+
+        let reopened = Registry::open(dir.path()).await.expect("reopen");
+        let row = reopened.get_row(id2.as_str()).await.unwrap().unwrap();
+        assert_eq!(row.avd_name, "pixel6_api34_2");
+        assert_eq!(row.display_name, "Pixel 6 · API 34 (2)");
+    }
+
+    #[tokio::test]
+    async fn rename_de_duplicates_against_other_emulators() {
+        let fs = InMemoryFs::new();
+        let (provider, _dir) = provider_with(FakeProcessRunner::new(), fs).await;
+        let a = seed_emulator(&provider).await; // display "Pixel 6 · API 34"
+                                                // A second row with a different name.
+        let b = EmulatorId::generate();
+        provider
+            .registry
+            .upsert_emulator(&EmulatorRow::new(
+                b.clone(),
+                "other_avd".into(),
+                "Other".into(),
+                "pixel_6".into(),
+                coord(),
+                emu_core::model::emulator::Hardware::default(),
+                EmulatorSource::Manual { discovered: false },
+                OffsetDateTime::now_utc(),
+            ))
+            .await
+            .unwrap();
+
+        // Renaming B onto A's name gets a suffix; renaming B to its own current name is a no-op.
+        provider
+            .rename(&b, "Pixel 6 · API 34")
+            .await
+            .expect("rename");
+        assert_eq!(
+            provider.detail(&b).await.unwrap().display_name,
+            "Pixel 6 · API 34 (2)"
+        );
+        // A keeps its name.
+        assert_eq!(
+            provider.detail(&a).await.unwrap().display_name,
+            "Pixel 6 · API 34"
+        );
     }
 
     #[tokio::test]
