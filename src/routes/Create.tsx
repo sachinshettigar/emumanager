@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Placeholder, Screen } from "../components/Screen";
 import type { DeviceInfo, ImageInfo } from "../lib/bindings";
@@ -20,6 +20,19 @@ function formatSize(bytes: number): string {
   const mb = bytes / (1024 * 1024);
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb).toString()} MB`;
 }
+
+/** Friendly names for `sdkmanager`'s system-image "tag" ids, which mean little to a newcomer. */
+const IMAGE_TYPE_LABEL: Record<string, string> = {
+  default: "Android Open Source",
+  google_apis: "Google APIs",
+  google_apis_playstore: "Google Play Store",
+  aosp_atd: "test-optimised (ATD)",
+  google_atd: "test-optimised (ATD)",
+  android_automotive: "Automotive",
+  android_automotive_playstore: "Automotive + Play",
+};
+
+const imageTypeLabel = (t: string): string => IMAGE_TYPE_LABEL[t] ?? t.replace(/_/g, " ");
 
 function StepTabs({ current }: { current: number }): React.JSX.Element {
   return (
@@ -183,6 +196,11 @@ function DeviceStep({
   );
 }
 
+/** Installed images first (ready instantly), then newest Android version first. */
+function sortImages(images: ImageInfo[]): ImageInfo[] {
+  return [...images].sort((a, b) => Number(b.installed) - Number(a.installed) || b.api - a.api);
+}
+
 function ImageStep({
   images,
   selectedCoord,
@@ -192,31 +210,59 @@ function ImageStep({
   selectedCoord: string | null;
   onSelect: (coord: string) => void;
 }): React.JSX.Element {
+  const sorted = useMemo(() => sortImages(images), [images]);
+  const recommended = sorted.find((i) => i.installed)?.coord ?? null;
+
   return (
-    <ul className="grid min-h-0 flex-1 auto-rows-min gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-      {images.map((image) => (
-        <li key={image.coord}>
-          <button
-            type="button"
-            data-testid={`image-${image.coord}`}
-            data-selected={image.coord === selectedCoord}
-            onClick={() => {
-              onSelect(image.coord);
-            }}
-            className="flex h-full w-full flex-col gap-0.5 rounded-card border border-border-default bg-surface px-3.5 py-3 text-left text-[13px] data-[selected=true]:border-primary"
-          >
-            <span>
-              Android {image.androidVersion} · API {image.api}
-              {image.hasPlayStore ? " · Play Store" : ""}
-            </span>
-            <span className="text-[11px] text-muted">
-              {image.imageType} · {image.abi} ·{" "}
-              {image.installed ? "installed" : formatSize(image.downloadSizeBytes)}
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      <p className="text-[12px] text-muted">
+        Pick an Android version. Images marked <span className="text-running">Installed</span> are
+        already downloaded and launch instantly; the rest download the first time you use them.
+      </p>
+      <ul className="grid auto-rows-min gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+        {sorted.map((image) => (
+          <li key={image.coord}>
+            <button
+              type="button"
+              data-testid={`image-${image.coord}`}
+              data-selected={image.coord === selectedCoord}
+              data-installed={image.installed}
+              onClick={() => {
+                onSelect(image.coord);
+              }}
+              className="flex h-full w-full flex-col gap-1 rounded-card border border-border-default bg-surface px-3.5 py-3 text-left text-[13px] data-[selected=true]:border-primary data-[installed=true]:border-running/40"
+            >
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="font-medium text-ink">Android {image.androidVersion}</span>
+                <span className="text-[11px] text-faint">API {image.api}</span>
+                {image.hasPlayStore ? (
+                  <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">
+                    Play Store
+                  </span>
+                ) : null}
+              </span>
+              <span className="text-[11px] text-muted">
+                {imageTypeLabel(image.imageType)} · {image.abi}
+              </span>
+              <span className="flex items-center gap-1.5 text-[11px]">
+                {image.installed ? (
+                  <span className="rounded bg-running/15 px-1.5 py-0.5 font-medium text-running">
+                    Installed
+                  </span>
+                ) : (
+                  <span className="text-muted">
+                    Downloads {formatSize(image.downloadSizeBytes)}
+                  </span>
+                )}
+                {image.coord === recommended ? (
+                  <span className="text-faint">· Recommended</span>
+                ) : null}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -298,7 +344,18 @@ export function Create(): React.JSX.Element {
   const device = devicesQuery.data?.find((d) => d.id === deviceId) ?? null;
   const image = imagesQuery.data?.find((i) => i.coord === imageCoord) ?? null;
   const effectiveName =
-    name.trim() || (device && image ? `${device.name} · API ${image.api.toString()}` : "");
+    name.trim() || (device && image ? `${device.name} · Android ${image.androidVersion}` : "");
+
+  // Pre-select the newest already-installed image so a common path is one click shorter.
+  useEffect(() => {
+    if (imageCoord !== null || !imagesQuery.data) {
+      return;
+    }
+    const installed = sortImages(imagesQuery.data).find((i) => i.installed);
+    if (installed) {
+      setImageCoord(installed.coord);
+    }
+  }, [imagesQuery.data, imageCoord]);
 
   const busy = create.isPending || run.running;
 
@@ -413,8 +470,12 @@ export function Create(): React.JSX.Element {
         <dd>{effectiveName}</dd>
         <dt className="text-muted">Device</dt>
         <dd>{device?.name ?? "—"}</dd>
-        <dt className="text-muted">Image</dt>
-        <dd>{image ? `${image.imageType} · API ${image.api.toString()} · ${image.abi}` : "—"}</dd>
+        <dt className="text-muted">Android</dt>
+        <dd>
+          {image
+            ? `${image.androidVersion} (API ${image.api.toString()}) · ${imageTypeLabel(image.imageType)} · ${image.abi}`
+            : "—"}
+        </dd>
         <dt className="text-muted">RAM</dt>
         <dd>{ramMb} MB</dd>
         <dt className="text-muted">Storage</dt>
@@ -425,98 +486,91 @@ export function Create(): React.JSX.Element {
     );
   }
 
-  const actions =
-    step < 3 ? (
-      <div className="flex items-center gap-2">
-        {step > 0 ? (
-          <button
-            type="button"
-            data-testid="back-button"
-            onClick={() => {
-              setStep((s) => s - 1);
-            }}
-            className="rounded-md border border-border-default px-3.5 py-2 text-[13px]"
-          >
-            Back
-          </button>
-        ) : null}
-        <button
-          type="button"
-          data-testid="next-button"
-          disabled={!canAdvance}
-          onClick={() => {
-            setStep((s) => s + 1);
-          }}
-          className="rounded-md bg-primary px-3.5 py-2 text-[13px] font-medium text-white disabled:opacity-50"
-        >
-          Next
-        </button>
-      </div>
-    ) : (
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          data-testid="back-button"
-          onClick={() => {
-            setStep((s) => s - 1);
-          }}
-          className="rounded-md border border-border-default px-3.5 py-2 text-[13px]"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          data-testid="save-as-profile"
-          disabled={saveProfile.isPending}
-          onClick={saveAsProfile}
-          className="rounded-md border border-border-default px-3.5 py-2 text-[13px] disabled:opacity-50"
-        >
-          {saveProfile.isSuccess ? "Saved" : "Save as profile"}
-        </button>
-        <button
-          type="button"
-          data-testid="create-button"
-          disabled={busy}
-          onClick={() => {
-            submit(false);
-          }}
-          className="rounded-md border border-primary px-3.5 py-2 text-[13px] font-medium text-primary disabled:opacity-50"
-        >
-          Create
-        </button>
-        <button
-          type="button"
-          data-testid="create-launch-button"
-          disabled={busy}
-          onClick={() => {
-            submit(true);
-          }}
-          className="rounded-md bg-primary px-3.5 py-2 text-[13px] font-medium text-white disabled:opacity-50"
-        >
-          {busy ? "Working…" : "Create & launch"}
-        </button>
-      </div>
-    );
-
   const done = !run.running && !run.error && create.isSuccess;
 
+  const backButton = (
+    <button
+      type="button"
+      data-testid="back-button"
+      onClick={() => {
+        setStep((s) => s - 1);
+      }}
+      className="rounded-md border border-border-default px-3.5 py-2 text-[13px]"
+    >
+      Back
+    </button>
+  );
+
   return (
-    <Screen title="Create emulator" actions={actions}>
-      <StepTabs current={step} />
-      {done ? (
-        <div
-          data-testid="create-success"
-          className="rounded-card border border-running bg-surface p-4 text-[13px] text-running"
-        >
-          Emulator created. It&apos;s on the dashboard now.
-        </div>
-      ) : (
-        body
-      )}
-      <JobPanel run={run} />
-      {create.error && !run.error ? (
-        <p className="text-[12.5px] text-danger">{create.error.ipc.message}</p>
-      ) : null}
+    <Screen title="Create emulator">
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+        <StepTabs current={step} />
+        {done ? (
+          <div
+            data-testid="create-success"
+            className="rounded-card border border-running bg-surface p-4 text-[13px] text-running"
+          >
+            Emulator created. It&apos;s on the dashboard now.
+          </div>
+        ) : (
+          body
+        )}
+        <JobPanel run={run} />
+        {create.error && !run.error ? (
+          <p className="text-[12.5px] text-danger">{create.error.ipc.message}</p>
+        ) : null}
+      </div>
+
+      <div className="sticky bottom-0 -mx-6 -mb-6 flex items-center justify-between gap-2 border-t border-border-default bg-app/95 px-6 py-3 backdrop-blur-sm">
+        <div>{step > 0 ? backButton : null}</div>
+        {step < 3 ? (
+          <button
+            type="button"
+            data-testid="next-button"
+            disabled={!canAdvance}
+            onClick={() => {
+              setStep((s) => s + 1);
+            }}
+            className="rounded-md bg-primary px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
+          >
+            {step === 0 ? "Next: system image" : step === 1 ? "Next: hardware" : "Next: review"}
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="save-as-profile"
+              disabled={saveProfile.isPending}
+              onClick={saveAsProfile}
+              className="rounded-md border border-border-default px-3.5 py-2 text-[13px] disabled:opacity-50"
+            >
+              {saveProfile.isSuccess ? "Saved" : "Save as profile"}
+            </button>
+            <button
+              type="button"
+              data-testid="create-button"
+              disabled={busy}
+              onClick={() => {
+                submit(false);
+              }}
+              className="rounded-md border border-primary px-3.5 py-2 text-[13px] font-medium text-primary disabled:opacity-50"
+            >
+              Create
+            </button>
+            <button
+              type="button"
+              data-testid="create-launch-button"
+              disabled={busy}
+              onClick={() => {
+                submit(true);
+              }}
+              className="rounded-md bg-primary px-4 py-2 text-[13px] font-medium text-white disabled:opacity-50"
+            >
+              {busy ? "Working…" : "Create & launch"}
+            </button>
+          </div>
+        )}
+      </div>
     </Screen>
   );
 }

@@ -150,6 +150,41 @@ describe("Create wizard", () => {
     expect(screen.getByTestId("next-button")).not.toBeDisabled();
   });
 
+  it("marks installed images, sorts them first, and pre-selects one", async () => {
+    const INSTALLED: ImageInfo = {
+      coord: "system-images;android-33;google_apis;x86_64",
+      api: 33,
+      androidVersion: "13",
+      imageType: "google_apis",
+      abi: "x86_64",
+      revision: "9",
+      downloadSizeBytes: 1_200_000_000,
+      installed: true,
+      hasPlayStore: false,
+    };
+    listImagesMock.mockResolvedValue({ status: "ok", data: [IMAGE, INSTALLED] });
+    renderCreate();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("device-pixel_6")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("device-pixel_6"));
+    fireEvent.click(screen.getByTestId("next-button"));
+
+    const installedCard = await screen.findByTestId(
+      "image-system-images;android-33;google_apis;x86_64",
+    );
+    // Shown as an Android version, flagged installed, and already selected.
+    expect(installedCard).toHaveTextContent("Android 13");
+    expect(installedCard).toHaveTextContent("Installed");
+    expect(installedCard).toHaveAttribute("data-selected", "true");
+    // Installed sorts ahead of the larger, not-installed image.
+    const cards = screen.getAllByTestId(/^image-/);
+    expect(cards[0]).toBe(installedCard);
+    // So Next is immediately enabled without another click.
+    expect(screen.getByTestId("next-button")).not.toBeDisabled();
+  });
+
   it("groups devices by form factor", async () => {
     const WEAR: DeviceInfo = {
       ...PIXEL,
