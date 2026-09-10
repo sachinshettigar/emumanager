@@ -1,0 +1,6 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Emulator Studio">
+  <rect x="33" y="11" width="62" height="106" rx="13" stroke="#2f6db3" stroke-width="7"/>
+  <line x1="54" y1="23" x2="74" y2="23" stroke="#2f6db3" stroke-width="5" stroke-linecap="round"/>
+  <line x1="57" y1="105" x2="71" y2="105" stroke="#2f6db3" stroke-width="5" stroke-linecap="round"/>
+  <path d="M55 45 L55 83 L87 64 Z" fill="#2f8a5f"/>
+</svg>
