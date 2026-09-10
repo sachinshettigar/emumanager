@@ -34,7 +34,7 @@ and rebuilds the same instance locally.
 | | |
 | --- | --- |
 | 📦 **SDK from zero** | Bootstraps command-line tools, platform-tools, the emulator, and system images into its own data directory. No system-wide install, no IDE, no `sdkmanager` incantations — and it reuses a real Android SDK if it finds one. |
-| ✨ **Guided create & launch** | Browse devices by form factor and API level, name it, pick RAM / storage, launch with a real device frame. Your desktop keyboard works inside the emulator. |
+| ✨ **Guided create & launch** | Browse devices by form factor and API level, name it, set RAM / storage, and launch with a real device frame. |
 | 📇 **Live tracking** | Every emulator you've made, with its state (stopped / booting / running). Relaunch, stop, wipe, rename, delete. |
 | 🪵 **Watch it run** | A `logcat` viewer with level / tag / text filters and colour-coded priorities, plus a facts strip — model, Android version, battery, `/data` usage. |
 | 🔁 **Share a setup** | Export to a `.emuprofile` JSON recipe; import one and it resolves and downloads what's missing, then re-creates the instance. Recipes carry no SDK or image bytes. |
