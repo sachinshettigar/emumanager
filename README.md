@@ -12,11 +12,15 @@
 &nbsp;![Rust](https://img.shields.io/badge/Rust-stable-b7410e)
 &nbsp;![React](https://img.shields.io/badge/React-18-61dafb)
 
-[Install](#install) · [Build an installer](#build-an-installer-yourself) · [How it works](#how-it-works) · [Contributing](CONTRIBUTING.md)
+[Install](#install) · [Build an installer](#build-an-installer-yourself) · [Screenshots](#screenshots) · [How it works](#how-it-works) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
 ---
+
+<p align="center">
+  <img src="docs/screenshots/hero.png" width="900" alt="Emulator Studio's dashboard next to a Pixel 7 Pro emulator it launched" />
+</p>
 
 Emulator Studio is a small, fast desktop app for working with Android Virtual Devices without the
 IDE. It downloads the exact Android SDK pieces it needs into its own folder, lets you spin up an
@@ -35,6 +39,15 @@ and rebuilds the same instance locally.
 | 🪵 **Watch it run** | A `logcat` viewer with level / tag / text filters and colour-coded priorities, plus a facts strip — model, Android version, battery, `/data` usage. |
 | 🔁 **Share a setup** | Export to a `.emuprofile` JSON recipe; import one and it resolves and downloads what's missing, then re-creates the instance. Recipes carry no SDK or image bytes. |
 | 🖥️ **Reads your host** | Detects KVM / WHPX / Hypervisor.framework and tells you whether emulators will be hardware-accelerated, degraded, or blocked — with a one-time elevated helper for the fixes that need admin rights. |
+
+## Screenshots
+
+| | |
+| --- | --- |
+| <img src="docs/screenshots/dashboard.png" alt="Dashboard — emulators with live state" /> | <img src="docs/screenshots/create.png" alt="Create wizard — device catalogue by form factor" /> |
+| **Dashboard** — every emulator with live state; launch, stop, or export from the row. | **Create** — pick a device by form factor, then a system image, hardware, and review. |
+| <img src="docs/screenshots/dependencies.png" alt="Dependencies — the managed Android SDK" /> | <img src="docs/screenshots/profiles.png" alt="Profiles — import a .emuprofile recipe" /> |
+| **Dependencies** — the SDK pieces the app manages, plus a host-readiness panel. | **Profiles** — drop a `.emuprofile` to resolve and recreate an emulator locally. |
 
 ## How it works
 

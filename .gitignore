@@ -47,3 +47,6 @@ target/nextest
 /.scratch
 /tmp
 .claude/
+
+# raw screenshot inputs — only the polished PNGs are committed
+docs/screenshots/_raw-*.png
