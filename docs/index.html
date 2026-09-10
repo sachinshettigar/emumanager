@@ -29,6 +29,7 @@
     line-height:1.6; -webkit-font-smoothing:antialiased; overflow-x:hidden;
   }
   a{color:inherit;text-decoration:none}
+  code{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.92em}
   h1,h2,h3{line-height:1.15;margin:0;letter-spacing:-.02em;text-wrap:balance}
   section{padding:96px 24px;position:relative}
   .wrap{max-width:var(--max);margin:0 auto}
@@ -67,7 +68,11 @@
   @keyframes drift{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(40px,60px,0) scale(1.15)}}
   .hero .wrap{position:relative;z-index:1}
   .hero h1{font-size:clamp(34px,6vw,60px);font-weight:700;margin:0 auto;max-width:16ch}
-  .hero .sub{margin:20px auto 0;color:var(--muted);font-size:clamp(16px,2vw,20px);max-width:52ch}
+  .hero .tagline{
+    margin:22px auto 0;max-width:24ch;color:var(--ink);font-weight:600;
+    font-size:clamp(18px,2.6vw,26px);letter-spacing:-.01em;text-wrap:balance
+  }
+  .hero .sub{margin:14px auto 0;color:var(--muted);font-size:clamp(15px,1.9vw,18px);max-width:56ch}
   .cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:34px}
   .btn{
     display:inline-flex;align-items:center;gap:10px;font-weight:600;font-size:15px;
@@ -156,10 +161,14 @@
   .fineprint code{font-family:"IBM Plex Mono",monospace;background:var(--panel);border:1px solid var(--line-soft);border-radius:6px;padding:1px 6px;font-size:12px}
 
   /* ---------- footer ---------- */
-  footer{padding:44px 24px;border-top:1px solid var(--line-soft);color:var(--faint);font-size:13px}
-  footer .wrap{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:center;justify-content:space-between}
-  footer a{color:var(--muted)}
-  footer a:hover{color:var(--ink)}
+  footer{padding:40px 24px;border-top:1px solid var(--line-soft);font-size:13.5px}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:16px 22px;align-items:center;justify-content:space-between}
+  footer .brand{display:flex;align-items:center;gap:9px;font-weight:600;color:var(--ink)}
+  footer .brand img{width:22px;height:22px}
+  footer nav{display:flex;flex-wrap:wrap;gap:20px}
+  footer nav a{color:var(--muted)}
+  footer nav a:hover{color:var(--ink)}
+  footer .fine{margin:18px auto 0;text-align:center;font-size:12px;color:var(--faint);max-width:60ch}
 
   @media(prefers-reduced-motion:reduce){
     *{animation:none!important}
@@ -187,20 +196,21 @@
 <header class="hero" id="top">
   <div class="aurora" aria-hidden="true"><span class="a"></span><span class="b"></span><span class="c"></span></div>
   <div class="wrap">
-    <p class="eyebrow reveal in">Android emulators · Windows · macOS · Linux</p>
+    <p class="eyebrow reveal in">Windows · macOS · Linux</p>
     <h1 class="reveal in" data-d="1">Android emulators without Android&nbsp;Studio.</h1>
-    <p class="sub reveal in" data-d="2">
-      A small, fast desktop app to create, launch, track, and share Android Virtual Devices.
-      It brings its own SDK — no IDE, no <code>sdkmanager</code> incantations.
+    <p class="tagline reveal in" data-d="2">Made for people who know their machine but not Android&nbsp;tooling.</p>
+    <p class="sub reveal in" data-d="3">
+      Pick a device and an Android version. Emulator Studio grabs exactly the SDK it needs, boots
+      it, and streams the logs — then hands the whole setup to a teammate as one file.
     </p>
-    <div class="cta-row reveal in" data-d="3">
+    <div class="cta-row reveal in" data-d="4">
       <a class="btn btn-primary" id="heroDownload" href="https://github.com/sachinshettigar/emumanager/releases">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M6 9l4 4 4-4M4 16h12"/></svg>
         <span id="heroDownloadLabel">Download</span>
       </a>
       <a class="btn" href="https://github.com/sachinshettigar/emumanager">View source</a>
     </div>
-    <p class="hero-note reveal in" data-d="4">Free &amp; open source (MIT). Builds are unsigned — first launch needs one extra click.</p>
+    <p class="hero-note reveal in" data-d="5">Free &amp; open source. Unsigned builds — first launch takes one extra click.</p>
   </div>
   <figure class="hero-shot reveal in" data-d="5">
     <img src="screenshots/hero.png" alt="Emulator Studio's dashboard next to a Pixel emulator it launched" loading="eager" />
@@ -209,11 +219,11 @@
 
 <section class="statement">
   <div class="wrap">
-    <p class="reveal">Made for people who <b>know their machine</b> but not Android tooling.</p>
+    <p class="reveal">No IDE. No <code>sdkmanager</code>. <b>Nothing system-wide.</b></p>
     <p class="lead reveal" data-d="1">
-      Pick a device and an Android version, and Emulator Studio downloads exactly the SDK pieces it
-      needs into its own folder. Then launch, watch the logs, and hand the setup to a teammate as a
-      one-file recipe. Nothing touches a system Android install.
+      Everything Emulator Studio downloads lives in one folder it owns — the SDK, the images, the
+      emulators. Remove that folder and your machine is back to how it started. Already have a real
+      Android SDK? It's reused, untouched.
     </p>
   </div>
 </section>
@@ -292,10 +302,15 @@
 
 <footer>
   <div class="wrap">
-    <span>Emulator Studio · <a href="https://github.com/sachinshettigar/emumanager/blob/main/LICENSE">MIT</a> · © Sachin Shettigar</span>
-    <span><a href="https://github.com/sachinshettigar/emumanager">GitHub</a> · <a href="https://github.com/sachinshettigar/emumanager/releases">Releases</a> · <a href="https://github.com/sachinshettigar/emumanager/issues">Issues</a></span>
-    <span>Not affiliated with Google or the Android Open Source Project.</span>
+    <a class="brand" href="#top"><img src="assets/logo.svg" alt="" /> Emulator&nbsp;Studio</a>
+    <nav>
+      <a href="https://github.com/sachinshettigar/emumanager">GitHub</a>
+      <a href="https://github.com/sachinshettigar/emumanager/releases">Releases</a>
+      <a href="https://github.com/sachinshettigar/emumanager/issues">Issues</a>
+      <a href="https://github.com/sachinshettigar/emumanager/blob/main/LICENSE">MIT&nbsp;License</a>
+    </nav>
   </div>
+  <p class="fine">Android is a trademark of Google LLC. This project is independent and not affiliated with Google.</p>
 </footer>
 
 <script>
