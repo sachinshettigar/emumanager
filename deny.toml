@@ -41,8 +41,8 @@ allow = [
 ]
 confidence-threshold = 0.9
 exceptions = []
-# Our own workspace crates (`publish = false`) aren't distributed, so their
-# license field (an SPDX-invalid "UNLICENSED") shouldn't gate this check.
+# Our own workspace crates (`publish = false`, MIT) aren't distributed as
+# packages, so skip them here — the repo LICENSE is what applies.
 private = { ignore = true }
 
 [bans]

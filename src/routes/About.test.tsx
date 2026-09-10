@@ -30,7 +30,7 @@ describe("About", () => {
     appInfoMock.mockResolvedValue({
       name: "Emulator Studio",
       version: "0.1.0",
-      license: "UNLICENSED",
+      license: "MIT",
       repository: "https://github.com/sachinshettigar/emumanager",
       description: "Create, launch, track and share Android emulators.",
       features: [
@@ -43,7 +43,7 @@ describe("About", () => {
     await waitFor(() => {
       expect(screen.getByTestId("about-version")).toHaveTextContent("0.1.0");
     });
-    expect(screen.getByTestId("about-license")).toHaveTextContent("UNLICENSED");
+    expect(screen.getByTestId("about-license")).toHaveTextContent("MIT");
     expect(screen.getByTestId("about-features")).toHaveTextContent("Portable .emuprofile recipes");
     expect(screen.getByRole("link", { name: /github.com\/sachinshettigar/ })).toBeInTheDocument();
   });

@@ -88,4 +88,4 @@ Development setup, the task workflow, coding standards, and the architecture tou
 
 ## License
 
-TBD before the first public release.
+[MIT](LICENSE) © Sachin Shettigar

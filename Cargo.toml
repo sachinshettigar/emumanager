@@ -12,10 +12,9 @@ members = [
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.82"
-# Not a valid SPDX expression (Cargo has no "proprietary" identifier) and not
-# published — `publish = false` below is what actually matters; `license` is
-# informational only for an unpublished workspace.
-license = "UNLICENSED"
+# Not published (see `publish = false`); the crates carry the workspace license
+# for completeness. Full text in ./LICENSE.
+license = "MIT"
 publish = false
 repository = "https://github.com/sachinshettigar/emumanager"
 

@@ -26,12 +26,7 @@ export function About(): React.JSX.Element {
             {d.version}
           </dd>
           <dt className="text-muted">License</dt>
-          <dd data-testid="about-license">
-            {d.license}
-            {d.license === "UNLICENSED" ? (
-              <span className="text-faint"> — all rights reserved (OSS license TBD)</span>
-            ) : null}
-          </dd>
+          <dd data-testid="about-license">{d.license}</dd>
           <dt className="text-muted">Source</dt>
           <dd>
             <a

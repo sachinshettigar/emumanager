@@ -5,6 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@10.0.0",
   "description": "Desktop app to create, launch, track, and share Android emulators without Android Studio.",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

@@ -42,7 +42,7 @@ pub struct AppInfo {
     pub name: String,
     /// `CARGO_PKG_VERSION`.
     pub version: String,
-    /// `CARGO_PKG_LICENSE` — `"UNLICENSED"` today; a real OSS licence is M7's `LICENSE`-chosen line.
+    /// `CARGO_PKG_LICENSE` — `MIT` (see the repo `LICENSE`).
     pub license: String,
     pub repository: String,
     pub description: String,
@@ -57,9 +57,7 @@ pub fn app_info() -> AppInfo {
     AppInfo {
         name: "Emulator Studio".to_owned(),
         version: env!("CARGO_PKG_VERSION").to_owned(),
-        license: option_env!("CARGO_PKG_LICENSE")
-            .unwrap_or("UNLICENSED")
-            .to_owned(),
+        license: option_env!("CARGO_PKG_LICENSE").unwrap_or("MIT").to_owned(),
         repository: option_env!("CARGO_PKG_REPOSITORY")
             .unwrap_or("https://github.com/sachinshettigar/emumanager")
             .to_owned(),

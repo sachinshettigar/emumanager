@@ -157,7 +157,7 @@ export type AppInfo = {
 	name: string,
 	/**  `CARGO_PKG_VERSION`. */
 	version: string,
-	/**  `CARGO_PKG_LICENSE` — `"UNLICENSED"` today; a real OSS licence is M7's `LICENSE`-chosen line. */
+	/**  `CARGO_PKG_LICENSE` — `MIT` (see the repo `LICENSE`). */
 	license: string,
 	repository: string,
 	description: string,
