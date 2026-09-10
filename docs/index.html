@@ -72,8 +72,7 @@
     margin:22px auto 0;max-width:24ch;color:var(--ink);font-weight:600;
     font-size:clamp(18px,2.6vw,26px);letter-spacing:-.01em;text-wrap:balance
   }
-  .hero .sub{margin:14px auto 0;color:var(--muted);font-size:clamp(15px,1.9vw,18px);max-width:56ch}
-  .cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:34px}
+  .cta-row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:30px}
   .btn{
     display:inline-flex;align-items:center;gap:10px;font-weight:600;font-size:15px;
     padding:13px 22px;border-radius:12px;border:1px solid var(--line);color:var(--ink);
@@ -151,10 +150,49 @@
   }
   .os:hover{transform:translateY(-3px)}
   .os.is-you{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue),0 20px 50px -24px rgba(106,164,221,.5)}
-  .os .top{display:flex;align-items:center;justify-content:space-between}
-  .os h3{font-size:16px;font-weight:600}
+  .os .top{display:flex;align-items:center;justify-content:space-between;min-height:44px}
+  .os h3{font-size:16px;font-weight:600;margin:12px 0 0}
   .os .tag{font-size:10.5px;font-family:"IBM Plex Mono",monospace;letter-spacing:.08em;color:var(--blue);border:1px solid rgba(106,164,221,.4);border-radius:999px;padding:3px 8px}
-  .os p{font-size:12.5px;color:var(--muted);margin:2px 0 14px}
+  .os p{font-size:12.5px;color:var(--muted);margin:4px 0 14px}
+  .os-badge{
+    display:grid;place-items:center;width:44px;height:44px;border-radius:12px;
+    background:var(--bg-2);border:1px solid var(--line-soft);color:var(--muted);
+    transition:transform .25s var(--ease),color .25s,border-color .25s
+  }
+  .os-badge .os-ico{width:24px;height:24px}
+  .os:hover .os-badge{transform:translateY(-2px) rotate(-4deg);color:var(--ink);border-color:var(--line)}
+  .os.is-you .os-badge{color:var(--blue);border-color:rgba(106,164,221,.5);background:rgba(106,164,221,.10)}
+  @media(prefers-reduced-motion:no-preference){
+    .os.in .os-badge{animation:badgePop .55s var(--ease) both}
+    .os.in[data-d="1"] .os-badge{animation-delay:.08s}
+    .os.in[data-d="2"] .os-badge{animation-delay:.16s}
+    .os.is-you .os-badge{animation:badgePop .55s var(--ease) both, badgeGlow 2.6s ease-in-out 1s infinite}
+  }
+  @keyframes badgePop{from{opacity:0;transform:scale(.5) rotate(-12deg)}to{opacity:1;transform:none}}
+  @keyframes badgeGlow{0%,100%{box-shadow:0 0 0 0 rgba(106,164,221,0)}50%{box-shadow:0 0 0 6px rgba(106,164,221,.14)}}
+
+  /* platform icon in the hero button */
+  .os-ico{display:block;fill:currentColor}
+  #heroDownloadIcon{width:17px;height:17px}
+
+  /* ---------- intro (fullscreen logo → nav logo) ---------- */
+  #intro{
+    position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--bg);
+    transition:background .55s ease,opacity .45s ease;
+    animation:introSafety .6s 2.8s forwards  /* pure-CSS failsafe if JS never runs */
+  }
+  @keyframes introSafety{to{opacity:0;visibility:hidden;pointer-events:none}}
+  #intro.lift{background:transparent}
+  #intro.gone{opacity:0;pointer-events:none}
+  #intro .mark{
+    width:clamp(112px,17vw,158px);height:auto;
+    opacity:0;transform:scale(.72);animation:introPop .8s var(--ease) forwards;
+    filter:drop-shadow(0 20px 50px rgba(106,164,221,.28))
+  }
+  @keyframes introPop{to{opacity:1;transform:none}}
+  body.intro-run .nav .brand img{opacity:0}
+  .nav .brand img{transition:opacity .3s ease}
+  @media(prefers-reduced-motion:reduce){#intro{display:none}}
   .os a{margin-top:auto;text-align:center;font-weight:600;font-size:13.5px;border:1px solid var(--line);border-radius:10px;padding:10px;transition:border-color .2s,background .2s}
   .os a:hover{border-color:var(--blue);background:rgba(106,164,221,.08)}
   .fineprint{margin-top:26px;font-size:13px;color:var(--faint);max-width:70ch}
@@ -180,6 +218,23 @@
 </head>
 <body>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="os-mac" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M16.7 12.4c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.8-2-1.6-.16-3.1.94-3.9.94-.8 0-2.05-.92-3.37-.9-1.73.03-3.33 1-4.22 2.55-1.8 3.13-.46 7.75 1.29 10.29.86 1.24 1.88 2.63 3.22 2.58 1.29-.05 1.78-.83 3.34-.83s2 .83 3.37.8c1.39-.02 2.27-1.26 3.12-2.51.98-1.44 1.39-2.84 1.41-2.91-.03-.02-2.7-1.04-2.72-4.11Z"/>
+    <path fill="currentColor" d="M14.13 4.9c.71-.86 1.19-2.06 1.06-3.25-1.02.04-2.26.68-3 1.54-.65.76-1.22 1.98-1.07 3.14 1.14.09 2.3-.58 3.01-1.43Z"/>
+  </symbol>
+  <symbol id="os-win" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M3 5.4 10.6 4.3v6.9H3V5.4Zm0 13.2 7.6 1.1v-6.8H3v5.7Zm8.5 1.2L21 21V13h-9.5v6.8Zm0-15.6V11H21V3l-9.5 1.2Z"/>
+  </symbol>
+  <symbol id="os-linux" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 2.1c-1.98 0-3.28 1.64-3.28 3.85 0 .48.05.94.12 1.35-.1.4-.5.9-1 1.6-1 1.4-2.3 3.5-2.3 6.15 0 1.7.55 2.9 1.2 3.72-.66.32-1.24.72-1.66 1.2-.5.58-.8 1.27-.8 1.9 0 .4.2.72.6.92.48.24 1.18.35 2.08.35h5.68c.9 0 1.6-.11 2.08-.35.4-.2.6-.52.6-.92 0-.63-.3-1.32-.8-1.9-.42-.48-1-.88-1.66-1.2.65-.82 1.2-2.02 1.2-3.72 0-2.65-1.3-4.75-2.3-6.15-.5-.7-.9-1.2-1-1.6.07-.41.12-.87.12-1.35 0-2.21-1.3-3.85-3.28-3.85Zm-1.55 3.4c.42 0 .76.42.76.94s-.34.94-.76.94-.76-.42-.76-.94.34-.94.76-.94Zm3.1 0c.42 0 .76.42.76.94s-.34.94-.76.94-.76-.42-.76-.94.34-.94.76-.94Zm-1.55 2.2c.62 0 1.5.44 1.5.86 0 .3-.5.5-1.05.62-.15.03-.3.16-.45.16s-.3-.13-.45-.16C10.95 8.99 10.45 8.79 10.45 8.5c0-.42.88-.86 1.5-.86Z"/>
+  </symbol>
+</svg>
+
+<div id="intro" aria-hidden="true">
+  <img class="mark" src="assets/logo.svg" alt="" width="150" height="150" />
+</div>
+
 <nav class="nav" id="nav">
   <div class="wrap">
     <a class="brand" href="#top"><img src="assets/logo.svg" alt="" /> Emulator Studio</a>
@@ -199,18 +254,14 @@
     <p class="eyebrow reveal in">Windows · macOS · Linux</p>
     <h1 class="reveal in" data-d="1">Android emulators without Android&nbsp;Studio.</h1>
     <p class="tagline reveal in" data-d="2">Create and launch an Android emulator in minutes — with zero&nbsp;setup.</p>
-    <p class="sub reveal in" data-d="3">
-      Pick a device and an Android version. Emulator Studio sets it up, boots it, and streams the
-      logs — then hands the whole thing to a teammate as one file.
-    </p>
-    <div class="cta-row reveal in" data-d="4">
+    <div class="cta-row reveal in" data-d="3">
       <a class="btn btn-primary" id="heroDownload" href="https://github.com/sachinshettigar/emumanager/releases">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v10M6 9l4 4 4-4M4 16h12"/></svg>
+        <svg class="os-ico" id="heroDownloadIcon" viewBox="0 0 24 24"><use href="#os-mac" /></svg>
         <span id="heroDownloadLabel">Download</span>
       </a>
       <a class="btn" href="https://github.com/sachinshettigar/emumanager">View source</a>
     </div>
-    <p class="hero-note reveal in" data-d="5">Free and open source. The first launch takes one extra click.</p>
+    <p class="hero-note reveal in" data-d="4">Free and open source. No account, no tracking.</p>
   </div>
   <figure class="hero-shot reveal in" data-d="5">
     <img src="screenshots/hero.png" alt="Emulator Studio's dashboard next to a Pixel emulator it launched" loading="eager" />
@@ -274,18 +325,30 @@
     <h2 class="reveal" data-d="1">Grab a build for your OS.</h2>
     <p class="lead reveal" data-d="1">Latest builds live on the GitHub Releases page. Your platform is highlighted below.</p>
     <div class="dl-grid">
-      <div class="os" data-os="mac">
-        <div class="top"><h3>macOS</h3><span class="tag" hidden>Detected</span></div>
+      <div class="os reveal" data-os="mac">
+        <div class="top">
+          <span class="os-badge"><svg class="os-ico" viewBox="0 0 24 24"><use href="#os-mac" /></svg></span>
+          <span class="tag" hidden>Detected</span>
+        </div>
+        <h3>macOS</h3>
         <p>Apple Silicon &amp; Intel · <code>.dmg</code></p>
         <a href="https://github.com/sachinshettigar/emumanager/releases">Download for macOS</a>
       </div>
-      <div class="os" data-os="windows">
-        <div class="top"><h3>Windows</h3><span class="tag" hidden>Detected</span></div>
+      <div class="os reveal" data-d="1" data-os="windows">
+        <div class="top">
+          <span class="os-badge"><svg class="os-ico" viewBox="0 0 24 24"><use href="#os-win" /></svg></span>
+          <span class="tag" hidden>Detected</span>
+        </div>
+        <h3>Windows</h3>
         <p>64-bit · <code>.msi</code> / setup <code>.exe</code></p>
         <a href="https://github.com/sachinshettigar/emumanager/releases">Download for Windows</a>
       </div>
-      <div class="os" data-os="linux">
-        <div class="top"><h3>Linux</h3><span class="tag" hidden>Detected</span></div>
+      <div class="os reveal" data-d="2" data-os="linux">
+        <div class="top">
+          <span class="os-badge"><svg class="os-ico" viewBox="0 0 24 24"><use href="#os-linux" /></svg></span>
+          <span class="tag" hidden>Detected</span>
+        </div>
+        <h3>Linux</h3>
         <p>x86-64 · <code>.AppImage</code> / <code>.deb</code></p>
         <a href="https://github.com/sachinshettigar/emumanager/releases">Download for Linux</a>
       </div>
@@ -340,8 +403,15 @@
     else if (/win/.test(plat) || /windows/i.test(ua)) os = 'windows';
     else if (/linux|x11|cros/.test(plat) || /linux/i.test(ua)) os = 'linux';
     var label = { mac:'Download for macOS', windows:'Download for Windows', linux:'Download for Linux' };
+    var sym = { mac:'#os-mac', windows:'#os-win', linux:'#os-linux' };
     var heroLabel = document.getElementById('heroDownloadLabel');
-    if (os && label[os]) heroLabel.textContent = label[os];
+    var heroUse = document.querySelector('#heroDownloadIcon use');
+    if (os && label[os]) {
+      heroLabel.textContent = label[os];
+      if (heroUse) heroUse.setAttribute('href', sym[os]);
+    } else {
+      heroLabel.textContent = 'Download';
+    }
     var card = os && document.querySelector('.os[data-os="' + os + '"]');
     if (card) {
       card.classList.add('is-you');
@@ -349,6 +419,41 @@
       // move the detected card first
       card.parentNode.insertBefore(card, card.parentNode.firstChild);
     }
+  })();
+
+  // Intro: fullscreen logo settles into the nav logo, then clears.
+  (function(){
+    var intro = document.getElementById('intro');
+    if (!intro) return;
+    if (reduce) { intro.parentNode.removeChild(intro); return; }
+    var mark = intro.querySelector('.mark');
+    var target = document.querySelector('.nav .brand img');
+    document.body.classList.add('intro-run');
+    var done = false;
+    function finish(){
+      if (done) return; done = true;
+      intro.classList.add('gone');
+      document.body.classList.remove('intro-run');
+      setTimeout(function(){ if (intro.parentNode) intro.parentNode.removeChild(intro); }, 650);
+    }
+    var killer = setTimeout(finish, 3200); // failsafe — never trap the page
+    function morph(){
+      if (done) return;
+      if (!target || !mark.getBoundingClientRect) { finish(); return; }
+      var a = mark.getBoundingClientRect(), b = target.getBoundingClientRect();
+      if (!b.width) { finish(); return; }
+      var s = b.width / a.width;
+      var dx = (b.left + b.width / 2) - (a.left + a.width / 2);
+      var dy = (b.top + b.height / 2) - (a.top + a.height / 2);
+      mark.style.transition = 'transform .68s var(--ease), filter .5s ease';
+      mark.style.filter = 'drop-shadow(0 0 0 rgba(0,0,0,0))';
+      mark.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(' + s + ')';
+      intro.classList.add('lift');
+      setTimeout(function(){ clearTimeout(killer); finish(); }, 640);
+    }
+    var start = function(){ setTimeout(morph, 820); };
+    if (document.readyState === 'complete') start();
+    else addEventListener('load', start);
   })();
 </script>
 </body>
