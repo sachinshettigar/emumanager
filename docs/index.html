@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Emulator Studio — Android emulators without Android Studio</title>
-<meta name="description" content="A small, fast desktop app to create, launch, track, and share Android emulators. No Android Studio, no manual sdkmanager. macOS, Windows, Linux." />
+<meta name="description" content="A small, fast desktop app to create, launch, track, and share Android emulators. No Android Studio. macOS, Windows, Linux." />
 <meta property="og:title" content="Emulator Studio" />
 <meta property="og:description" content="Create, launch, track, and share Android emulators from one desktop app — no Android Studio." />
 <meta property="og:type" content="website" />
@@ -198,10 +198,10 @@
   <div class="wrap">
     <p class="eyebrow reveal in">Windows · macOS · Linux</p>
     <h1 class="reveal in" data-d="1">Android emulators without Android&nbsp;Studio.</h1>
-    <p class="tagline reveal in" data-d="2">An Android emulator without becoming an Android&nbsp;developer.</p>
+    <p class="tagline reveal in" data-d="2">Create and launch an Android emulator in minutes — with zero&nbsp;setup.</p>
     <p class="sub reveal in" data-d="3">
-      Pick a device and an Android version. Emulator Studio grabs exactly the SDK it needs, boots
-      it, and streams the logs — then hands the whole setup to a teammate as one file.
+      Pick a device and an Android version. Emulator Studio sets it up, boots it, and streams the
+      logs — then hands the whole thing to a teammate as one file.
     </p>
     <div class="cta-row reveal in" data-d="4">
       <a class="btn btn-primary" id="heroDownload" href="https://github.com/sachinshettigar/emumanager/releases">
@@ -210,7 +210,7 @@
       </a>
       <a class="btn" href="https://github.com/sachinshettigar/emumanager">View source</a>
     </div>
-    <p class="hero-note reveal in" data-d="5">Free &amp; open source. Unsigned builds — first launch takes one extra click.</p>
+    <p class="hero-note reveal in" data-d="5">Free and open source. The first launch takes one extra click.</p>
   </div>
   <figure class="hero-shot reveal in" data-d="5">
     <img src="screenshots/hero.png" alt="Emulator Studio's dashboard next to a Pixel emulator it launched" loading="eager" />
@@ -219,11 +219,11 @@
 
 <section class="statement">
   <div class="wrap">
-    <p class="reveal">No IDE. No <code>sdkmanager</code>. <b>Nothing system-wide.</b></p>
+    <p class="reveal">Nothing to install. <b>No leftovers.</b></p>
     <p class="lead reveal" data-d="1">
-      Everything Emulator Studio downloads lives in one folder it owns — the SDK, the images, the
-      emulators. Remove that folder and your machine is back to how it started. Already have a real
-      Android SDK? It's reused, untouched.
+      Choose a phone and an Android version — Emulator Studio takes care of the rest and starts it
+      up. No setup guide, no commands to run. When you're done, delete the app and it's gone; it
+      doesn't leave anything behind on your system.
     </p>
   </div>
 </section>
@@ -233,12 +233,12 @@
     <p class="eyebrow reveal">What it does</p>
     <h2 class="reveal" data-d="1">Everything to run an emulator, nothing you don't need.</h2>
     <div class="grid">
-      <div class="card reveal"><div class="ico i-blue">📦</div><h3>SDK from zero</h3><p>Bootstraps command-line tools, platform-tools, the emulator, and system images into its own data directory. Reuses a real Android SDK if it finds one.</p></div>
-      <div class="card reveal" data-d="1"><div class="ico i-blue">✨</div><h3>Guided create &amp; launch</h3><p>Browse devices by form factor and API level, name it, set RAM and storage, and launch with a real device frame.</p></div>
-      <div class="card reveal" data-d="2"><div class="ico i-green">📇</div><h3>Live tracking</h3><p>Every emulator you've made with its state — stopped, booting, running. Relaunch, stop, wipe, rename, delete from one list.</p></div>
-      <div class="card reveal"><div class="ico i-amber">🪵</div><h3>Watch it run</h3><p>A logcat viewer with level, tag, and text filters and colour-coded priorities, plus a facts strip — model, Android version, battery, storage.</p></div>
-      <div class="card reveal" data-d="1"><div class="ico i-green">🔁</div><h3>Share a setup</h3><p>Export any emulator to a portable <code>.emuprofile</code> recipe. Import one and it resolves and downloads what's missing, then rebuilds it locally.</p></div>
-      <div class="card reveal" data-d="2"><div class="ico i-amber">🖥️</div><h3>Reads your host</h3><p>Detects KVM, WHPX, or Hypervisor.framework and tells you whether emulators will be hardware-accelerated — with a one-time helper for fixes that need admin rights.</p></div>
+      <div class="card reveal"><div class="ico i-blue">📦</div><h3>Zero setup</h3><p>The first time you run an emulator, Emulator Studio quietly downloads whatever it needs. You never install anything else or open a terminal.</p></div>
+      <div class="card reveal" data-d="1"><div class="ico i-blue">✨</div><h3>Guided create &amp; launch</h3><p>Browse phones, tablets, TVs and more, pick an Android version, set a name and how much RAM and storage, then launch — with a realistic device frame.</p></div>
+      <div class="card reveal" data-d="2"><div class="ico i-green">📇</div><h3>All in one list</h3><p>Every emulator you've made and whether it's running. Start, stop, rename, or delete any of them from one place.</p></div>
+      <div class="card reveal"><div class="ico i-amber">🪵</div><h3>See what it's doing</h3><p>The device's live logs, filtered and colour-coded by severity, next to a quick status strip — Android version, battery, free space.</p></div>
+      <div class="card reveal" data-d="1"><div class="ico i-green">🔁</div><h3>Share a setup</h3><p>Save any emulator as a single small file. Send it to a teammate and it rebuilds the exact same emulator on their machine.</p></div>
+      <div class="card reveal" data-d="2"><div class="ico i-amber">🖥️</div><h3>Checks your computer</h3><p>Tells you up front whether emulators will run fast on your machine, and helps you switch on acceleration if it's turned off.</p></div>
     </div>
   </div>
 </section>
@@ -248,9 +248,9 @@
     <p class="eyebrow reveal">How it works</p>
     <h2 class="reveal" data-d="1">Three steps, then it's on your dashboard.</h2>
     <div class="steps">
-      <div class="step reveal"><span class="n">STEP 1</span><h3>Choose</h3><p>Pick a device and an Android version. Images you already have are marked ready to launch instantly.</p></div>
-      <div class="step reveal" data-d="1"><span class="n">STEP 2 · AUTOMATIC</span><h3>Prepare</h3><p>Emulator Studio fetches just the SDK pieces it needs into its own folder. No Android Studio, no terminal.</p></div>
-      <div class="step reveal" data-d="2"><span class="n">STEP 3</span><h3>Run</h3><p>Launch it and watch the logs. Export the setup as a <code>.emuprofile</code> to hand to a teammate.</p></div>
+      <div class="step reveal"><span class="n">STEP 1</span><h3>Choose</h3><p>Pick a phone and an Android version. Ones you've set up before start instantly.</p></div>
+      <div class="step reveal" data-d="1"><span class="n">STEP 2 · AUTOMATIC</span><h3>Prepare</h3><p>Emulator Studio downloads whatever that emulator needs, in the background. Nothing for you to configure.</p></div>
+      <div class="step reveal" data-d="2"><span class="n">STEP 3</span><h3>Run</h3><p>Launch it and watch the logs. Save the whole thing as one file to share.</p></div>
     </div>
   </div>
 </section>
@@ -291,10 +291,9 @@
       </div>
     </div>
     <p class="fineprint reveal">
-      Builds are unsigned. <b>macOS:</b> right-click the app → Open → Open the first time.
-      <b>Windows:</b> on SmartScreen, More info → Run anyway. The auto-updater itself is
-      signature-verified. No release yet, or want to build it yourself?
-      <code>git clone</code> then <code>just package</code> — see the
+      The first launch needs one extra step. <b>macOS:</b> right-click the app → Open → Open.
+      <b>Windows:</b> on the SmartScreen prompt, choose More info → Run anyway. Prefer to build
+      it yourself? <code>git clone</code>, then <code>just package</code> — see the
       <a href="https://github.com/sachinshettigar/emumanager#build-an-installer-yourself" style="color:var(--blue)">README</a>.
     </p>
   </div>
