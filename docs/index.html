@@ -469,19 +469,26 @@
     var killer = setTimeout(finish, 3200); // failsafe — never trap the page
     function morph(){
       if (done) return;
-      if (!target || !mark.getBoundingClientRect) { finish(); return; }
-      var a = mark.getBoundingClientRect(), b = target.getBoundingClientRect();
-      if (!b.width) { finish(); return; }
+      target = document.querySelector('.nav .brand img');
+      var b = target && target.getBoundingClientRect();
+      if (!b || !b.width) { finish(); return; }
+      // Release the intro-pop animation (its forwards-fill would otherwise pin `transform`),
+      // freeze the mark at its settled centre, then transition it onto the nav logo.
+      mark.style.animation = 'none';
+      mark.style.opacity = '1';
+      mark.style.transform = 'none';
+      mark.style.filter = 'none';
+      void mark.offsetWidth; // commit that state before starting the move
+      var a = mark.getBoundingClientRect();
       var s = b.width / a.width;
       var dx = (b.left + b.width / 2) - (a.left + a.width / 2);
       var dy = (b.top + b.height / 2) - (a.top + a.height / 2);
-      mark.style.transition = 'transform .68s var(--ease), filter .5s ease';
-      mark.style.filter = 'drop-shadow(0 0 0 rgba(0,0,0,0))';
+      mark.style.transition = 'transform .72s var(--ease)';
       mark.style.transform = 'translate(' + dx + 'px,' + dy + 'px) scale(' + s + ')';
       intro.classList.add('lift');
-      setTimeout(function(){ clearTimeout(killer); finish(); }, 640);
+      setTimeout(function(){ clearTimeout(killer); finish(); }, 720);
     }
-    var start = function(){ setTimeout(morph, 820); };
+    var start = function(){ setTimeout(morph, 900); };
     if (document.readyState === 'complete') start();
     else addEventListener('load', start);
   })();
