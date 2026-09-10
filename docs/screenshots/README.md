@@ -6,7 +6,7 @@ The README embeds four PNGs from this folder:
 | --- | --- | --- |
 | `dashboard.png` | Dashboard | app opens here; have at least one emulator created |
 | `create.png` | Create wizard | **New emulator** → the device step (grouped list visible) |
-| `logcat.png` | Device inspector | open a **running** emulator → Device → Logcat tab, streaming |
+| `logcat.png` | Logcat | open a **running** emulator, start logcat so lines are streaming |
 | `dependencies.png` | Dependencies | sidebar → **Dependencies**, after the SDK is installed |
 
 ## Capturing them

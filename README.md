@@ -5,12 +5,9 @@
 Emulator Studio is a small, fast desktop app (Windows, Linux, macOS) for working with Android
 Virtual Devices without the IDE. It downloads the exact Android SDK pieces it needs into its own
 folder, lets you spin up an emulator from a device + API level in a few clicks, keeps a list of
-every emulator you've made with its live running state, and streams logs and device info while
-one runs. You can export any emulator as a portable `.emuprofile` recipe and hand it to a
-teammate; importing it re-downloads what's missing and rebuilds the same instance locally.
-
-Android only — iOS simulators can't run off macOS, so they're out of scope
-([ADR 0003](docs/adr/0003-android-only-scope.md)).
+every emulator you've made with its live running state, and streams its logs while one runs. You
+can export any emulator as a portable `.emuprofile` recipe and hand it to a teammate; importing
+it re-downloads what's missing and rebuilds the same instance locally.
 
 ## What it does
 
@@ -21,9 +18,8 @@ Android only — iOS simulators can't run off macOS, so they're out of scope
   storage, launch it (with a real device frame). Your desktop keyboard works inside it.
 - **Track** — every emulator you've created, with its live state (stopped / booting / running);
   relaunch, stop, wipe, rename, delete.
-- **Inspect a running device** — a `logcat` viewer with level / tag / text filters and
-  colour-coded priorities, a facts strip (model, Android version, battery, `/data` usage), and a
-  socket-level network panel (open connections per app).
+- **Watch it run** — a `logcat` viewer with level / tag / text filters and colour-coded
+  priorities, plus a facts strip (model, Android version, battery, `/data` usage).
 - **Share** — export an emulator to a `.emuprofile` JSON recipe; import one and it resolves and
   downloads what's missing, then re-creates the instance. **Recipes carry no SDK or image bytes.**
 
@@ -33,15 +29,15 @@ Android only — iOS simulators can't run off macOS, so they're out of scope
 | --- | --- |
 | ![Dashboard — every emulator and its live state](docs/screenshots/dashboard.png) | ![Create wizard — pick a device and API level](docs/screenshots/create.png) |
 | **Dashboard** — every emulator you've made, live state, quick launch/stop/export. | **Create** — device catalogue grouped by form factor, then image, hardware, review. |
-| ![Device inspector — colour-coded logcat](docs/screenshots/logcat.png) | ![Dependencies — the managed Android SDK](docs/screenshots/dependencies.png) |
-| **Device inspector** — live `logcat` with filters + priority colours, and a Network tab. | **Dependencies** — the SDK pieces the app manages, install / uninstall, diagnostics. |
+| ![Live logcat with colour-coded priorities](docs/screenshots/logcat.png) | ![Dependencies — the managed Android SDK](docs/screenshots/dependencies.png) |
+| **Logcat** — live device logs with level / tag / text filters and priority colours. | **Dependencies** — the SDK pieces the app manages, install / uninstall, diagnostics. |
 
 ## Install
 
 Grab the installer for your OS from the
-[Releases page](https://github.com/sachinshettigar/emumanager/releases). Builds are **unsigned**
-([ADR 0007](docs/adr/0007-ship-unsigned-v1.md)), so your OS warns on first launch — get past it
-once and the app runs normally afterwards (the auto-updater *is* signature-verified).
+[Releases page](https://github.com/sachinshettigar/emumanager/releases). Builds are **unsigned**,
+so your OS warns on first launch — get past it once and the app runs normally afterwards (the
+auto-updater *is* signature-verified).
 
 - **macOS** (`.dmg`) — open it, drag the app to Applications, then **right-click the app → Open →
   Open**. A plain double-click is blocked by Gatekeeper the first time only.
