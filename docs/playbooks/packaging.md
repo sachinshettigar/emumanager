@@ -1,7 +1,7 @@
 # Playbook: building installers locally
 
 All installers are **unsigned / un-notarized** (ADR 0007). First-run instructions per OS are in
-the [README](../../README.md#install-pre-release). The only signing credential is the Tauri
+the [README](../../README.md#install). The only signing credential is the Tauri
 **updater key** — see [`release-signing.md`](release-signing.md); without it the `.app`/`.dmg`/
 `.exe` still build, only the updater feed artifacts (`.tar.gz` / `.zip` + `.sig`) go unsigned.
 
