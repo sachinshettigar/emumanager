@@ -477,12 +477,22 @@ export function EmulatorDetail(): React.JSX.Element {
   );
 }
 
+/** A distinct hue per logcat priority so severity reads at a glance, Android-Studio style. */
 const LEVEL_TONE: Record<string, string> = {
-  E: "text-danger",
+  E: "text-danger font-medium",
   W: "text-attention",
-  I: "text-ink",
-  D: "text-muted",
+  I: "text-running",
+  D: "text-primary",
   V: "text-faint",
+};
+
+/** Spelled-out priority names for the "minimum level" dropdown and the colour legend. */
+const LEVEL_LABEL: Record<string, string> = {
+  V: "Verbose",
+  D: "Debug",
+  I: "Info",
+  W: "Warn",
+  E: "Error",
 };
 
 /** Live device telemetry for a running emulator: a facts strip, an Android-Studio-style `adb
@@ -605,7 +615,7 @@ function LogcatTab({ id, running }: { id: string; running: boolean }): React.JSX
         >
           {LOGCAT_LEVELS.map((lv) => (
             <option key={lv} value={lv}>
-              {lv}+
+              {LEVEL_LABEL[lv] ?? lv}+
             </option>
           ))}
         </select>
@@ -655,6 +665,13 @@ function LogcatTab({ id, running }: { id: string; running: boolean }): React.JSX
         <span className="text-faint">
           {shown.length} / {source.length} lines
         </span>
+        <span aria-hidden className="flex flex-wrap items-center gap-x-2.5 text-[10px] text-faint">
+          {LOGCAT_LEVELS.map((lv) => (
+            <span key={lv} className={LEVEL_TONE[lv]}>
+              {LEVEL_LABEL[lv]}
+            </span>
+          ))}
+        </span>
       </div>
 
       <div
@@ -669,6 +686,7 @@ function LogcatTab({ id, running }: { id: string; running: boolean }): React.JSX
           shown.map((l, i) => (
             <p
               key={`${String(i)}-${l.raw}`}
+              data-level={l.level}
               className={`whitespace-pre-wrap ${LEVEL_TONE[l.level] ?? "text-muted"}`}
             >
               {l.raw}

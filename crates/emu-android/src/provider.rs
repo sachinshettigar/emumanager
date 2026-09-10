@@ -219,9 +219,9 @@ impl AndroidProvider {
         &self.registry
     }
 
-    /// Every AVD name `avdmanager list avd` reports (loadable *or* broken) — the set an
-    /// `avdmanager create avd -n <name>` would collide with. `Ok([])` if `avdmanager` can't run.
-    async fn list_avd_names(&self) -> Vec<String> {
+    /// Every entry `avdmanager list avd` reports (loadable *or* broken), including the on-disk
+    /// `.avd` path when it prints one. `[]` if `avdmanager` can't run.
+    async fn list_avd_entries(&self) -> Vec<AvdEntry> {
         let Ok(sdk_root) = self.sdk_root().await else {
             return Vec::new();
         };
@@ -231,11 +231,59 @@ impl AndroidProvider {
             .run(Command::new(avdmanager.display().to_string()).args(["list", "avd"]))
             .await
         {
-            Ok(out) => parse_avdmanager_list_avd(&out.stdout)
-                .into_iter()
-                .map(|a| a.name)
-                .collect(),
+            Ok(out) => parse_avdmanager_list_avd(&out.stdout),
             Err(_) => Vec::new(),
+        }
+    }
+
+    /// Every AVD name `avdmanager list avd` reports (loadable *or* broken) — the set an
+    /// `avdmanager create avd -n <name>` would collide with. `Ok([])` if `avdmanager` can't run.
+    async fn list_avd_names(&self) -> Vec<String> {
+        self.list_avd_entries()
+            .await
+            .into_iter()
+            .map(|a| a.name)
+            .collect()
+    }
+
+    /// Make sure the AVD at `avd_dir` boots with `hw.keyboard=yes` so the **desktop** keyboard
+    /// types into Android text fields. `avdmanager create avd` leaves the key out of `config.ini`
+    /// and the emulator then defaults a phone AVD to `hw.keyboard=no` — only the on-screen
+    /// keyboard works and host keystrokes are dropped. Android Studio's AVD Manager writes `yes`;
+    /// we match it. (`hw.keyboard` is a documented AVD hardware property carried in the AVD's
+    /// `config.ini`; see the emulator command-line reference,
+    /// <https://developer.android.com/studio/run/emulator-commandline>.)
+    ///
+    /// Look up `avd_name`'s on-disk dir via `avdmanager list avd` and run [`Self::ensure_hw_keyboard`]
+    /// on it. Returns the launch-log line, or `None` if the AVD dir can't be found or nothing
+    /// needed changing.
+    async fn ensure_hw_keyboard_for(&self, avd_name: &str) -> Option<String> {
+        let avd_dir = self
+            .list_avd_entries()
+            .await
+            .into_iter()
+            .find(|e| e.name == avd_name)
+            .and_then(|e| e.path)?;
+        self.ensure_hw_keyboard(&avd_dir).await
+    }
+
+    /// Returns a line for the launch log when it changed something (or tried and failed), else
+    /// `None`. Best-effort: a missing/unreadable/unwritable `config.ini` never blocks a launch.
+    async fn ensure_hw_keyboard(&self, avd_dir: &Path) -> Option<String> {
+        let config = avd_dir.join("config.ini");
+        let bytes = self.fs.read(&config).await.ok()?;
+        let text = std::str::from_utf8(&bytes).ok()?;
+        let fixed = hw_keyboard_fix(text)?;
+        match self.fs.write_atomic(&config, fixed.as_bytes()).await {
+            Ok(()) => Some(
+                "enabled the hardware keyboard (hw.keyboard=yes) so your desktop keyboard types \
+                 into the emulator"
+                    .to_string(),
+            ),
+            Err(e) => Some(format!(
+                "could not enable the hardware keyboard in config.ini ({e}); the on-screen \
+                 keyboard still works"
+            )),
         }
     }
 
@@ -1023,6 +1071,11 @@ impl Provider for AndroidProvider {
             ));
         }
 
+        // Desktop keyboard: `avdmanager` omits `hw.keyboard` from `config.ini`, so the emulator
+        // drops host keystrokes in text fields until it reads `yes`. Fixed every launch — covers
+        // AVDs we created and ones adopted from elsewhere. Best-effort.
+        let kbd_note = self.ensure_hw_keyboard_for(&avd_name).await;
+
         let sdk_root = self.sdk_root().await?;
         let adb = self.adb_path(&sdk_root);
 
@@ -1067,6 +1120,9 @@ impl Provider for AndroidProvider {
         let _ = self.fs.ensure_dir(&self.data_dir.join("logs")).await;
         let _ = self.fs.write_atomic(&log_path, b"").await;
 
+        if let Some(note) = kbd_note {
+            self.emit_log(job, &log_path, note).await;
+        }
         if let Some(note) = skin_note {
             self.emit_log(job, &log_path, note).await;
         }
@@ -1400,6 +1456,30 @@ fn parse_ini(text: &str) -> HashMap<&str, &str> {
             Some((k.trim(), v.trim()))
         })
         .collect()
+}
+
+/// Given an AVD `config.ini`'s current text, return the text it should be rewritten to so the
+/// desktop keyboard reaches Android text fields (`hw.keyboard=yes`), or `None` if it already
+/// says `yes` (nothing to do). Any existing `hw.keyboard=...` line is replaced; otherwise the
+/// key is appended. Every other line — comments, blanks, order — is preserved. See
+/// [`AndroidProvider::ensure_hw_keyboard`] for why `avdmanager` leaves this wrong.
+fn hw_keyboard_fix(config_ini: &str) -> Option<String> {
+    let already_yes = parse_ini(config_ini)
+        .get("hw.keyboard")
+        .is_some_and(|v| v.eq_ignore_ascii_case("yes"));
+    if already_yes {
+        return None;
+    }
+    let mut out = String::with_capacity(config_ini.len() + 16);
+    for line in config_ini.lines().filter(|line| {
+        line.split_once('=')
+            .is_none_or(|(k, _)| k.trim() != "hw.keyboard")
+    }) {
+        out.push_str(line);
+        out.push('\n');
+    }
+    out.push_str("hw.keyboard=yes\n");
+    Some(out)
 }
 
 impl AndroidProvider {
@@ -1835,6 +1915,73 @@ mod tests {
         assert_eq!(conns[1].remote, "8.8.8.8:443");
         assert_eq!(conns[1].uid, 10123);
         assert_eq!(conns[1].package.as_deref(), Some("com.example.app"));
+    }
+
+    #[test]
+    fn hw_keyboard_fix_appends_the_key_when_it_is_missing() {
+        let out = hw_keyboard_fix("hw.ramSize=2048\nhw.gpu.enabled=yes\n")
+            .expect("a config without hw.keyboard needs the fix");
+        assert!(out.contains("hw.ramSize=2048"));
+        assert!(out.contains("hw.gpu.enabled=yes"));
+        assert!(out.ends_with("hw.keyboard=yes\n"));
+    }
+
+    #[test]
+    fn hw_keyboard_fix_replaces_an_explicit_no() {
+        let out = hw_keyboard_fix("hw.keyboard=no\nhw.ramSize=2048\n")
+            .expect("hw.keyboard=no needs the fix");
+        assert!(!out.contains("hw.keyboard=no"));
+        assert_eq!(out.matches("hw.keyboard").count(), 1);
+        assert!(out.contains("hw.keyboard=yes"));
+        assert!(out.contains("hw.ramSize=2048"));
+    }
+
+    #[test]
+    fn hw_keyboard_fix_is_a_no_op_when_already_yes() {
+        assert_eq!(hw_keyboard_fix("hw.keyboard=yes\nhw.ramSize=2048\n"), None);
+        assert_eq!(hw_keyboard_fix("hw.keyboard = YES\n"), None);
+    }
+
+    #[tokio::test]
+    async fn launch_enables_the_hardware_keyboard_in_config_ini() {
+        let fs = InMemoryFs::new();
+        fs.write_atomic(
+            Path::new("/data/avd/pixel6_api34.avd/config.ini"),
+            b"hw.device.name=pixel_6\nhw.keyboard=no\n",
+        )
+        .await
+        .unwrap();
+        let process = FakeProcessRunner::new()
+            .on_run(
+                "avdmanager list avd",
+                ok(
+                    "Available Android Virtual Devices:\n    Name: pixel6_api34\n  Device: \
+                    pixel_6 (Google)\n    Path: /data/avd/pixel6_api34.avd\n",
+                ),
+            )
+            .on_spawn("emulator @pixel6_api34", ["emulator: boot started"], ok(""))
+            .on_run(
+                "adb devices",
+                ok("List of devices attached\nemulator-5554\tdevice\n"),
+            )
+            .on_run("shell getprop sys.boot_completed", ok("1\n"));
+        let (provider, _dir) = provider_with(process, fs).await;
+        let id = seed_emulator(&provider).await;
+
+        provider
+            .launch(id, LaunchOpts::default(), &job())
+            .await
+            .expect("launch");
+
+        let config = provider
+            .fs
+            .read(Path::new("/data/avd/pixel6_api34.avd/config.ini"))
+            .await
+            .expect("config.ini still there");
+        let text = String::from_utf8(config).unwrap();
+        assert!(text.contains("hw.keyboard=yes"), "got: {text}");
+        assert!(!text.contains("hw.keyboard=no"));
+        assert!(text.contains("hw.device.name=pixel_6"));
     }
 
     #[tokio::test]

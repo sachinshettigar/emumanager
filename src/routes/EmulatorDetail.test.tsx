@@ -199,6 +199,15 @@ describe("EmulatorDetail", () => {
     });
     expect(screen.getByTestId("logcat-console")).not.toHaveTextContent("not mine");
 
+    // The level dropdown spells the priorities out ("Info+", not "I+").
+    expect(screen.getByTestId("logcat-level")).toHaveTextContent("Info+");
+    expect(screen.getByTestId("logcat-level")).toHaveTextContent("Error+");
+
+    // Each priority is drawn in its own colour: Info green, Error red.
+    const console_ = screen.getByTestId("logcat-console");
+    expect(console_.querySelector('[data-level="I"]')).toHaveClass("text-running");
+    expect(console_.querySelector('[data-level="E"]')).toHaveClass("text-danger");
+
     // Raise the minimum level to E — the Info line drops out.
     fireEvent.change(screen.getByTestId("logcat-level"), { target: { value: "E" } });
     await waitFor(() => {

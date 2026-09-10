@@ -5,6 +5,16 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
+- **`0040` (keyboard + logcat readability) done** (session 12): three fixes from live-testing
+  the 0039 build. (1) **The desktop keyboard now types into the emulator** — every `launch`
+  rewrites the AVD's `config.ini` to `hw.keyboard=yes` (best-effort; `avdmanager` omits the key
+  and the emulator defaults a phone AVD to `no`, so only the on-screen keyboard worked). Pure
+  rewrite in `hw_keyboard_fix`, applied via `ensure_hw_keyboard` after `launch`'s prereq checks,
+  note emitted on the job log. (2) Logcat level filter spelled out — `Info+` / `Verbose+` etc.
+  instead of `I+`. (3) Logcat rows coloured by priority — 5 distinct hues (Error red+bold, Warn
+  amber, Info green, Debug blue, Verbose faint) + a legend. *Still open:* a real HTTP
+  request/response inspector (URL + query + body) — needs a MITM proxy + CA cert or the
+  `androidx.inspection` agent; tracked on M7.
 - **`0039` (device inspector v2) done** (session 11): the emulator detail panel's "Device"
   section is now tabbed — **Logcat** (the existing viewer, taller console) and **Network** (new).
   The Network tab shows interface addresses (`ip -o addr`) and a filterable table of open
