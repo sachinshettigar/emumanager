@@ -51,16 +51,9 @@ and rebuilds the same instance locally.
 
 ## How it works
 
-```mermaid
-flowchart LR
-    U([You]) --> ES["Emulator Studio"]
-    ES -->|downloads| SDK[("Managed Android SDK<br/>cmdline-tools · platform-tools<br/>emulator · system images")]
-    ES -->|avdmanager| AVD["Android Virtual Device"]
-    SDK --> AVD
-    AVD -->|emulator| RUN[["Running emulator"]]
-    ES -->|adb: state · logcat| RUN
-    ES <-->|export / import| P[".emuprofile recipe"]
-```
+<p align="center">
+  <img src=".github/how-it-works.svg" width="900" alt="Three steps: choose a device and Android version, Emulator Studio fetches the SDK pieces it needs, then launch and watch it run" />
+</p>
 
 Everything lives under one data directory; nothing touches a system Android install.
 
