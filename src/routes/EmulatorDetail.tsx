@@ -8,6 +8,7 @@ import {
   revealPath,
   useDeleteEmulator,
   useDeviceFacts,
+  useDeviceNetwork,
   useEditHardware,
   useEmulatorDetail,
   useEmulatorJob,
@@ -476,45 +477,19 @@ export function EmulatorDetail(): React.JSX.Element {
   );
 }
 
-/** Live device telemetry for a running emulator: a facts strip + an Android-Studio-style
- * `adb logcat` viewer with level / tag / text filters, pause and clear. */
+const LEVEL_TONE: Record<string, string> = {
+  E: "text-danger",
+  W: "text-attention",
+  I: "text-ink",
+  D: "text-muted",
+  V: "text-faint",
+};
+
+/** Live device telemetry for a running emulator: a facts strip, an Android-Studio-style `adb
+ * logcat` viewer, and a socket-level network panel. */
 function DeviceInspector({ id, running }: { id: string; running: boolean }): React.JSX.Element {
   const facts = useDeviceFacts(id, running);
-  const startLogcat = useStartLogcat();
-  const stopLogcat = useStopLogcat();
-  const { lines, clear } = useLogcatStream(id);
-
-  const [streaming, setStreaming] = useState(false);
-  const [paused, setPaused] = useState(false);
-  const [frozen, setFrozen] = useState<LogcatLine[]>([]);
-  const [minLevel, setMinLevel] = useState("V");
-  const [tag, setTag] = useState("");
-  const [text, setText] = useState("");
-
-  const source = paused ? frozen : lines;
-  const shown = useMemo(
-    () => filterLogcat(source, { minLevel, tag, text }),
-    [source, minLevel, tag, text],
-  );
-
-  const toggleStream = (): void => {
-    if (streaming) {
-      stopLogcat.mutate(id);
-      setStreaming(false);
-    } else {
-      clear();
-      startLogcat.mutate(id);
-      setStreaming(true);
-    }
-  };
-
-  const LEVEL_TONE: Record<string, string> = {
-    E: "text-danger",
-    W: "text-attention",
-    I: "text-ink",
-    D: "text-muted",
-    V: "text-faint",
-  };
+  const [tab, setTab] = useState<"logcat" | "network">("logcat");
 
   return (
     <section className="flex flex-col gap-2" data-testid="device-inspector">
@@ -552,6 +527,64 @@ function DeviceInspector({ id, running }: { id: string; running: boolean }): Rea
         )}
       </div>
 
+      <div className="flex gap-1 text-[12px]">
+        {(["logcat", "network"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            data-testid={`device-tab-${t}`}
+            onClick={() => {
+              setTab(t);
+            }}
+            className={`rounded-md px-3 py-1.5 ${
+              tab === t ? "bg-surface font-medium text-ink" : "text-muted hover:text-ink"
+            }`}
+          >
+            {t === "logcat" ? "Logcat" : "Network"}
+          </button>
+        ))}
+      </div>
+
+      {tab === "logcat" ? (
+        <LogcatTab id={id} running={running} />
+      ) : (
+        <NetworkTab id={id} running={running} />
+      )}
+    </section>
+  );
+}
+
+function LogcatTab({ id, running }: { id: string; running: boolean }): React.JSX.Element {
+  const startLogcat = useStartLogcat();
+  const stopLogcat = useStopLogcat();
+  const { lines, clear } = useLogcatStream(id);
+
+  const [streaming, setStreaming] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [frozen, setFrozen] = useState<LogcatLine[]>([]);
+  const [minLevel, setMinLevel] = useState("V");
+  const [tag, setTag] = useState("");
+  const [text, setText] = useState("");
+
+  const source = paused ? frozen : lines;
+  const shown = useMemo(
+    () => filterLogcat(source, { minLevel, tag, text }),
+    [source, minLevel, tag, text],
+  );
+
+  const toggleStream = (): void => {
+    if (streaming) {
+      stopLogcat.mutate(id);
+      setStreaming(false);
+    } else {
+      clear();
+      startLogcat.mutate(id);
+      setStreaming(true);
+    }
+  };
+
+  return (
+    <>
       <div className="flex flex-wrap items-center gap-2 text-[12px]">
         <button
           type="button"
@@ -626,7 +659,7 @@ function DeviceInspector({ id, running }: { id: string; running: boolean }): Rea
 
       <div
         data-testid="logcat-console"
-        className="max-h-72 overflow-y-auto rounded-md bg-panel p-2 font-mono text-[11px] leading-snug"
+        className="max-h-[28rem] overflow-y-auto rounded-md bg-panel p-2 font-mono text-[11px] leading-snug"
       >
         {shown.length === 0 ? (
           <p className="text-muted">
@@ -634,13 +667,124 @@ function DeviceInspector({ id, running }: { id: string; running: boolean }): Rea
           </p>
         ) : (
           shown.map((l, i) => (
-            <p key={`${String(i)}-${l.raw}`} className={LEVEL_TONE[l.level] ?? "text-muted"}>
+            <p
+              key={`${String(i)}-${l.raw}`}
+              className={`whitespace-pre-wrap ${LEVEL_TONE[l.level] ?? "text-muted"}`}
+            >
               {l.raw}
             </p>
           ))
         )}
       </div>
-    </section>
+    </>
+  );
+}
+
+/** Socket-level network view (interfaces + open sockets from `/proc/net`). NOT an HTTP
+ * inspector — Android Studio's needs an in-app agent that Emulator Studio can't inject. */
+function NetworkTab({ id, running }: { id: string; running: boolean }): React.JSX.Element {
+  const net = useDeviceNetwork(id, running);
+  const [filter, setFilter] = useState("");
+
+  const rows = useMemo(() => {
+    const all = net.data?.connections ?? [];
+    const q = filter.trim().toLowerCase();
+    const matched = q
+      ? all.filter((c) =>
+          `${c.package ?? ""} ${String(c.uid)} ${c.local} ${c.remote} ${c.state} ${c.proto}`
+            .toLowerCase()
+            .includes(q),
+        )
+      : all;
+    // Established first, then listeners, then the rest; by local port within.
+    const rank = (s: string): number => (s === "ESTABLISHED" ? 0 : s === "LISTEN" ? 1 : 2);
+    return [...matched].sort((a, b) => rank(a.state) - rank(b.state));
+  }, [net.data, filter]);
+
+  if (!running) {
+    return (
+      <p className="rounded-md border border-border-default bg-surface p-3 text-[12px] text-muted">
+        Start the emulator to see its network state.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2 text-[12px]">
+      <p className="text-[11px] text-faint">
+        Socket-level view from <code>/proc/net</code> — open TCP/UDP sockets and interface
+        addresses. This is not an HTTP request inspector.
+      </p>
+
+      <div data-testid="net-interfaces" className="flex flex-wrap gap-x-4 gap-y-1 text-muted">
+        {(net.data?.interfaces ?? []).length === 0 ? (
+          <span>{net.error ? net.error.ipc.message : "reading interfaces…"}</span>
+        ) : (
+          net.data?.interfaces.map((i) => (
+            <span key={`${i.name}-${i.addr}`}>
+              <span className="text-ink">{i.name}</span> {i.addr}
+            </span>
+          ))
+        )}
+      </div>
+
+      <input
+        type="text"
+        data-testid="net-filter"
+        value={filter}
+        onChange={(e) => {
+          setFilter(e.target.value);
+        }}
+        placeholder="filter (package, ip, port, state)"
+        className="w-64 rounded-md border border-border-default bg-surface px-2 py-1.5"
+      />
+
+      <div className="max-h-[24rem] overflow-auto rounded-md border border-border-default">
+        <table data-testid="net-connections" className="w-full text-left text-[11px]">
+          <thead className="sticky top-0 bg-surface text-muted">
+            <tr>
+              <th className="px-2 py-1.5 font-medium">App / uid</th>
+              <th className="px-2 py-1.5 font-medium">Proto</th>
+              <th className="px-2 py-1.5 font-medium">State</th>
+              <th className="px-2 py-1.5 font-medium">Local</th>
+              <th className="px-2 py-1.5 font-medium">Remote</th>
+            </tr>
+          </thead>
+          <tbody className="font-mono">
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-2 py-3 text-center font-sans text-muted">
+                  {net.isPending ? "reading sockets…" : "No sockets match."}
+                </td>
+              </tr>
+            ) : (
+              rows.map((c, i) => (
+                <tr
+                  key={`${String(i)}-${c.proto}-${c.local}-${c.remote}`}
+                  className="border-t border-border-default"
+                >
+                  <td className="px-2 py-1 font-sans">{c.package ?? `uid ${String(c.uid)}`}</td>
+                  <td className="px-2 py-1">{c.proto}</td>
+                  <td
+                    className={`px-2 py-1 ${
+                      c.state === "ESTABLISHED"
+                        ? "text-running"
+                        : c.state === "LISTEN"
+                          ? "text-attention"
+                          : "text-muted"
+                    }`}
+                  >
+                    {c.state || "—"}
+                  </td>
+                  <td className="px-2 py-1">{c.local}</td>
+                  <td className="px-2 py-1">{c.remote === "0.0.0.0:0" ? "*" : c.remote}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 

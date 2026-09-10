@@ -5,6 +5,16 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
+- **`0039` (device inspector v2) done** (session 11): the emulator detail panel's "Device"
+  section is now tabbed — **Logcat** (the existing viewer, taller console) and **Network** (new).
+  The Network tab shows interface addresses (`ip -o addr`) and a filterable table of open
+  IPv4 TCP/UDP sockets read from `/proc/net/{tcp,udp}` — little-endian hex decoded to
+  `a.b.c.d:port`, TCP state, owning uid, and the package name (via `pm list packages -U`). It's
+  socket-level, **not** an HTTP request inspector — that needs an in-app agent Emulator Studio
+  can't inject, and the panel says so. New `device_network` command + `useDeviceNetwork` (4 s
+  poll). Also fixes/answers: launch needs `platform-tools` (fast-fail), export uses a native
+  Save dialog, Create wizard fills the window, device groups expand by default, duplicate
+  emulator names auto-suffix `" (2)"`.
 - **`0030` (E2E harness) done** (session 10) — with `0029`, the last open M6 items that aren't
   blocked on CI billing. New self-contained `e2e/` npm project (own `package.json` /
   `node_modules`, outside the pnpm workspace, so it never affects `just validate`):

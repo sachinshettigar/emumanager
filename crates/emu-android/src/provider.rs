@@ -75,6 +75,39 @@ pub struct DeviceFacts {
     pub data_total_mb: Option<u64>,
 }
 
+/// Live network state of a running device — [`AndroidProvider::device_network`]'s return.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DeviceNetwork {
+    pub interfaces: Vec<NetInterface>,
+    pub connections: Vec<NetConnection>,
+}
+
+/// One address on one network interface (from `ip -o addr`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NetInterface {
+    /// e.g. `wlan0`, `radio0`, `lo`.
+    pub name: String,
+    /// e.g. `10.0.2.16/24` (family kept as printed: `inet` / `inet6`).
+    pub addr: String,
+}
+
+/// One open IPv4 socket (from `/proc/net/tcp` or `/proc/net/udp`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NetConnection {
+    /// `"tcp"` or `"udp"`.
+    pub proto: &'static str,
+    /// `ip:port`.
+    pub local: String,
+    /// `ip:port`; `0.0.0.0:0` for a listener / unconnected UDP.
+    pub remote: String,
+    /// TCP state (`ESTABLISHED`, `LISTEN`, …); empty for UDP.
+    pub state: &'static str,
+    /// Owning Linux uid.
+    pub uid: u32,
+    /// Package name for `uid`, when `pm list packages -U` mapped it.
+    pub package: Option<String>,
+}
+
 /// One registry-tracked emulator plus its live run state — [`AndroidProvider::tracked_states`]'s
 /// element type, what the Dashboard renders.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -547,6 +580,54 @@ impl AndroidProvider {
         })
     }
 
+    /// Live network state of a running emulator: interface addresses + open IPv4 sockets.
+    ///
+    /// Sources, all standard/stable formats parsed defensively:
+    /// - interfaces: `ip -o addr` (one address per line: `<idx>: <iface> <family> <addr>/<prefix> …`)
+    /// - sockets: `/proc/net/tcp` and `/proc/net/udp` — the kernel format documented in
+    ///   `Documentation/networking/proc_net_tcp.rst` (little-endian hex `IP:PORT`, hex state, uid)
+    /// - uid → package: `pm list packages -U` (`package:<name> uid:<n>`)
+    ///
+    /// IPv6 sockets (`/proc/net/tcp6`) are deliberately not parsed yet — the emulator's traffic
+    /// is almost always IPv4 and the v6 hex encoding is a separate can of worms.
+    pub async fn device_network(&self, id: &EmulatorId) -> Result<DeviceNetwork> {
+        let serial = self.running_serial(id).await?;
+        let sdk_root = self.sdk_root().await?;
+        let adb = self.adb_path(&sdk_root);
+
+        let sh = |args: &[&'static str]| {
+            let adb = adb.display().to_string();
+            let serial = serial.clone();
+            let args: Vec<&'static str> = args.to_vec();
+            async move {
+                self.process
+                    .run(
+                        Command::new(adb)
+                            .args(["-s", &serial])
+                            .arg("shell")
+                            .args(args),
+                    )
+                    .await
+                    .map(|o| o.stdout)
+                    .unwrap_or_default()
+            }
+        };
+
+        let interfaces = parse_ip_addr(&sh(&["ip", "-o", "addr"]).await);
+        let uid_pkg = parse_pm_list_packages_u(&sh(&["pm", "list", "packages", "-U"]).await);
+        let mut connections = parse_proc_net(&sh(&["cat", "/proc/net/tcp"]).await, "tcp", &uid_pkg);
+        connections.extend(parse_proc_net(
+            &sh(&["cat", "/proc/net/udp"]).await,
+            "udp",
+            &uid_pkg,
+        ));
+
+        Ok(DeviceNetwork {
+            interfaces,
+            connections,
+        })
+    }
+
     fn avdmanager_path(&self, sdk_root: &Path) -> PathBuf {
         let sdkmanager = toolchain::binary_path(sdk_root, ComponentId::CmdlineTools, self.os);
         let bin = if matches!(self.os, HostOs::Windows) {
@@ -690,6 +771,110 @@ fn parse_df_data(df: &str) -> (Option<u64>, Option<u64>) {
         .and_then(|c| c.parse::<u64>().ok())
         .map(kib_to_mb);
     (free, total)
+}
+
+/// `ip -o addr` → one [`NetInterface`] per `inet`/`inet6` address line. With `-o`, each address
+/// is on its own line: `2: wlan0    inet 10.0.2.16/24 brd … scope global wlan0 \ …`.
+fn parse_ip_addr(out: &str) -> Vec<NetInterface> {
+    out.lines()
+        .filter_map(|line| {
+            let mut toks = line.split_whitespace();
+            let _idx = toks.next()?;
+            let name = toks.next()?.trim_end_matches(':').to_string();
+            let family = toks.next()?; // "inet" | "inet6" | "link/ether" | …
+            if family != "inet" && family != "inet6" {
+                return None;
+            }
+            let addr = toks.next()?.to_string(); // "10.0.2.16/24"
+            Some(NetInterface { name, addr })
+        })
+        .collect()
+}
+
+/// `pm list packages -U` → uid → package. Each line is `package:<name> uid:<n>`.
+fn parse_pm_list_packages_u(out: &str) -> std::collections::HashMap<u32, String> {
+    let mut map = std::collections::HashMap::new();
+    for line in out.lines() {
+        let pkg = line
+            .split_whitespace()
+            .find_map(|t| t.strip_prefix("package:"));
+        let uid = line
+            .split_whitespace()
+            .find_map(|t| t.strip_prefix("uid:"))
+            .and_then(|n| n.trim().parse::<u32>().ok());
+        if let (Some(pkg), Some(uid)) = (pkg, uid) {
+            map.entry(uid).or_insert_with(|| pkg.to_string());
+        }
+    }
+    map
+}
+
+/// Decode a `/proc/net/*` little-endian hex `IIIIIIII:PPPP` field into `"a.b.c.d:port"`.
+/// IPv6 (32-hex) fields aren't handled — `None`.
+fn decode_hex_addr(field: &str) -> Option<String> {
+    let (ip_hex, port_hex) = field.split_once(':')?;
+    if ip_hex.len() != 8 {
+        return None; // IPv6 or malformed
+    }
+    let n = u32::from_str_radix(ip_hex, 16).ok()?;
+    let port = u16::from_str_radix(port_hex, 16).ok()?;
+    Some(format!(
+        "{}.{}.{}.{}:{port}",
+        n & 0xff,
+        (n >> 8) & 0xff,
+        (n >> 16) & 0xff,
+        (n >> 24) & 0xff
+    ))
+}
+
+/// The hex TCP state in `/proc/net/tcp` column 3 → its name. (`Documentation/networking/proc_net_tcp.rst`)
+fn tcp_state(hex: &str) -> &'static str {
+    match hex {
+        "01" => "ESTABLISHED",
+        "02" => "SYN_SENT",
+        "03" => "SYN_RECV",
+        "04" => "FIN_WAIT1",
+        "05" => "FIN_WAIT2",
+        "06" => "TIME_WAIT",
+        "07" => "CLOSE",
+        "08" => "CLOSE_WAIT",
+        "09" => "LAST_ACK",
+        "0A" => "LISTEN",
+        "0B" => "CLOSING",
+        _ => "?",
+    }
+}
+
+/// Parse `/proc/net/tcp` (or `udp`) into [`NetConnection`]s (IPv4 rows only). Columns after the
+/// header: `sl local_address rem_address st … … … uid …`. Rows that don't parse are skipped.
+fn parse_proc_net(
+    out: &str,
+    proto: &'static str,
+    uid_pkg: &std::collections::HashMap<u32, String>,
+) -> Vec<NetConnection> {
+    out.lines()
+        .skip(1) // "  sl  local_address rem_address   st …" header
+        .filter_map(|line| {
+            // cols: [ "0:", local, remote, st, tx:rx, tr:when, retrnsmt, uid, … ]
+            let cols: Vec<&str> = line.split_whitespace().collect();
+            let local = decode_hex_addr(cols.get(1)?)?;
+            let remote = decode_hex_addr(cols.get(2)?)?;
+            let state = if proto == "tcp" {
+                tcp_state(cols.get(3)?)
+            } else {
+                ""
+            };
+            let uid = cols.get(7)?.parse::<u32>().ok()?;
+            Some(NetConnection {
+                proto,
+                local,
+                remote,
+                state,
+                uid,
+                package: uid_pkg.get(&uid).cloned(),
+            })
+        })
+        .collect()
 }
 
 #[async_trait]
@@ -1605,6 +1790,51 @@ mod tests {
         assert_eq!(free, Some(5_341_900 / 1024));
         assert_eq!(total, Some(6_154_240 / 1024));
         assert_eq!(parse_df_data("header only\n"), (None, None));
+    }
+
+    #[test]
+    fn parse_ip_addr_keeps_only_inet_lines() {
+        let out = "1: lo    inet 127.0.0.1/8 scope host lo\\       valid_lft forever\n\
+                   2: wlan0    inet 10.0.2.16/24 brd 10.0.2.255 scope global wlan0\\    valid_lft\n\
+                   2: wlan0    link/ether 02:00:00:00:00:00 brd ff:ff:ff:ff:ff:ff\n";
+        let ifs = parse_ip_addr(out);
+        assert_eq!(ifs.len(), 2);
+        assert_eq!(ifs[1].name, "wlan0");
+        assert_eq!(ifs[1].addr, "10.0.2.16/24");
+    }
+
+    #[test]
+    fn decode_hex_addr_reverses_the_le_ipv4_and_reads_the_port() {
+        // 0100007F:1F90 → 127.0.0.1:8080 ; IPv6 (32-hex) → None.
+        assert_eq!(
+            decode_hex_addr("0100007F:1F90").as_deref(),
+            Some("127.0.0.1:8080")
+        );
+        assert_eq!(
+            decode_hex_addr("00000000:0000").as_deref(),
+            Some("0.0.0.0:0")
+        );
+        assert_eq!(
+            decode_hex_addr("00000000000000000000000001000000:0035"),
+            None
+        );
+    }
+
+    #[test]
+    fn parse_proc_net_reads_tcp_rows_and_maps_the_uid() {
+        let uid_pkg =
+            parse_pm_list_packages_u("package:com.example.app uid:10123\npackage:x uid:10124\n");
+        let tcp = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   \
+                   0: 0100007F:1F90 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 111 1 0 0\n   \
+                   1: 1002000A:D9F2 08080808:01BB 01 00000000:00000000 00:00000000 00000000 10123        0 222 1 0 0\n";
+        let conns = parse_proc_net(tcp, "tcp", &uid_pkg);
+        assert_eq!(conns.len(), 2);
+        assert_eq!(conns[0].state, "LISTEN");
+        assert_eq!(conns[0].local, "127.0.0.1:8080");
+        assert_eq!(conns[1].state, "ESTABLISHED");
+        assert_eq!(conns[1].remote, "8.8.8.8:443");
+        assert_eq!(conns[1].uid, 10123);
+        assert_eq!(conns[1].package.as_deref(), Some("com.example.app"));
     }
 
     #[tokio::test]

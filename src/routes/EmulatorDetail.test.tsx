@@ -40,6 +40,7 @@ vi.mock("../lib/bindings", () => ({
     startLogcat: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     stopLogcat: vi.fn().mockResolvedValue({ status: "ok", data: null }),
     deviceFacts: vi.fn(),
+    deviceNetwork: vi.fn(),
   },
   events: {
     jobEmulator: { listen: vi.fn().mockResolvedValue(() => {}) },
@@ -204,6 +205,38 @@ describe("EmulatorDetail", () => {
       expect(screen.getByTestId("logcat-console")).not.toHaveTextContent("hello world");
     });
     expect(screen.getByTestId("logcat-console")).toHaveTextContent("FATAL EXCEPTION");
+  });
+
+  it("shows the network panel — interfaces and open sockets — on the Network tab", async () => {
+    detailMock.mockResolvedValue({ status: "ok", data: { ...DETAIL, state: "running" } });
+    vi.mocked(commands.deviceNetwork).mockResolvedValue({
+      status: "ok",
+      data: {
+        interfaces: [{ name: "wlan0", addr: "10.0.2.16/24" }],
+        connections: [
+          {
+            proto: "tcp",
+            local: "10.0.2.16:55600",
+            remote: "8.8.8.8:443",
+            state: "ESTABLISHED",
+            uid: 10123,
+            package: "com.example.app",
+          },
+        ],
+      },
+    });
+    renderDetail();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("device-tab-network")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId("device-tab-network"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("net-interfaces")).toHaveTextContent("10.0.2.16/24");
+      expect(screen.getByTestId("net-connections")).toHaveTextContent("com.example.app");
+      expect(screen.getByTestId("net-connections")).toHaveTextContent("8.8.8.8:443");
+    });
   });
 
   it("picks a location then exports the profile there", async () => {

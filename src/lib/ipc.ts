@@ -19,6 +19,7 @@ import {
   type ComponentInfo,
   type CreateEmulatorRequest,
   type DeviceFactsDto,
+  type DeviceNetworkDto,
   type DeviceInfo,
   type EmulatorDetail,
   type EmulatorInfo,
@@ -860,5 +861,23 @@ export function useDeviceFacts(
     queryFn: () => deviceFacts(id),
     enabled,
     refetchInterval: 5000,
+  });
+}
+
+async function deviceNetwork(id: string): Promise<DeviceNetworkDto> {
+  return unwrap(await commands.deviceNetwork(id));
+}
+
+/** Poll a running emulator's interface addresses + open sockets every 4 s. Socket-level (from
+ * `/proc/net`), not an HTTP inspector. */
+export function useDeviceNetwork(
+  id: string,
+  enabled: boolean,
+): UseQueryResult<DeviceNetworkDto, IpcCallError> {
+  return useQuery<DeviceNetworkDto, IpcCallError>({
+    queryKey: ["device-network", id],
+    queryFn: () => deviceNetwork(id),
+    enabled,
+    refetchInterval: 4000,
   });
 }

@@ -90,6 +90,74 @@ pub async fn stop_logcat(mgr: State<'_, ManagedProvider>, id: String) -> Result<
     Ok(())
 }
 
+/// One network interface address for the inspector's Network panel.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct NetInterfaceDto {
+    pub name: String,
+    /// e.g. `10.0.2.16/24`.
+    pub addr: String,
+}
+
+/// One open IPv4 socket for the inspector's Network panel.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct NetConnectionDto {
+    /// `tcp` / `udp`.
+    pub proto: String,
+    pub local: String,
+    pub remote: String,
+    /// TCP state; empty for UDP.
+    pub state: String,
+    pub uid: u32,
+    pub package: Option<String>,
+}
+
+/// Live network state of a running emulator.
+#[derive(Debug, Clone, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceNetworkDto {
+    pub interfaces: Vec<NetInterfaceDto>,
+    pub connections: Vec<NetConnectionDto>,
+}
+
+/// Interface addresses + open sockets of a running emulator (socket-level, IPv4 — this is not an
+/// HTTP inspector; that needs an in-app agent Emulator Studio doesn't inject).
+#[tauri::command]
+#[specta::specta]
+pub async fn device_network(
+    mgr: State<'_, ManagedProvider>,
+    id: String,
+) -> Result<DeviceNetworkDto, IpcError> {
+    let provider = mgr.get().await?;
+    let net = provider
+        .device_network(&EmulatorId(id))
+        .await
+        .map_err(IpcError::from)?;
+    Ok(DeviceNetworkDto {
+        interfaces: net
+            .interfaces
+            .into_iter()
+            .map(|i| NetInterfaceDto {
+                name: i.name,
+                addr: i.addr,
+            })
+            .collect(),
+        connections: net
+            .connections
+            .into_iter()
+            .map(|c| NetConnectionDto {
+                proto: c.proto.to_string(),
+                local: c.local,
+                remote: c.remote,
+                state: c.state.to_string(),
+                uid: c.uid,
+                package: c.package,
+            })
+            .collect(),
+    })
+}
+
 /// Model / Android version / battery / `/data` usage for a running emulator.
 #[tauri::command]
 #[specta::specta]

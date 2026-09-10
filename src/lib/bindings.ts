@@ -132,6 +132,11 @@ export const commands = {
 	stopLogcat: (id: string) => typedError<null, IpcError>(__TAURI_INVOKE("stop_logcat", { id })),
 	/**  Model / Android version / battery / `/data` usage for a running emulator. */
 	deviceFacts: (id: string) => typedError<DeviceFactsDto, IpcError>(__TAURI_INVOKE("device_facts", { id })),
+	/**
+	 *  Interface addresses + open sockets of a running emulator (socket-level, IPv4 — this is not an
+	 *  HTTP inspector; that needs an in-app agent Emulator Studio doesn't inject).
+	 */
+	deviceNetwork: (id: string) => typedError<DeviceNetworkDto, IpcError>(__TAURI_INVOKE("device_network", { id })),
 	/**  Write a redacted diagnostics zip to `<data_dir>/diagnostics-<unix-ts>.zip`. */
 	exportDiagnostics: () => typedError<string, IpcError>(__TAURI_INVOKE("export_diagnostics")),
 };
@@ -274,6 +279,12 @@ export type DeviceLogLine = {
 	line: string,
 };
 
+/**  Live network state of a running emulator. */
+export type DeviceNetworkDto = {
+	interfaces: NetInterfaceDto[],
+	connections: NetConnectionDto[],
+};
+
 /**  Full config + live state for the detail panel. */
 export type EmulatorDetail = {
 	id: string,
@@ -414,6 +425,25 @@ export type IpcError = {
 	 *  arbitrary JSON and specta will not emit its BigInt-bearing `Number`.
 	 */
 	details: unknown,
+};
+
+/**  One open IPv4 socket for the inspector's Network panel. */
+export type NetConnectionDto = {
+	/**  `tcp` / `udp`. */
+	proto: string,
+	local: string,
+	remote: string,
+	/**  TCP state; empty for UDP. */
+	state: string,
+	uid: number,
+	package: string | null,
+};
+
+/**  One network interface address for the inspector's Network panel. */
+export type NetInterfaceDto = {
+	name: string,
+	/**  e.g. `10.0.2.16/24`. */
+	addr: string,
 };
 
 /**  Reply from [`ping`]. Proves the Rust↔TS seam and version wiring are live. */

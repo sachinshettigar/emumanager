@@ -65,6 +65,7 @@ fn specta_builder() -> Builder<tauri::Wry> {
             commands::device::start_logcat,
             commands::device::stop_logcat,
             commands::device::device_facts,
+            commands::device::device_network,
             commands::diagnostics::export_diagnostics,
         ])
         .events(collect_events![
