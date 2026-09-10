@@ -39,6 +39,28 @@
   }
   .lead{color:var(--muted);font-size:clamp(15px,1.6vw,18px);max-width:62ch}
 
+  /* hero platform row */
+  .os-row{
+    display:inline-flex;flex-wrap:wrap;gap:6px 20px;align-items:center;justify-content:center;
+    text-transform:none;letter-spacing:.04em;font-size:12.5px
+  }
+  .os-chip{
+    display:inline-flex;align-items:center;gap:7px;color:var(--muted);cursor:default;
+    transition:color .2s var(--ease),transform .2s var(--ease)
+  }
+  .os-chip .os-ico{width:14px;height:14px;color:var(--blue);transition:transform .28s var(--ease),color .2s}
+  .os-chip:hover{color:var(--ink);transform:translateY(-1px)}
+  .os-chip:hover .os-ico{transform:translateY(-3px) scale(1.22) rotate(-8deg);color:var(--green)}
+  .os-chip:active .os-ico{transform:scale(.9)}
+  @media(prefers-reduced-motion:no-preference){
+    .os-row.armed-chips .os-chip{opacity:0}
+    .os-row.go .os-chip{animation:chipIn .5s var(--ease) both}
+    .os-row.go .os-chip:nth-child(1){animation-delay:0s}
+    .os-row.go .os-chip:nth-child(2){animation-delay:.09s}
+    .os-row.go .os-chip:nth-child(3){animation-delay:.18s}
+  }
+  @keyframes chipIn{from{opacity:0;transform:translateY(8px) scale(.72) rotate(-10deg)}to{opacity:1;transform:none}}
+
   /* ---------- nav ---------- */
   .nav{
     position:fixed;inset:0 0 auto 0;z-index:50;display:flex;justify-content:center;
@@ -251,7 +273,11 @@
 <header class="hero" id="top">
   <div class="aurora" aria-hidden="true"><span class="a"></span><span class="b"></span><span class="c"></span></div>
   <div class="wrap">
-    <p class="eyebrow reveal in">Windows · macOS · Linux</p>
+    <p class="eyebrow reveal in os-row" id="osRow">
+      <span class="os-chip"><svg class="os-ico" viewBox="0 0 24 24"><use href="#os-win" /></svg>Windows</span>
+      <span class="os-chip"><svg class="os-ico" viewBox="0 0 24 24"><use href="#os-mac" /></svg>macOS</span>
+      <span class="os-chip"><svg class="os-ico" viewBox="0 0 24 24"><use href="#os-linux" /></svg>Linux</span>
+    </p>
     <h1 class="reveal in" data-d="1">Android emulators without Android&nbsp;Studio.</h1>
     <p class="tagline reveal in" data-d="2">Create and launch an Android emulator in minutes — with zero&nbsp;setup.</p>
     <div class="cta-row reveal in" data-d="3">
@@ -424,8 +450,11 @@
   // Intro: fullscreen logo settles into the nav logo, then clears.
   (function(){
     var intro = document.getElementById('intro');
-    if (!intro) return;
+    var osRow = document.getElementById('osRow');
+    function popChips(){ if (osRow) { osRow.classList.remove('armed-chips'); osRow.classList.add('go'); } }
+    if (!intro) { popChips(); return; }
     if (reduce) { intro.parentNode.removeChild(intro); return; }
+    if (osRow) osRow.classList.add('armed-chips');           // hide until the logo lands
     var mark = intro.querySelector('.mark');
     var target = document.querySelector('.nav .brand img');
     document.body.classList.add('intro-run');
@@ -434,6 +463,7 @@
       if (done) return; done = true;
       intro.classList.add('gone');
       document.body.classList.remove('intro-run');
+      popChips();                                            // chips spring in as the logo settles
       setTimeout(function(){ if (intro.parentNode) intro.parentNode.removeChild(intro); }, 650);
     }
     var killer = setTimeout(finish, 3200); // failsafe — never trap the page
