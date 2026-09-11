@@ -53,7 +53,7 @@ sha1 = "0.10"
 tokio = { version = "1", default-features = false, features = ["rt"] }
 # EmulatorId::generate() (task 0015) — real ULIDs (https://github.com/ulid/spec), lexicographically
 # sortable by creation time. No unsafe, no dependencies of its own.
-ulid = "1"
+ulid = "3"
 
 [features]
 # Enables the in-crate fakes for the port traits (FakeProcessRunner, FakeDownloader,
