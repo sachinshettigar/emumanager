@@ -19,4 +19,4 @@ emu-core.workspace = true
 async-trait = "0.1"
 # RAM total + free disk on the data volume, cross-platform without a per-OS syscall of our own.
 # `system` + `disk` only (no network/component/user); `0.36` is the last release for rustc 1.82.
-sysinfo = { version = "0.36", default-features = false, features = ["system", "disk"] }
+sysinfo = { version = "0.39", default-features = false, features = ["system", "disk"] }
