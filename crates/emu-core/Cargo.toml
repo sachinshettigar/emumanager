@@ -93,4 +93,4 @@ emu-android.workspace = true
 # fails a test rather than shipping. `default-features = false` drops its `reqwest`/`resolve-http`
 # ($id remote-ref) feature — the schema is a local file with only internal refs. Dev-only; runtime
 # schema validation is the frontend's `ajv` (`scripts/validate-schema.mjs`).
-jsonschema = { version = "0.33", default-features = false }
+jsonschema = { version = "0.55", default-features = false }
