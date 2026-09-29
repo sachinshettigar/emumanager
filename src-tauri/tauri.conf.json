@@ -51,7 +51,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhBMDI5QUEyN0I3MkI1RUUKUldUdXRYSjdvcG9DaXIxUnpkc3RZaHdwaUIva05TbkF0dVg0MGZnb1h2TCtnNGxXSmhXdklRbjcK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVBQURBMjEwOENGMzJCQ0UKUldUT0svT01FS0t0NmpWZndzYitkdnZDSiszd2RNSHArekkvYjRsdHNEMTR0OTl1cGxVREx2RnIK",
       "endpoints": [
         "https://github.com/sachinshettigar/emumanager/releases/latest/download/latest.json"
       ]
