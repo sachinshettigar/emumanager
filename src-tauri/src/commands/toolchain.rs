@@ -244,7 +244,10 @@ pub async fn uninstall_component(app: AppHandle, component_id: String) -> Result
     })?;
     let (data_dir, state) = scan_installed(&app, os).await?;
     let process = NativeProcessRunner;
-    let ports = toolchain::UninstallPorts { process: &process };
+    let ports = toolchain::UninstallPorts {
+        fs: &NativeFs,
+        process: &process,
+    };
     let job = JobHandle::noop(JobId(JOB_ID.to_string()));
     toolchain::uninstall(&data_dir, target, &state, os, &ports, &job)
         .await

@@ -187,7 +187,7 @@ describe("Dashboard", () => {
     });
   });
 
-  it("disables Launch and shows the reason when the host can't run emulators", async () => {
+  it("warns with the reason but still lets you launch when the emulator reports no acceleration", async () => {
     listEmulatorsMock.mockResolvedValue({ status: "ok", data: [STOPPED] });
     probeHostMock.mockResolvedValueOnce({
       status: "ok",
@@ -200,16 +200,17 @@ describe("Dashboard", () => {
         diskFreeMb: 100_000,
         ramMb: 16_384,
         verdict: "cannotRun",
-        verdictReason: "hardware virtualization is turned off in your firmware (BIOS/UEFI)",
+        verdictReason: "the Android emulator reports that KVM can't be used on this computer",
         fixes: [],
       },
     });
     renderDashboard();
 
     await waitFor(() => {
-      expect(screen.getByTestId("launch-01J0STOPPED")).toBeDisabled();
+      expect(screen.getByTestId("launch-warning-01J0STOPPED")).toHaveTextContent("can't be used");
     });
-    expect(screen.getByTestId("launch-blocked-01J0STOPPED")).toHaveTextContent("firmware");
+    // A guess (or even a refusal) never takes the button away — the emulator is the judge.
+    expect(screen.getByTestId("launch-01J0STOPPED")).toBeEnabled();
   });
 
   it("surfaces a load failure", async () => {

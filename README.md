@@ -83,8 +83,10 @@ Grab the installer for your OS from the
   Run anyway**.
 - **Linux** (`.AppImage`) — `chmod +x` it and run. A `.deb` is also provided.
 
-Emulator acceleration needs KVM (Linux), the Windows Hypervisor Platform (Windows), or
-Hypervisor.framework (macOS). The app detects what's available and guides you.
+Nothing else to install: Emulator Studio reuses a Java or Android SDK it finds on your computer and
+downloads whatever is missing. Fast emulators need hardware acceleration (KVM on Linux, the Windows
+Hypervisor Platform on Windows, Hypervisor.framework on macOS) — the app asks the emulator itself
+whether it works and tells you what to change if it doesn't.
 
 ## Build an installer yourself
 

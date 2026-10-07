@@ -1,6 +1,6 @@
 # ADR 0006: Require a system JDK 17+ instead of bundling one
 
-- Status: accepted
+- Status: superseded by [ADR 0008](0008-resolve-or-download-jdk.md)
 - Date: 2026-09-05
 - Deciders: project owner (via task 0012)
 

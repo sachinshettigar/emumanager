@@ -26,10 +26,11 @@ use emu_core::error::{CoreError, Result};
 use emu_core::model::component::{ComponentId, HostOs};
 use emu_core::model::device::DeviceProfile;
 use emu_core::model::emulator::{EmulatorId, EmulatorSource, Graphics, LiveState, RunState};
+use emu_core::model::host::AccelCheck;
 use emu_core::model::image::{ImageCoord, ImageFilter, SystemImage};
 use emu_core::model::job::{JobHandle, Progress};
 use emu_core::model::plan::CreateSpec;
-use emu_core::ports::{ChildProcess, Command, Fs, ProcessRunner};
+use emu_core::ports::{ChildProcess, Command, Fs, Output, ProcessRunner};
 use emu_core::provider::{LaunchOpts, Provider, RunningHandle};
 use emu_core::registry::{EmulatorRow, Registry};
 use emu_core::toolchain;
@@ -201,6 +202,33 @@ impl AndroidProvider {
             .map_or(app_sdk_dir, |l| l.sdk_root.clone()))
     }
 
+    /// Ask the emulator itself whether hardware acceleration works here (`emulator -accel-check`,
+    /// documented at <https://developer.android.com/studio/run/emulator-acceleration>). `None`
+    /// when the emulator isn't installed yet or can't be run — the caller falls back to guessing.
+    pub async fn accel_check(&self) -> Option<AccelCheck> {
+        let sdk_root = self.sdk_root().await.ok()?;
+        let emulator = self.emulator_path(&sdk_root);
+        if !self.fs.exists(&emulator).await.unwrap_or(false) {
+            return None;
+        }
+        let out = self
+            .process
+            .run(Command::new(emulator.display().to_string()).arg("-accel-check"))
+            .await
+            .ok()?;
+        Some(parse_accel_check(&out))
+    }
+
+    /// Pin `JAVA_HOME` on a `sdkmanager`/`avdmanager` invocation to the JDK Emulator Studio chose
+    /// during setup (found on the machine or downloaded — `emu_core::toolchain::jdk`). Unchanged
+    /// when nothing is recorded, so a plain `java` on `PATH` still works.
+    async fn with_java(&self, cmd: Command) -> Command {
+        match toolchain::jdk::java_env(self.fs.as_ref(), &self.data_dir, self.os).await {
+            Some((k, v)) => cmd.env(k, v),
+            None => cmd,
+        }
+    }
+
     /// Scan what SDK components are installed (app-managed dir + any system SDK). Feeds
     /// `emu_core::profile::resolve` (task `0023`'s `inspect_profile`).
     ///
@@ -228,7 +256,12 @@ impl AndroidProvider {
         let avdmanager = self.avdmanager_path(&sdk_root);
         match self
             .process
-            .run(Command::new(avdmanager.display().to_string()).args(["list", "avd"]))
+            .run(
+                self.with_java(
+                    Command::new(avdmanager.display().to_string()).args(["list", "avd"]),
+                )
+                .await,
+            )
             .await
         {
             Ok(out) => parse_avdmanager_list_avd(&out.stdout),
@@ -953,10 +986,12 @@ impl Provider for AndroidProvider {
 
         let sdkmanager = toolchain::binary_path(&sdk_root, ComponentId::CmdlineTools, self.os);
         job.report(Progress::log(format!("installing {coord}")));
-        let cmd = Command {
-            stdin: Some(Self::prompt_answer_stdin()),
-            ..Command::new(sdkmanager.display().to_string()).arg(coord.to_string())
-        };
+        let cmd = self
+            .with_java(Command {
+                stdin: Some(Self::prompt_answer_stdin()),
+                ..Command::new(sdkmanager.display().to_string()).arg(coord.to_string())
+            })
+            .await;
         let output = self.process.run(cmd).await?;
         if !output.success() {
             return Err(CoreError::Process {
@@ -1004,15 +1039,17 @@ impl Provider for AndroidProvider {
         let display_name =
             emu_core::profile::unique_display_name(&spec.display_name, &taken_display);
 
-        let cmd = Command {
-            stdin: Some(Self::prompt_answer_stdin()),
-            ..Command::new(avdmanager.display().to_string())
-                .arg("create")
-                .arg("avd")
-                .args(["-n", &avd_name])
-                .args(["-k", &spec.image_coord.to_string()])
-                .args(["-d", &spec.device_profile_id])
-        };
+        let cmd = self
+            .with_java(Command {
+                stdin: Some(Self::prompt_answer_stdin()),
+                ..Command::new(avdmanager.display().to_string())
+                    .arg("create")
+                    .arg("avd")
+                    .args(["-n", &avd_name])
+                    .args(["-k", &spec.image_coord.to_string()])
+                    .args(["-d", &spec.device_profile_id])
+            })
+            .await;
         let output = self.process.run(cmd).await?;
         if !output.success() {
             return Err(classify_create_avd_error(&spec, &output));
@@ -1268,9 +1305,13 @@ impl Provider for AndroidProvider {
 
         if wipe {
             let avdmanager = self.avdmanager_path(&sdk_root);
-            let cmd = Command::new(avdmanager.display().to_string())
-                .args(["delete", "avd"])
-                .args(["-n", &row.avd_name]);
+            let cmd = self
+                .with_java(
+                    Command::new(avdmanager.display().to_string())
+                        .args(["delete", "avd"])
+                        .args(["-n", &row.avd_name]),
+                )
+                .await;
             let out = self.process.run(cmd).await?;
             // "There is no Android Virtual Device named '<name>'." — already gone out-of-band; the
             // end state (no AVD) is what we wanted, so treat it as success.
@@ -1309,7 +1350,12 @@ impl Provider for AndroidProvider {
         // Ground truth #1: on-disk AVDs.
         let list_out = self
             .process
-            .run(Command::new(avdmanager.display().to_string()).args(["list", "avd"]))
+            .run(
+                self.with_java(
+                    Command::new(avdmanager.display().to_string()).args(["list", "avd"]),
+                )
+                .await,
+            )
             .await?;
         let avds = parse_avdmanager_list_avd(&list_out.stdout);
         let on_disk: HashMap<&str, &AvdEntry> = avds.iter().map(|a| (a.name.as_str(), a)).collect();
@@ -1558,6 +1604,37 @@ impl AndroidProvider {
                 Err(_elapsed) => {} // no line this slice — loop, re-check deadline / boot state
             }
         }
+    }
+}
+
+/// Read `emulator -accel-check`. Real output when usable (macOS, exit 0, captured 2026-10-07 in
+/// `tests/fixtures/emulator-accel-check-macos.txt`): `accel:`, a numeric status (`0` = usable),
+/// a one-line explanation, then `accel`. Usable only when the process exits 0 *and* any numeric
+/// status line is `0`, so either signal alone can veto.
+fn parse_accel_check(out: &Output) -> AccelCheck {
+    let text = if out.stdout.trim().is_empty() {
+        &out.stderr
+    } else {
+        &out.stdout
+    };
+    let lines: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && *l != "accel:" && *l != "accel")
+        .collect();
+    let status_ok = lines
+        .iter()
+        .find(|l| l.chars().all(|c| c.is_ascii_digit()))
+        .is_none_or(|l| *l == "0");
+    let detail = lines
+        .iter()
+        .filter(|l| !l.chars().all(|c| c.is_ascii_digit()))
+        .copied()
+        .collect::<Vec<_>>()
+        .join(" ");
+    AccelCheck {
+        usable: out.success() && status_ok,
+        detail,
     }
 }
 
@@ -2175,6 +2252,83 @@ mod tests {
         };
         provider.launch(id, opts, &job()).await.expect("launch");
         // `on_spawn` needle matches only if `-skin` + `-skindir` were in the argv.
+    }
+
+    #[test]
+    fn accel_check_parses_the_real_emulator_output() {
+        let real = include_str!("../tests/fixtures/emulator-accel-check-macos.txt");
+        let usable = parse_accel_check(&ok(real));
+        assert!(usable.usable);
+        assert_eq!(usable.detail, "Hypervisor.Framework OS X Version 26.4");
+
+        // A non-zero exit and a non-zero status line each veto on their own.
+        let refused = Output {
+            status: 1,
+            ..ok("accel:\n1\nWHPX is not installed\naccel\n")
+        };
+        let check = parse_accel_check(&refused);
+        assert!(!check.usable);
+        assert_eq!(check.detail, "WHPX is not installed");
+        assert!(!parse_accel_check(&ok("accel:\n2\nsomething off\naccel\n")).usable);
+    }
+
+    #[tokio::test]
+    async fn accel_check_asks_the_installed_emulator() {
+        let process = FakeProcessRunner::new().on_run(
+            "emulator -accel-check",
+            ok("accel:\n0\nWHPX(10.0.22631) is installed and usable.\naccel\n"),
+        );
+        let (provider, _dir) = provider_with(process, InMemoryFs::new()).await;
+        let check = provider.accel_check().await.expect("emulator is installed");
+        assert!(check.usable);
+    }
+
+    #[tokio::test]
+    async fn accel_check_is_none_when_the_emulator_is_not_installed() {
+        let dir = tempfile::tempdir().unwrap();
+        let provider = AndroidProvider::new(
+            Arc::new(FakeProcessRunner::new()),
+            Arc::new(InMemoryFs::new()),
+            Registry::open(dir.path()).await.unwrap(),
+            PathBuf::from("/data"),
+            HostOs::Linux,
+        );
+        assert_eq!(provider.accel_check().await, None);
+    }
+
+    #[tokio::test]
+    async fn avdmanager_runs_on_the_jdk_recorded_during_setup() {
+        let fs = InMemoryFs::new();
+        fs.write_atomic(Path::new("/data/jdk/java_home"), b"/data/jdk/temurin-17")
+            .await
+            .unwrap();
+        fs.write_atomic(Path::new("/data/jdk/temurin-17/bin/java"), b"")
+            .await
+            .unwrap();
+        let process = Arc::new(FakeProcessRunner::new().on_run("avdmanager list avd", ok("")));
+        let dir = tempfile::tempdir().unwrap();
+        let registry = Registry::open(dir.path()).await.unwrap();
+        fs.write_atomic(
+            Path::new("/data/sdk/cmdline-tools/latest/bin/sdkmanager"),
+            b"#!/bin/sh",
+        )
+        .await
+        .unwrap();
+        let provider = AndroidProvider::new(
+            process.clone(),
+            Arc::new(fs),
+            registry,
+            PathBuf::from("/data"),
+            HostOs::Linux,
+        );
+
+        provider.list_avd_entries().await;
+
+        let calls = process.calls();
+        assert_eq!(
+            calls[0].env,
+            [("JAVA_HOME".to_string(), "/data/jdk/temurin-17".to_string())]
+        );
     }
 
     #[tokio::test]

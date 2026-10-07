@@ -3,7 +3,7 @@
 //! The native probe ([`crate::probe`]) fills this in per OS; unit tests fabricate it, so the
 //! verdict/fixes derivation never has to touch real hardware.
 
-use emu_core::model::host::Virtualization;
+use emu_core::model::host::{AccelCheck, Virtualization};
 
 /// Raw host facts, gathered once, in a form the pure [`build_report`](crate::build_report) can
 /// reason about.
@@ -17,6 +17,9 @@ pub struct HostSignals {
     pub virtualization: Virtualization,
     /// What the OS-specific accelerator probe found (KVM / HVF / WHPX / AEHD).
     pub accel: AccelSignal,
+    /// The emulator's own `-accel-check` verdict, when the emulator is installed. Overrides the
+    /// OS-level guesses above: it is exactly what the emulator will do at launch.
+    pub emulator_check: Option<AccelCheck>,
     /// Total system RAM in bytes; `0` when it couldn't be read.
     pub ram_bytes: u64,
     /// Free space on the data-directory volume in bytes; `0` when it couldn't be read.

@@ -21,7 +21,8 @@ const DISK_LOW_BYTES: u64 = 25 * 1024 * 1024 * 1024;
 
 /// Turn raw signals into the full [`HostReport`] the UI renders.
 #[must_use]
-pub fn build_report(s: &HostSignals) -> HostReport {
+pub fn build_report(signals: &HostSignals) -> HostReport {
+    let s = &with_emulator_verdict(signals);
     let kind = accelerator_kind_for(&s.os);
     let status = accelerator_status(s.accel);
     let fixes = fixes_for(kind, s);
@@ -37,6 +38,25 @@ pub fn build_report(s: &HostSignals) -> HostReport {
         verdict,
         fixes,
     }
+}
+
+/// Fold the emulator's own `-accel-check` into the OS-level guesses. A usable result clears a
+/// false "virtualization is off" (on Windows with Hyper-V running, the firmware flag reads
+/// `false` even though virtualization is on — the usual case on managed work PCs); an unusable
+/// one means whatever the guesses said, acceleration is not available.
+fn with_emulator_verdict(s: &HostSignals) -> HostSignals {
+    let mut out = s.clone();
+    match &s.emulator_check {
+        Some(check) if check.usable => {
+            out.virtualization = Virtualization::Enabled;
+            out.accel = AccelSignal::Ready;
+        }
+        Some(_) if matches!(out.accel, AccelSignal::Ready | AccelSignal::Unknown) => {
+            out.accel = AccelSignal::Missing;
+        }
+        _ => {}
+    }
+    out
 }
 
 /// The accelerator the Android emulator uses on this OS.
@@ -80,10 +100,15 @@ fn gb(bytes: u64) -> String {
 }
 
 fn verdict_for(kind: AcceleratorKind, status: AcceleratorStatus, s: &HostSignals) -> Verdict {
-    if s.virtualization == Virtualization::DisabledInFirmware {
+    // The emulator's own check is the only thing allowed to say "can't".
+    if let Some(check) = s.emulator_check.as_ref().filter(|c| !c.usable) {
         return Verdict::CannotRun {
-            reason: "hardware virtualization is turned off in your firmware (BIOS/UEFI)"
-                .to_string(),
+            reason: format!(
+                "the Android emulator reports that {} can't be used on this computer ({}) — x86 \
+                 emulators won't start without it",
+                kind_label(kind),
+                check.detail
+            ),
         };
     }
     if s.ram_bytes > 0 && s.ram_bytes < RAM_FLOOR_BYTES {
@@ -102,10 +127,18 @@ fn verdict_for(kind: AcceleratorKind, status: AcceleratorStatus, s: &HostSignals
             ),
         };
     }
+    // Without an emulator to ask, these are guesses — warn, never block.
+    if s.virtualization == Virtualization::DisabledInFirmware {
+        return Verdict::Degraded {
+            reason: "hardware virtualization looks turned off in your BIOS/UEFI — emulators may \
+                     not start until it's on"
+                .to_string(),
+        };
+    }
     if status == AcceleratorStatus::Missing {
-        return Verdict::CannotRun {
+        return Verdict::Degraded {
             reason: format!(
-                "{} isn't available — an emulator would be far too slow to use without it",
+                "{} doesn't look available — emulators may not start or will be very slow",
                 kind_label(kind)
             ),
         };
@@ -142,7 +175,8 @@ fn verdict_for(kind: AcceleratorKind, status: AcceleratorStatus, s: &HostSignals
 fn fixes_for(kind: AcceleratorKind, s: &HostSignals) -> Vec<Fix> {
     let mut fixes = Vec::new();
 
-    if s.virtualization == Virtualization::DisabledInFirmware {
+    let emulator_refused = s.emulator_check.as_ref().is_some_and(|c| !c.usable);
+    if s.virtualization == Virtualization::DisabledInFirmware || emulator_refused {
         fixes.push(Fix {
             id: "enable-virtualization".to_string(),
             title: "Enable virtualization in your BIOS/UEFI".to_string(),
@@ -150,7 +184,9 @@ fn fixes_for(kind: AcceleratorKind, s: &HostSignals) -> Vec<Fix> {
             needs_reboot: true,
             description: "Reboot into firmware setup and turn on Intel VT-x / AMD-V (sometimes \
                           labelled \"SVM Mode\" or \"Virtualization Technology\"). Emulator Studio \
-                          can't change a firmware setting for you."
+                          can't change a firmware setting for you. On a work-managed computer this \
+                          is often locked by policy — ask your IT team to allow virtualization \
+                          (and the Windows Hypervisor Platform on Windows)."
                 .to_string(),
         });
     }
@@ -201,6 +237,8 @@ fn fixes_for(kind: AcceleratorKind, s: &HostSignals) -> Vec<Fix> {
 
 #[cfg(test)]
 mod tests {
+    use emu_core::model::host::AccelCheck;
+
     use super::*;
 
     fn healthy_mac() -> HostSignals {
@@ -211,6 +249,7 @@ mod tests {
             accel: AccelSignal::Ready,
             ram_bytes: 32 * 1024 * 1024 * 1024,
             disk_free_bytes: 400 * 1_000_000_000,
+            emulator_check: None,
         }
     }
 
@@ -224,7 +263,7 @@ mod tests {
     }
 
     #[test]
-    fn ci_runner_without_virtualization_cannot_run_and_offers_the_bios_fix() {
+    fn firmware_flag_alone_warns_and_offers_the_bios_fix_but_never_blocks() {
         let s = HostSignals {
             os: "linux".to_string(),
             arch: "x86_64".to_string(),
@@ -232,11 +271,13 @@ mod tests {
             accel: AccelSignal::Missing,
             ram_bytes: 16 * 1024 * 1024 * 1024,
             disk_free_bytes: 100 * 1_000_000_000,
+            emulator_check: None,
         };
         let r = build_report(&s);
-        assert!(matches!(r.verdict, Verdict::CannotRun { .. }));
-        if let Verdict::CannotRun { reason } = &r.verdict {
-            assert!(reason.contains("firmware"));
+        // A guess (no emulator to ask yet) must not block anyone.
+        assert!(matches!(r.verdict, Verdict::Degraded { .. }));
+        if let Verdict::Degraded { reason } = &r.verdict {
+            assert!(reason.contains("BIOS"));
         }
         assert!(r
             .fixes
@@ -253,6 +294,7 @@ mod tests {
             accel: AccelSignal::NoPermission,
             ram_bytes: 16 * 1024 * 1024 * 1024,
             disk_free_bytes: 100 * 1_000_000_000,
+            emulator_check: None,
         };
         let r = build_report(&s);
         assert!(matches!(r.verdict, Verdict::Degraded { .. }));
@@ -266,7 +308,7 @@ mod tests {
     }
 
     #[test]
-    fn whpx_missing_cannot_run_with_a_reboot_fix() {
+    fn whpx_missing_is_degraded_with_a_reboot_fix() {
         let s = HostSignals {
             os: "windows".to_string(),
             arch: "x86_64".to_string(),
@@ -274,9 +316,10 @@ mod tests {
             accel: AccelSignal::Missing,
             ram_bytes: 16 * 1024 * 1024 * 1024,
             disk_free_bytes: 100 * 1_000_000_000,
+            emulator_check: None,
         };
         let r = build_report(&s);
-        assert!(matches!(r.verdict, Verdict::CannotRun { .. }));
+        assert!(matches!(r.verdict, Verdict::Degraded { .. }));
         let fix = r
             .fixes
             .iter()
@@ -319,8 +362,51 @@ mod tests {
             accel: AccelSignal::Unknown,
             ram_bytes: 0,
             disk_free_bytes: 0,
+            emulator_check: None,
         };
         // Nothing is known to be wrong → not a CannotRun.
         assert_eq!(build_report(&s).verdict, Verdict::CanAccelerate);
+    }
+
+    fn windows_with_hyper_v() -> HostSignals {
+        // `Win32_Processor.VirtualizationFirmwareEnabled` reads false while Hyper-V is running.
+        HostSignals {
+            os: "windows".to_string(),
+            arch: "x86_64".to_string(),
+            virtualization: Virtualization::DisabledInFirmware,
+            accel: AccelSignal::Unknown,
+            ram_bytes: 16 * 1024 * 1024 * 1024,
+            disk_free_bytes: 100 * 1_000_000_000,
+            emulator_check: None,
+        }
+    }
+
+    #[test]
+    fn a_usable_emulator_check_clears_a_false_firmware_warning() {
+        let mut s = windows_with_hyper_v();
+        s.emulator_check = Some(AccelCheck {
+            usable: true,
+            detail: "WHPX is installed and usable.".to_string(),
+        });
+        let r = build_report(&s);
+        assert_eq!(r.verdict, Verdict::CanAccelerate);
+        assert_eq!(r.virtualization, Virtualization::Enabled);
+        assert!(r.fixes.is_empty());
+    }
+
+    #[test]
+    fn an_unusable_emulator_check_is_the_only_hard_block() {
+        let mut s = windows_with_hyper_v();
+        s.emulator_check = Some(AccelCheck {
+            usable: false,
+            detail: "WHPX is not installed".to_string(),
+        });
+        let r = build_report(&s);
+        let Verdict::CannotRun { reason } = &r.verdict else {
+            panic!("expected CannotRun, got {:?}", r.verdict);
+        };
+        assert!(reason.contains("WHPX is not installed"));
+        assert!(r.fixes.iter().any(|f| f.id == "enable-virtualization"));
+        assert!(r.fixes.iter().any(|f| f.id == "enable-whpx"));
     }
 }

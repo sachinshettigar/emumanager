@@ -11,8 +11,9 @@
 //! Steps, each skipped when already satisfied:
 //! 1. Bail out early if nothing in `wanted` is missing (checked against `state`, which already
 //!    folded in any existing *system* SDK — see [`super::installed_state`]) — a true no-op.
-//! 2. A system JDK 17+ check (`java -version`) — see `docs/adr/0006-require-system-jdk.md`. Only
-//!    reached once we know real work is needed.
+//! 2. Make sure a JDK 17+ exists — reuse one already on the machine, otherwise download Temurin 17
+//!    (see [`super::jdk`] and `docs/adr/0008-resolve-or-download-jdk.md`). Only reached once we
+//!    know real work is needed.
 //! 3. If `cmdline-tools` is missing: download it (SHA-1-verified against the catalog, task 0010)
 //!    and unpack it into `<data_dir>/sdk/cmdline-tools/latest`.
 //! 4. `sdkmanager --licenses`, feeding enough `y` answers to accept every current license.
@@ -24,20 +25,21 @@ use std::path::{Path, PathBuf};
 use sha1::{Digest, Sha1};
 
 use crate::error::{CoreError, Result};
-use crate::model::component::{Component, ComponentId, HostOs};
+use crate::model::component::{Component, ComponentId, HostArch, HostOs};
 use crate::model::job::{JobHandle, Progress};
 use crate::ports::{Command, Downloader, Fs, Output, ProcessRunner};
 
 use super::installed_state::{self, InstalledState};
+use super::jdk;
 
 /// The leaf ports `bootstrap` needs, bundled by reference. A plain struct, not a new trait —
 /// `bootstrap` is a free function over the existing four ports, same as everything else here.
 pub struct BootstrapPorts<'a> {
     /// Filesystem access, for the app-managed `sdk/` dir.
     pub fs: &'a dyn Fs,
-    /// Fetches the `cmdline-tools` archive.
+    /// Fetches the `cmdline-tools` archive (and the JDK when the machine has none).
     pub downloader: &'a dyn Downloader,
-    /// Runs `java`, `sdkmanager`, and (on Unix) `chmod`.
+    /// Runs `java`, `sdkmanager`, and (on Unix) `chmod` / `tar`.
     pub process: &'a dyn ProcessRunner,
 }
 
@@ -69,7 +71,19 @@ pub async fn bootstrap(
         return Ok(());
     }
 
-    ensure_jdk(ports.process).await?;
+    let jdk = jdk::ensure(
+        data_dir,
+        os,
+        HostArch::current(),
+        &|k| std::env::var(k).ok(),
+        ports,
+        job,
+    )
+    .await?;
+    let java_env = jdk
+        .java_home
+        .as_ref()
+        .map(|h| ("JAVA_HOME".to_string(), h.display().to_string()));
 
     let app_sdk_dir = data_dir.join("sdk");
     ports.fs.ensure_dir(&app_sdk_dir).await?;
@@ -100,10 +114,17 @@ pub async fn bootstrap(
 
     // A license must be accepted before `sdkmanager` installs anything — needed whether we just
     // unpacked a brand-new `cmdline-tools` or are reusing one `state` already found.
-    accept_licenses(&sdkmanager, ports.process, job).await?;
+    accept_licenses(&sdkmanager, java_env.as_ref(), ports.process, job).await?;
 
     if !remaining_pkgs.is_empty() {
-        install_packages(&sdkmanager, &remaining_pkgs, ports.process, job).await?;
+        install_packages(
+            &sdkmanager,
+            &remaining_pkgs,
+            java_env.as_ref(),
+            ports.process,
+            job,
+        )
+        .await?;
     }
 
     Ok(())
@@ -126,55 +147,6 @@ fn sdkmanager_path(
             .map_or_else(|| app_sdk_dir.to_path_buf(), |l| l.sdk_root.clone())
     };
     root.join(installed_state::marker_file(ComponentId::CmdlineTools, os))
-}
-
-/// A system JDK 17+ is required — `cmdline-tools` is a `java` wrapper script, not a standalone
-/// binary, and Google stopped shipping one to bundle (`docs/adr/0006-require-system-jdk.md`).
-/// Checked with `java -version` (real OpenJDK/Oracle builds print the version line to **stderr**,
-/// not stdout — verified against a real JDK 21 install, 2026-09-05) rather than guessed.
-async fn ensure_jdk(process: &dyn ProcessRunner) -> Result<()> {
-    let output = process
-        .run(Command::new("java").arg("-version"))
-        .await
-        .map_err(|_| jdk_missing_err())?;
-    let text = if output.stderr.is_empty() {
-        &output.stdout
-    } else {
-        &output.stderr
-    };
-    match parse_java_major_version(text) {
-        Some(major) if major >= 17 => Ok(()),
-        Some(major) => Err(CoreError::Unsupported(format!(
-            "found a JDK, but it's version {major}; Emulator Studio needs JDK 17 or newer on PATH or \
-             JAVA_HOME (docs/adr/0006-require-system-jdk.md)"
-        ))),
-        None => Err(jdk_missing_err()),
-    }
-}
-
-fn jdk_missing_err() -> CoreError {
-    CoreError::Unsupported(
-        "no JDK 17+ found on PATH or JAVA_HOME; install one (e.g. Eclipse Temurin 17+) and set \
-         JAVA_HOME, then retry — Emulator Studio does not bundle a JRE \
-         (docs/adr/0006-require-system-jdk.md)"
-            .to_string(),
-    )
-}
-
-/// Parse the major version out of `java -version`'s `"..."`-quoted version string. Handles both
-/// the pre-JDK9 scheme (`"1.8.0_372"` = Java 8) and the JEP 223 scheme (`"17.0.9"`, `"21"`).
-fn parse_java_major_version(text: &str) -> Option<u32> {
-    let start = text.find('"')? + 1;
-    let rest = &text[start..];
-    let end = rest.find('"')?;
-    let ver = &rest[..end];
-    let mut segments = ver.split(['.', '_']);
-    let first: u32 = segments.next()?.parse().ok()?;
-    if first == 1 {
-        segments.next()?.parse().ok()
-    } else {
-        Some(first)
-    }
 }
 
 /// Download `cmdline-tools;latest`, verify it against the catalog's SHA-1 (task 0010 — Google's
@@ -216,12 +188,12 @@ async fn fetch_and_extract_cmdline_tools(
 }
 
 /// One file or directory read out of the archive, fully owned — no `zip`-crate type survives past
-/// [`read_cmdline_tools_zip`].
-struct ExtractedEntry {
-    /// Path relative to `cmdline-tools/latest/` (the archive's own leading segment stripped).
-    relative: PathBuf,
-    is_dir: bool,
-    contents: Vec<u8>,
+/// [`read_zip_stripping_top_dir`].
+pub(super) struct ExtractedEntry {
+    /// Path relative to the archive's own single top-level folder (that segment stripped).
+    pub(super) relative: PathBuf,
+    pub(super) is_dir: bool,
+    pub(super) contents: Vec<u8>,
 }
 
 /// Read every entry out of the archive into memory, synchronously, with no `.await` anywhere in
@@ -240,7 +212,7 @@ struct ExtractedEntry {
 /// archive while building this task — see the task file's Notes) and must be *renamed* to
 /// `latest/`: that placement is an Android convention the zip itself does not encode, so the
 /// leading path segment is stripped here rather than trusted from the archive.
-fn read_cmdline_tools_zip(zip_bytes: &[u8]) -> Result<Vec<ExtractedEntry>> {
+pub(super) fn read_zip_stripping_top_dir(zip_bytes: &[u8]) -> Result<Vec<ExtractedEntry>> {
     let mut archive =
         zip::ZipArchive::new(std::io::Cursor::new(zip_bytes)).map_err(|e| extract_err(&e))?;
     let mut entries = Vec::with_capacity(archive.len());
@@ -296,10 +268,10 @@ async fn extract_cmdline_tools(
     // path. `zip_bytes` is copied once into the blocking task rather than borrowed, since a
     // `'static` future can't hold a borrow of the caller's stack.
     let owned_bytes = zip_bytes.to_vec();
-    let entries = tokio::task::spawn_blocking(move || read_cmdline_tools_zip(&owned_bytes))
+    let entries = tokio::task::spawn_blocking(move || read_zip_stripping_top_dir(&owned_bytes))
         .await
         .map_err(|e| CoreError::Invalid {
-            what: "cmdline-tools archive",
+            what: "downloaded archive",
             detail: format!("extraction task panicked: {e}"),
         })??;
 
@@ -382,6 +354,7 @@ fn process_err(sdkmanager: &Path, output: &Output) -> CoreError {
 /// pattern, bounded instead of infinite.
 async fn accept_licenses(
     sdkmanager: &Path,
+    java_env: Option<&(String, String)>,
     process: &dyn ProcessRunner,
     job: &JobHandle,
 ) -> Result<()> {
@@ -390,10 +363,13 @@ async fn accept_licenses(
         ..Progress::empty()
     });
     let stdin = "y\n".repeat(LICENSE_ACCEPT_COUNT).into_bytes();
-    let cmd = Command {
-        stdin: Some(stdin),
-        ..Command::new(sdkmanager.display().to_string()).arg("--licenses")
-    };
+    let cmd = with_env(
+        Command {
+            stdin: Some(stdin),
+            ..Command::new(sdkmanager.display().to_string()).arg("--licenses")
+        },
+        java_env,
+    );
     let output = run_streamed(cmd, process, job).await?;
     if output.success() {
         Ok(())
@@ -408,6 +384,7 @@ async fn accept_licenses(
 async fn install_packages(
     sdkmanager: &Path,
     packages: &[&str],
+    java_env: Option<&(String, String)>,
     process: &dyn ProcessRunner,
     job: &JobHandle,
 ) -> Result<()> {
@@ -415,12 +392,24 @@ async fn install_packages(
         phase: Some(format!("Downloading & installing {}", packages.join(", "))),
         ..Progress::empty()
     });
-    let cmd = Command::new(sdkmanager.display().to_string()).args(packages.iter().copied());
+    let cmd = with_env(
+        Command::new(sdkmanager.display().to_string()).args(packages.iter().copied()),
+        java_env,
+    );
     let output = run_streamed(cmd, process, job).await?;
     if output.success() {
         Ok(())
     } else {
         Err(process_err(sdkmanager, &output))
+    }
+}
+
+/// Pin `JAVA_HOME` on a `sdkmanager` invocation so the JDK we chose is the one it runs on, even
+/// when the user's shell has a stale or too-old `JAVA_HOME`.
+fn with_env(cmd: Command, java_env: Option<&(String, String)>) -> Command {
+    match java_env {
+        Some((k, v)) => cmd.env(k, v),
+        None => cmd,
     }
 }
 
@@ -436,7 +425,7 @@ fn hex_sha1(bytes: &[u8]) -> String {
 
 fn extract_err(e: &zip::result::ZipError) -> CoreError {
     CoreError::Invalid {
-        what: "cmdline-tools archive",
+        what: "downloaded archive",
         detail: e.to_string(),
     }
 }
@@ -527,7 +516,7 @@ mod tests {
 
         let downloader = FakeDownloader::new().stub(url, zip_bytes.clone());
         let process = FakeProcessRunner::new()
-            .on_run("java -version", jdk_ok())
+            .on_run("java -XshowSettings:properties -version", jdk_ok())
             .on_run("chmod -R +x", ok(""))
             .on_spawn(
                 "sdkmanager --licenses",
@@ -677,7 +666,8 @@ mod tests {
         };
         let fs = InMemoryFs::new();
         let downloader = FakeDownloader::new(); // no stub registered for the URL
-        let process = FakeProcessRunner::new().on_run("java -version", jdk_ok());
+        let process =
+            FakeProcessRunner::new().on_run("java -XshowSettings:properties -version", jdk_ok());
         let ports = BootstrapPorts {
             fs: &fs,
             downloader: &downloader,
@@ -699,7 +689,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn missing_jdk_fails_fast_before_any_download() {
+    async fn no_jdk_and_no_download_fails_before_cmdline_tools_is_fetched() {
         let cmdline_tools = Component {
             id: ComponentId::CmdlineTools,
             version: "19.0".into(),
@@ -709,8 +699,9 @@ mod tests {
         };
         let fs = InMemoryFs::new();
         let downloader = FakeDownloader::new();
-        // `run` for "java -version" has no rule -> FakeProcessRunner errors -> ensure_jdk maps it
-        // to the "no JDK found" error, same as a real "command not found".
+        // No rule for `java` -> FakeProcessRunner errors, like a real "command not found". Every
+        // reuse path then misses, so the managed-JDK download is attempted — and, with no stub for
+        // the Adoptium API, fails before `cmdline-tools` is ever fetched.
         let process = FakeProcessRunner::new();
         let ports = BootstrapPorts {
             fs: &fs,
@@ -729,24 +720,7 @@ mod tests {
         )
         .await
         .unwrap_err();
-        assert_eq!(err.code(), "unsupported");
+        assert_eq!(err.code(), "download_failed");
         assert!(downloader.fetched().is_empty());
-    }
-
-    #[test]
-    fn java_version_parsing_handles_both_schemes() {
-        assert_eq!(
-            parse_java_major_version("openjdk version \"21\" 2023-09-19"),
-            Some(21)
-        );
-        assert_eq!(
-            parse_java_major_version("java version \"17.0.9\" 2023-10-17"),
-            Some(17)
-        );
-        assert_eq!(
-            parse_java_major_version("java version \"1.8.0_372\""),
-            Some(8)
-        );
-        assert_eq!(parse_java_major_version("not a version string"), None);
     }
 }

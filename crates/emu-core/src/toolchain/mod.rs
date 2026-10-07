@@ -3,11 +3,13 @@
 //! already has instead of re-downloading it.
 //!
 //! - [`installed_state`] — what's on disk right now, app-managed *and* any existing system SDK.
+//! - [`jdk`] — find a JDK 17+ already on the machine, or download one.
 //! - [`bootstrap`] — fetch + unpack `cmdline-tools`, accept licenses, install the rest.
 //! - [`uninstall`] — the inverse: `sdkmanager --uninstall` for one app-managed component.
 
 pub mod bootstrap;
 pub mod installed_state;
+pub mod jdk;
 pub mod uninstall;
 
 pub use bootstrap::{bootstrap, BootstrapPorts};

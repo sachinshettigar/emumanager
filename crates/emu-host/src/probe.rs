@@ -37,6 +37,7 @@ impl NativeHostProbe {
             arch: std::env::consts::ARCH.to_string(),
             virtualization,
             accel,
+            emulator_check: None,
             ram_bytes,
             disk_free_bytes,
         }
@@ -137,28 +138,41 @@ fn platform_probe() -> (Virtualization, AccelSignal) {
         .filter(|o| o.status.success())
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_lowercase());
 
-    let virt_fw = std::process::Command::new("powershell")
+    // `VirtualizationFirmwareEnabled` reads `False` whenever a hypervisor (Hyper-V, VBS, WSL2,
+    // Windows Sandbox — standard on managed work PCs) already owns the CPU feature, even though
+    // virtualization is on. `HypervisorPresent` tells the two apart; see
+    // [`windows_virtualization`].
+    let virt = std::process::Command::new("powershell")
         .args([
             "-NoProfile",
             "-Command",
-            "(Get-CimInstance Win32_Processor).VirtualizationFirmwareEnabled",
+            "\"$($(Get-CimInstance Win32_Processor | Select-Object -First 1).VirtualizationFirmwareEnabled)|$((Get-CimInstance Win32_ComputerSystem).HypervisorPresent)\"",
         ])
         .output()
         .ok()
         .filter(|o| o.status.success())
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_lowercase());
 
-    let virtualization = match virt_fw.as_deref() {
-        Some("true") => Virtualization::Enabled,
-        Some("false") => Virtualization::DisabledInFirmware,
-        _ => Virtualization::Unknown,
-    };
+    let virtualization = windows_virtualization(virt.as_deref().unwrap_or_default());
     let accel = match feature.as_deref() {
         Some("enabled") => AccelSignal::Ready,
         Some("disabled") => AccelSignal::Missing,
         _ => AccelSignal::Unknown,
     };
     (virtualization, accel)
+}
+
+/// Interpret `"<VirtualizationFirmwareEnabled>|<HypervisorPresent>"` (`PowerShell` booleans,
+/// lower-cased). A running hypervisor means virtualization is on no matter what the firmware flag
+/// says; only "flag false and no hypervisor" is genuinely switched off.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn windows_virtualization(text: &str) -> Virtualization {
+    let (firmware, hypervisor) = text.split_once('|').unwrap_or((text, ""));
+    match (firmware.trim(), hypervisor.trim()) {
+        (_, "true") | ("true", _) => Virtualization::Enabled,
+        ("false", _) => Virtualization::DisabledInFirmware,
+        _ => Virtualization::Unknown,
+    }
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
@@ -176,6 +190,24 @@ mod tests {
         let s = probe.gather();
         assert!(["linux", "macos", "windows"].contains(&s.os.as_str()) || !s.os.is_empty());
         assert!(!s.arch.is_empty());
+    }
+
+    #[test]
+    fn a_running_hypervisor_means_virtualization_is_on() {
+        // The managed-work-PC case: Hyper-V owns the CPU feature so the firmware flag reads False.
+        assert_eq!(
+            windows_virtualization("false|true"),
+            Virtualization::Enabled
+        );
+        assert_eq!(
+            windows_virtualization("true|false"),
+            Virtualization::Enabled
+        );
+        assert_eq!(
+            windows_virtualization("false|false"),
+            Virtualization::DisabledInFirmware
+        );
+        assert_eq!(windows_virtualization(""), Virtualization::Unknown);
     }
 
     #[tokio::test]

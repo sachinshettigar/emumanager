@@ -9,8 +9,8 @@
 //! just test-integration
 //! ```
 //!
-//! Needs real network access and a JDK 17+ already on `PATH`/`JAVA_HOME`
-//! (`docs/adr/0006-require-system-jdk.md`) — this test does not install one.
+//! Needs real network access. A JDK 17+ is reused if the machine has one; otherwise `bootstrap`
+//! downloads Temurin 17 itself (`docs/adr/0008-resolve-or-download-jdk.md`).
 //!
 //! `emu-core` must never depend on `tauri` (AGENTS.md §6.1), so this can't reuse `src-tauri`'s
 //! real `NativeFs`/`NativeDownloader`/`NativeProcessRunner` (task 0011) directly. The impls below
