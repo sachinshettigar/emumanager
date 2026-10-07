@@ -115,7 +115,7 @@ function EmulatorRow({ emulator }: { emulator: EmulatorInfo }): React.JSX.Elemen
   const host = useHostReport();
   const exportFile = useExportProfileToFile();
   const isRunningOrBooting = emulator.state === "running" || emulator.state === "booting";
-  const blocked = host.data?.verdict === "cannotRun";
+  const warn = host.data?.verdict === "cannotRun";
   const busy = launch.isPending || stop.isPending;
 
   return (
@@ -178,8 +178,8 @@ function EmulatorRow({ emulator }: { emulator: EmulatorInfo }): React.JSX.Elemen
           <button
             type="button"
             data-testid={`launch-${emulator.id}`}
-            disabled={busy || blocked}
-            title={blocked ? host.data?.verdictReason : undefined}
+            disabled={busy}
+            title={warn ? host.data?.verdictReason : undefined}
             onClick={() => {
               launch.mutate(emulator.id);
             }}
@@ -189,12 +189,12 @@ function EmulatorRow({ emulator }: { emulator: EmulatorInfo }): React.JSX.Elemen
           </button>
         )}
       </div>
-      {blocked && !isRunningOrBooting ? (
+      {warn && !isRunningOrBooting ? (
         <span
-          data-testid={`launch-blocked-${emulator.id}`}
-          className="ml-3 shrink-0 text-[11px] text-danger"
+          data-testid={`launch-warning-${emulator.id}`}
+          className="ml-3 shrink-0 text-[11px] text-attention"
         >
-          {host.data?.verdictReason}
+          {host.data?.verdictReason} — you can still try.
         </span>
       ) : null}
     </li>

@@ -5,6 +5,15 @@ Narrative companion to `.agent/state.json`. Update both together (see
 
 ## Current state
 
+- **`0041` (Java auto-setup + acceleration check) done** (session 13): found on a fresh Windows
+  work PC. (1) **No Java no longer stops setup** — `toolchain::jdk::ensure` reuses any JDK 17+
+  (remembered → `JAVA_HOME` → `PATH` → well-known dirs incl. Android Studio's JBR) and otherwise
+  downloads checksum-verified Temurin 17 into the app data dir; `JAVA_HOME` is pinned on every
+  `sdkmanager`/`avdmanager` call (ADR 0008 supersedes 0006). (2) **"Virtualization is off" was a
+  false positive** on machines running Hyper-V — the Windows probe now trusts `HypervisorPresent`,
+  and once the emulator is installed `emulator -accel-check` is the authority. Only that check
+  can say "can't run"; Launch is never disabled by a guess, a warning is shown instead.
+  (3) *Install all* is a full-width primary button below the component list.
 - **`0040` (keyboard + logcat readability) done** (session 12): three fixes from live-testing
   the 0039 build. (1) **The desktop keyboard now types into the emulator** — every `launch`
   rewrites the AVD's `config.ini` to `hw.keyboard=yes` (best-effort; `avdmanager` omits the key

@@ -91,7 +91,7 @@ export function EmulatorDetail(): React.JSX.Element {
   }
 
   const isRunningOrBooting = d.state === "running" || d.state === "booting";
-  const hostBlocked = host.data?.verdict === "cannotRun";
+  const hostWarning = host.data?.verdict === "cannotRun";
   const busy =
     rename.isPending ||
     editHardware.isPending ||
@@ -280,8 +280,8 @@ export function EmulatorDetail(): React.JSX.Element {
           <button
             type="button"
             data-testid="launch-button"
-            disabled={launch.isPending || hostBlocked}
-            title={hostBlocked ? host.data?.verdictReason : undefined}
+            disabled={launch.isPending}
+            title={hostWarning ? host.data?.verdictReason : undefined}
             onClick={() => {
               launch.mutate(id);
             }}
@@ -290,9 +290,9 @@ export function EmulatorDetail(): React.JSX.Element {
             Launch
           </button>
         )}
-        {hostBlocked && !isRunningOrBooting ? (
-          <span data-testid="launch-blocked" className="text-[12px] text-danger">
-            {host.data?.verdictReason}
+        {hostWarning && !isRunningOrBooting ? (
+          <span data-testid="launch-warning" className="text-[12px] text-attention">
+            {host.data?.verdictReason} — you can still try.
           </span>
         ) : null}
         <button

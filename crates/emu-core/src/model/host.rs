@@ -100,6 +100,17 @@ pub struct Fix {
     pub description: String,
 }
 
+/// The Android emulator's own answer to `emulator -accel-check` — the authority on whether
+/// hardware acceleration works on this machine right now (the OS-level probes are only guesses).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccelCheck {
+    /// `true` when the emulator reports acceleration as installed and usable.
+    pub usable: bool,
+    /// The emulator's one-line explanation (e.g. `Hypervisor.Framework OS X Version 26.4`).
+    pub detail: String,
+}
+
 /// Snapshot of host capabilities relevant to running emulators.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

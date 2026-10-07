@@ -318,24 +318,33 @@ export function Dependencies(): React.JSX.Element {
     );
   }
 
+  const missingBytes =
+    components?.filter((c) => !c.installed).reduce((sum, c) => sum + c.sizeBytes, 0) ?? 0;
+
   return (
-    <Screen
-      title="Dependencies & SDK"
-      actions={
-        missingCount > 1 && !allInstalled ? (
+    <Screen title="Dependencies & SDK">
+      {body}
+
+      {missingCount > 1 && !allInstalled ? (
+        <div className="flex flex-col gap-1.5">
           <button
             type="button"
             data-testid="install-button"
             onClick={handleInstall}
             disabled={installing || isPending}
-            className="rounded-md bg-primary px-3.5 py-2 text-[13px] font-medium text-white disabled:opacity-50"
+            className="w-full rounded-card bg-primary px-5 py-3.5 text-[15px] font-semibold text-white shadow-sm transition hover:brightness-110 disabled:opacity-60"
           >
-            {installing ? "Installing…" : `Install all (${String(missingCount)})`}
+            {installing
+              ? "Installing…"
+              : `Install all ${String(missingCount)} missing components${
+                  missingBytes > 0 ? ` · ${formatSize(missingBytes)}` : ""
+                }`}
           </button>
-        ) : undefined
-      }
-    >
-      {body}
+          <p className="text-center text-[12px] text-muted">
+            Java is set up automatically if your computer doesn&apos;t already have it.
+          </p>
+        </div>
+      ) : null}
 
       <RunProgress run={run} extraError={bootstrap.error?.ipc.message ?? null} />
 
@@ -347,9 +356,8 @@ export function Dependencies(): React.JSX.Element {
 
       <Placeholder>
         Components resolve live from Google&apos;s repository and install into Emulator
-        Studio&apos;s own data directory — no Android Studio, no terminal. A component already found
-        on this machine (an existing Android Studio SDK, for example) is reused, never
-        re-downloaded.
+        Studio&apos;s own data directory — no Android Studio, no terminal. Anything already on this
+        machine (an existing Android SDK or Java, for example) is reused, never re-downloaded.
       </Placeholder>
 
       <DiagnosticsRow />

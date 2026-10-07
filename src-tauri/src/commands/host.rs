@@ -10,7 +10,6 @@ use std::path::{Path, PathBuf};
 use emu_core::model::host::{
     AcceleratorKind, AcceleratorStatus, HostReport, Verdict, Virtualization,
 };
-use emu_core::ports::HostProbe as _;
 use emu_core::registry::HostSnapshotRow;
 use serde::Serialize;
 use tauri::{AppHandle, Manager as _, State};
@@ -135,13 +134,17 @@ pub async fn probe_host(
         .app_data_dir()
         .map_err(|e| IpcError::new("fs_error", format!("resolving the data directory: {e}")))?;
 
-    let report = emu_host::NativeHostProbe::new(data_dir)
-        .inspect()
-        .await
-        .map_err(IpcError::from)?;
+    // The OS-level probe is a guess; once the emulator is installed, its own `-accel-check`
+    // overrides it (it is exactly what a launch will do).
+    let mut signals = emu_host::NativeHostProbe::new(data_dir).gather();
+    let provider = mgr.get().await.ok();
+    if let Some(provider) = &provider {
+        signals.emulator_check = provider.accel_check().await;
+    }
+    let report = emu_host::build_report(&signals);
 
     // Snapshot it — never fatal to the probe itself.
-    if let Ok(provider) = mgr.get().await {
+    if let Some(provider) = &provider {
         if let Ok(json) = serde_json::to_string(&report) {
             let row = HostSnapshotRow {
                 id: emu_core::model::emulator::EmulatorId::generate().0,

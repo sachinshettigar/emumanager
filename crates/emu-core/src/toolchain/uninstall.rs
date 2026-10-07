@@ -15,11 +15,14 @@ use std::path::Path;
 use crate::error::{CoreError, Result};
 use crate::model::component::{ComponentId, HostOs};
 use crate::model::job::{JobHandle, Progress};
-use crate::ports::{Command, ProcessRunner};
+use crate::ports::{Command, Fs, ProcessRunner};
 use crate::toolchain::installed_state::{binary_path, InstalledState, SdkSource};
 
-/// Ports [`uninstall`] needs — just a process runner for `sdkmanager --uninstall`.
+/// Ports [`uninstall`] needs — a process runner for `sdkmanager --uninstall`, plus the filesystem
+/// to look up the JDK it should run on.
 pub struct UninstallPorts<'a> {
+    /// Reads which JDK `sdkmanager` should run on (see [`super::jdk::java_env`]).
+    pub fs: &'a dyn Fs,
     /// Runs `sdkmanager`.
     pub process: &'a dyn ProcessRunner,
 }
@@ -78,10 +81,13 @@ pub async fn uninstall(
 
     job.report(Progress::log(format!("removing {}", target.repo_path())));
 
-    let cmd = Command::new(sdkmanager.display().to_string())
+    let mut cmd = Command::new(sdkmanager.display().to_string())
         .arg("--uninstall")
         .arg(target.repo_path())
         .arg(format!("--sdk_root={}", app_sdk_dir.display()));
+    if let Some((k, v)) = super::jdk::java_env(ports.fs, data_dir, os).await {
+        cmd = cmd.env(k, v);
+    }
     let output = ports.process.run(cmd).await?;
 
     if output.success() {
@@ -103,7 +109,7 @@ mod tests {
     use super::*;
     use crate::model::job::JobId;
     use crate::ports::Output;
-    use crate::testing::FakeProcessRunner;
+    use crate::testing::{FakeProcessRunner, InMemoryFs};
     use crate::toolchain::installed_state::ComponentLocation;
 
     fn ok(stdout: &str) -> Output {
@@ -133,7 +139,10 @@ mod tests {
             app_managed(ComponentId::Emulator),
         ]);
         let process = FakeProcessRunner::new().on_run("sdkmanager --uninstall emulator", ok(""));
-        let ports = UninstallPorts { process: &process };
+        let ports = UninstallPorts {
+            fs: &InMemoryFs::new(),
+            process: &process,
+        };
 
         uninstall(
             Path::new("/data"),
@@ -158,7 +167,10 @@ mod tests {
     async fn removing_cmdline_tools_is_refused_without_touching_any_process() {
         let state = InstalledState::from_found(vec![app_managed(ComponentId::CmdlineTools)]);
         let process = FakeProcessRunner::new();
-        let ports = UninstallPorts { process: &process };
+        let ports = UninstallPorts {
+            fs: &InMemoryFs::new(),
+            process: &process,
+        };
 
         let err = uninstall(
             Path::new("/data"),
@@ -185,7 +197,10 @@ mod tests {
             },
         ]);
         let process = FakeProcessRunner::new();
-        let ports = UninstallPorts { process: &process };
+        let ports = UninstallPorts {
+            fs: &InMemoryFs::new(),
+            process: &process,
+        };
 
         let err = uninstall(
             Path::new("/data"),
@@ -205,7 +220,10 @@ mod tests {
     async fn removing_something_not_installed_is_a_noop() {
         let state = InstalledState::from_found(vec![app_managed(ComponentId::CmdlineTools)]);
         let process = FakeProcessRunner::new();
-        let ports = UninstallPorts { process: &process };
+        let ports = UninstallPorts {
+            fs: &InMemoryFs::new(),
+            process: &process,
+        };
 
         uninstall(
             Path::new("/data"),
@@ -225,7 +243,10 @@ mod tests {
         // emulator present but the command-line tools are gone — can't run `--uninstall`.
         let state = InstalledState::from_found(vec![app_managed(ComponentId::Emulator)]);
         let process = FakeProcessRunner::new();
-        let ports = UninstallPorts { process: &process };
+        let ports = UninstallPorts {
+            fs: &InMemoryFs::new(),
+            process: &process,
+        };
 
         let err = uninstall(
             Path::new("/data"),
@@ -260,7 +281,10 @@ mod tests {
                 stderr: "Warning: Package is in use".to_string(),
             },
         );
-        let ports = UninstallPorts { process: &process };
+        let ports = UninstallPorts {
+            fs: &InMemoryFs::new(),
+            process: &process,
+        };
 
         let err = uninstall(
             Path::new("/data"),
