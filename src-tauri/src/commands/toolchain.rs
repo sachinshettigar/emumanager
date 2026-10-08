@@ -78,7 +78,7 @@ const JOB_ID: &str = "toolchain-bootstrap";
 /// A human label for the UI. Matches on the real `sdkmanager` package path (not the enum
 /// discriminant directly — `ComponentId` is `#[non_exhaustive]`, so a match on it from outside
 /// `emu-core` needs a catch-all anyway; matching the stable path string doubles as that catch-all
-/// without silently mis-naming a variant this crate hasn't been updated to know about).
+/// without silently misnaming a variant this crate hasn't been updated to know about).
 fn component_name(id: ComponentId) -> String {
     match id.repo_path() {
         "cmdline-tools;latest" => "cmdline-tools".to_string(),

@@ -26,7 +26,7 @@ pub struct EmulatorRow {
     pub display_name: String,
     /// Device profile the AVD was built from (empty for an adopted AVD whose profile is unknown).
     pub device_profile_id: String,
-    /// System image coordinate; `None` when unset/unparseable (e.g. a freshly adopted AVD).
+    /// System image coordinate; `None` when unset/unparsable (e.g. a freshly adopted AVD).
     pub image_coord: Option<ImageCoord>,
     /// Hardware configuration.
     pub hardware: Hardware,
