@@ -17,3 +17,4 @@ emu = "emu"
 abi = "abi"
 Abi = "Abi"
 aarch = "aarch"
+PN = "PN"  # the "PNGs" plural splits into PN + Gs

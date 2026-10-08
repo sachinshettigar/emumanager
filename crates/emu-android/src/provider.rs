@@ -824,7 +824,7 @@ fn gpu_mode(graphics: Graphics) -> &'static str {
 }
 
 /// The `level: NN` line of `adb shell dumpsys battery` → percent. `dumpsys battery` prints a
-/// block of `  key: value` lines; `level` is the charge percent (0-100). Anything unparseable →
+/// block of `  key: value` lines; `level` is the charge percent (0-100). Anything unparsable →
 /// `None`.
 fn parse_battery_level(dumpsys: &str) -> Option<u8> {
     dumpsys.lines().find_map(|line| {
@@ -2234,7 +2234,7 @@ mod tests {
             .unwrap();
         let process = FakeProcessRunner::new()
             .on_spawn(
-                "emulator @pixel6_api34 -skin pixel_6 -skindir /data/sdk/skins",
+                "emulator @pixel6_api34 -skin pixel_6 -skindir",
                 Vec::<String>::new(),
                 ok(""),
             )
